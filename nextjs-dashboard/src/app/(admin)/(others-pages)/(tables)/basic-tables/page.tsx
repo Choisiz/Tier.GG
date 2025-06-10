@@ -11,13 +11,38 @@ export const metadata: Metadata = {
   // other metadata
 };
 
+interface ChampionImageData {
+  name: string;
+  url: string;
+}
+
+interface ApiResponse {
+  championImageUrls: ChampionImageData[];
+}
+
+async function Champion_images() {
+  
+      const response = await fetch('http://localhost:3000/api/champion_images?version=15.11.1&lang=ko_KR');
+      
+      if (!response.ok) {
+        throw new Error('API 호출 실패');
+      }
+      
+      const data: ApiResponse = await response.json();
+      return(
+       <>
+       <BasicTableOne champions={data.championImageUrls}/>
+       </>
+      )
+};
+
 export default function BasicTables() {
   return (
     <div>
-      <PageBreadcrumb pageTitle="Basic Table" />
+      <PageBreadcrumb pageTitle="챔피언 리스트" />
       <div className="space-y-6">
         <ComponentCard title="Basic Table 1">
-          <BasicTableOne />
+          <Champion_images />
         </ComponentCard>
       </div>
     </div>
