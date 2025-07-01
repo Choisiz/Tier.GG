@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {  getLatestVersion,getChampionData, getChampionImageUrl } from '../../../lib/champions';
 
-//GET http://localhost:3000/api/champion_images?version=15.11.1&lang=ko_KR
+//GET http://localhost:3001/api/champion_images?version=15.11.1&lang=ko_KR
 // 버전정보,챔피언이름,챔피언별 스퀘어 이미지
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
