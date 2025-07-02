@@ -85,7 +85,7 @@ export default function BasicTableOne({ champions = [] }: BasicTableOneProps) {
                     </TableCell>
                     
                     <TableCell className="px-5 py-4 text-start">
-                      <Link href={`champions/${championKey}`}>
+                      <Link href={`champions/info/${championKey}`}>
                         <div className="w-14 h-14 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer">
                           <Image
                             width={56}
@@ -100,7 +100,7 @@ export default function BasicTableOne({ champions = [] }: BasicTableOneProps) {
                     
                     <TableCell className="px-4 py-3 text-start">
                       <Link 
-                        href={`champions/${championKey}`}
+                        href={`champions/info/${championKey}`}
                         className="font-medium text-gray-800 text-theme-sm dark:text-white/90 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
                       >
                         {champion.name}
@@ -109,7 +109,7 @@ export default function BasicTableOne({ champions = [] }: BasicTableOneProps) {
                     
                     <TableCell className="px-4 py-3 text-start">
                       <Link
-                        href={`champions/${championKey}`}
+                        href={`champions/skins/${championKey}`}
                         className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                       >
                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
