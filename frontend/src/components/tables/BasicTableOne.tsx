@@ -57,7 +57,7 @@ export default function BasicTableOne({ champions = [] }: BasicTableOneProps) {
                   isHeader
                   className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
                 >
-                  챔피언 이름
+                  챔피언 이름ㄴ
                 </TableCell>
                 <TableCell
                   isHeader

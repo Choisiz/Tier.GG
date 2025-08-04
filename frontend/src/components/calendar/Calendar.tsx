@@ -1,15 +1,15 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
+import dayGridPlugin from "@fullcalendar/daygrid/index.js";
+import timeGridPlugin from "@fullcalendar/timegrid/index.js";
+import interactionPlugin from "@fullcalendar/interaction/index.js";
 import {
   EventInput,
   DateSelectArg,
   EventClickArg,
   EventContentArg,
-} from "@fullcalendar/core";
+} from "@fullcalendar/core/index.js";
 import { useModal } from "@/hooks/useModal";
 import { Modal } from "@/components/ui/modal";
 

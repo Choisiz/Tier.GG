@@ -294,8 +294,8 @@ export default function ChampionDetailPage() {
                 <div className="flex items-center gap-6 mb-4">
                 <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">티어리스트</h2>
                 <p className="text-gray-600 dark:text-gray-300 text-lg">{version} 패치</p>
-              </div>
-            </div>
+              </div>  
+            </div>  
           </div>
 
           {/* 능력치 & 스탯 */}

@@ -22,7 +22,7 @@ interface ApiResponse {
 
 async function Champion_images() {
   
-      const response = await fetch('http://localhost:3001/api/champion_images?version=15.11.1&lang=ko_KR');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/champion_images?version=15.11.1&lang=ko_KR`);
       
       if (!response.ok) {
         throw new Error('API 호출 실패');
