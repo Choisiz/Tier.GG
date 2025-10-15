@@ -1,0 +1,59 @@
+---
+alwaysApply: true
+---
+
+# 🏗️ Tier.GG Architecture Rules
+
+These rules guide how services are designed, connected, and scaled in the Tier.GG project.
+
+## 🔌 Service Boundaries
+
+- Frontend API Routes (Next.js) consume open Riot Data Dragon endpoints only (no API key, minimal interaction).
+- Backend (Express) implements authenticated Riot API access, user-interactive endpoints, and custom algorithms.
+- Airflow handles scheduled data ingestion/processing and writes to databases.
+- Datastores: PostgreSQL for relational data, MongoDB for documents, Redis for caching/queues.
+
+## 🗂️ Repository Structure
+
+- Frontend root: [frontend/](mdc:frontend/README.md)
+- Backend API root: [api/server.js](mdc:api/server.js)
+- Airflow DAGs: [airflow/dags/](mdc:airflow/dags)
+- Database init: [database/init.sql](mdc:database/init.sql)
+- Docker orchestration: [docker-compose.yml](mdc:docker-compose.yml)
+
+## 🌐 Networking & Config
+
+- All services run in Docker and join the `lol-network` bridge.
+- Use environment variables for ports and secrets (`API_PORT`, `FRONTEND_PORT`, `RIOT_API_KEY`, DB URLs).
+- Frontend uses `NEXT_PUBLIC_API_URL` to talk to backend.
+
+## 📡 API Contracts
+
+- Response format must be JSON with consistent envelope on errors.
+- Version endpoints that may evolve (e.g., `/api/v1/...`).
+- Frontend API routes live under `src/app/api/*/route.ts` and return cacheable data.
+
+## 🧱 Data Ownership
+
+- Backend is the source of truth for computed/aggregated analytics.
+- Airflow writes canonical ingested data; API services read from DBs.
+
+## 🛡️ Security
+
+- Never expose secrets in client bundles; keep `RIOT_API_KEY` server-side only.
+- Validate and sanitize all external inputs (query, params, body).
+
+## 🚦 Reliability
+
+- Use retries and timeouts for external Riot API calls.
+- Add DB indexes for high-traffic queries (see [database/init.sql](mdc:database/init.sql)).
+
+## 🚀 Performance
+
+- Frontend leverages `react` cache for Data Dragon reads.
+- Backend leverages Redis for hot endpoints; prefer batched DB reads.
+
+## 🧪 Environments
+
+- Parity across dev/prod through `docker-compose.yml` and `.env`.
+- Feature flags via env variables where behavior diverges.

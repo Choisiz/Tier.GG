@@ -1,0 +1,40 @@
+---
+alwaysApply: true
+---
+
+# ✍️ Edit Discipline & Formatting Integrity
+
+Enforce strict rules to prevent accidental formatting-only diffs and structural drift during edits.
+
+## 🔒 Indentation & Whitespace
+
+- Preserve existing indentation characters (tabs vs spaces) and width exactly.
+- Do not introduce or convert indentation styles.
+- Avoid whitespace-only edits; every change must have functional or content value.
+
+## 🧱 Structural Stability
+
+- Do not collapse multi-line JSX/TSX return blocks into single-line expressions unless required by the task.
+- Keep import order intact unless adding/removing imports.
+- Avoid reformatting unrelated code in the same edit.
+
+## 🧾 Minimal, Targeted Edits
+
+- Limit edits to the smallest diff that accomplishes the goal.
+- When modifying a component, prefer changing only the relevant props/logic.
+- Do not change quote styles, semicolons, or trailing commas unless enforced by linters.
+
+## 🧪 Lint & Build Awareness
+
+- After edits, ensure the code passes ESLint and TypeScript checks (see [eslint.config.mjs](mdc:frontend/eslint.config.mjs) and [tsconfig.json](mdc:frontend/tsconfig.json)).
+- Fix only linter errors introduced by your change; do not mass-fix legacy warnings in unrelated files.
+
+## 🧭 Commit Hygiene
+
+- Group related changes per commit; avoid mixing functional edits with formatting.
+- Use descriptive commit messages following conventional commits (e.g., `feat:`, `fix:`).
+
+## ✅ Example Do/Don't
+
+- ✅ Update only the function you are fixing; keep surrounding code intact.
+- ❌ Rewriting JSX to one-liners or sweeping style changes unrelated to the task.
