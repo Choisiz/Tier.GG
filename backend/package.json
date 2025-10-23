@@ -2,15 +2,23 @@
   "name": "tier-gg-backend",
   "version": "0.1.0",
   "private": true,
-  "main": "server.js",
+  "main": "dist/server.js",
   "license": "MIT",
   "scripts": {
-    "dev": "node server.js",
-    "start": "node server.js"
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
   },
   "dependencies": {
+    "axios": "^1.12.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.9.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.6.3"
   }
 }

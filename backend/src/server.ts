@@ -1,11 +1,13 @@
-const express = require("express");
-const cors = require("cors");
+import "dotenv/config";
+import express from "express";
+import tierRoutes from "./routes/tierRoutes";
+import matchesRoutes from "./routes/matchesRoutes";
 
 const app = express();
-const port = Number(process.env.PORT || 4000);
+const port = Number(process.env.PORT || 5300);
 
 app.use(express.json());
-app.use(cors());
+//app.use(cors());
 
 app.get("/healthz", (_req, res) => {
   res.status(200).json({ ok: true });
@@ -13,11 +15,12 @@ app.get("/healthz", (_req, res) => {
 
 app.get("/", (_req, res) => {
   res.json({
-    name: "tier.gg backend",
-    runtime: "node-express",
     status: "running",
   });
 });
+
+app.use("/info/tier", tierRoutes);
+app.use("/info/matches", matchesRoutes);
 
 app.listen(port, () => {
   console.log(`[backend] listening on http://0.0.0.0:${port}`);
