@@ -11,20 +11,18 @@ export const puuid = async (
   next: NextFunction
 ) => {
   try {
-    const { queue = "RANKED_SOLO_5x5", page = "1" } = req.query as {
-      queue?: string;
-      page?: string;
-    };
-
     const token = process.env.RIOT_API_KEY;
     const base = process.env.RIOT_API_BASE_URL;
-
     if (!token) {
       return res.status(500).json({ error: "Missing RIOT_API_KEY" });
     }
     if (!base) {
       return res.status(500).json({ error: "Missing RIOT_API_BASE_URL" });
     }
+    const { queue = "RANKED_SOLO_5x5", page = "1" } = req.query as {
+      queue?: string;
+      page?: string;
+    };
 
     const TIERS = [
       "IRON",
@@ -58,7 +56,8 @@ export const puuid = async (
             timeout: 10000,
           });
           const items = Array.isArray(response.data) ? response.data : [];
-          for (const it of items) {
+          const limited = items.slice(0, 4); // 조합당 최대 4명으로 제한
+          for (const it of limited) {
             all.push({
               puuid: it.puuid,
               tier: it.tier,
