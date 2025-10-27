@@ -4,7 +4,7 @@ import tierRoutes from "./routes/tierRoutes";
 import matchesRoutes from "./routes/matchesRoutes";
 
 const app = express();
-const port = Number(process.env.PORT || 5300);
+const port = Number(process.env.PORT || 5500);
 
 app.use(express.json());
 //app.use(cors());

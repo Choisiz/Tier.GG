@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import axios from "axios";
+import { insertPlayerMatches } from "../lib/db";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const RATE_PER_SEC = 9;
@@ -12,7 +13,8 @@ export const matches10 = async (
 ) => {
   try {
     const token = process.env.RIOT_API_KEY;
-    const base = process.env.RIOT_API_BASE_URL2;
+    const asiaBase =
+      process.env.RIOT_API_ASIA_BASE_URL || "https://asia.api.riotgames.com";
     if (!token) {
       return res.status(500).json({ error: "Missing RIOT_API_KEY" });
     }
@@ -25,8 +27,8 @@ export const matches10 = async (
 
     //puuid 정보를 가져올 백엔드 주소
     const baseUrl =
-      `http://${process.env.BACKEND_URL}:${process.env.PORT}` ||
-      `http://localhost:5500}`;
+      process.env.INTERNAL_API_BASE_URL ||
+      `http://localhost:${process.env.PORT || 5500}`;
     const tierUrl = `${baseUrl}/info/tier/puuid`;
 
     const tierResp = await axios.get(tierUrl, { timeout: 15000 });
@@ -44,7 +46,7 @@ export const matches10 = async (
     const seen = new Set<string>(); // 이전 puuid에서 이미 본 matchId 누적
     for (const p of puuidAll) {
       try {
-        const url = `${base}/lol/match/v5/matches/by-puuid/${encodeURIComponent(
+        const url = `${asiaBase}/lol/match/v5/matches/by-puuid/${encodeURIComponent(
           p
         )}/ids?count=${perPuuidLimit}`;
         const response = await axios.get(url, {
@@ -58,6 +60,13 @@ export const matches10 = async (
         const filtered = matchIds.filter((id) => !seen.has(id));
         filtered.forEach((id) => seen.add(id));
         results.push({ puuid: p, matchIds: filtered });
+        // 저장
+        try {
+          await insertPlayerMatches(p, filtered);
+        } catch (e) {
+          const err = e as Error;
+          console.error("insertPlayerMatches error:", err.message);
+        }
       } catch {
         results.push({ puuid: p, matchIds: [] });
       }

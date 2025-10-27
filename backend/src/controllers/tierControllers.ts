@@ -1,9 +1,31 @@
 import { Request, Response, NextFunction } from "express";
 import axios from "axios";
+import { upsertPlayer } from "../lib/db";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const RATE_PER_SEC = 9;
 const DELAY_MS = Math.ceil(1000 / RATE_PER_SEC); // 초당 9회 이하로 제한
+
+async function fetchPuuidBySummonerId(
+  base: string,
+  token: string,
+  summonerId: string
+): Promise<string | null> {
+  try {
+    const url = `${base}/lol/summoner/v4/summoners/${encodeURIComponent(
+      summonerId
+    )}`;
+    const resp = await axios.get(url, {
+      headers: { "X-Riot-Token": token },
+      timeout: 10000,
+    });
+    return resp.data?.puuid ?? null;
+  } catch (e) {
+    const err = e as Error;
+    console.error("fetchPuuidBySummonerId error:", err.message);
+    return null;
+  }
+}
 
 export const puuid = async (
   req: Request,
@@ -56,15 +78,36 @@ export const puuid = async (
             timeout: 10000,
           });
           const items = Array.isArray(response.data) ? response.data : [];
-          const limited = items.slice(0, 4); // 조합당 최대 4명으로 제한
+          const limited = items.slice(0, 10); // 조합당 최대 10명으로 제한
           for (const it of limited) {
+            let p: string | null = it.puuid ?? null;
+            if (!p && it.summonerId) {
+              // league/v4 entries에는 puuid가 없을 수 있어 summoner-v4로 조회
+              p = await fetchPuuidBySummonerId(base, token, it.summonerId);
+              // rate limit 보호: summoner 조회 사이에도 약간의 지연
+              await sleep(Math.ceil(DELAY_MS / 2));
+            }
+            if (!p) continue;
             all.push({
-              puuid: it.puuid,
+              puuid: p,
               tier: it.tier,
               rank: it.rank,
               wins: it.wins,
               losses: it.losses,
             });
+            // 저장(upsert)
+            try {
+              await upsertPlayer({
+                puuid: p,
+                tier: it.tier,
+                rank: it.rank,
+                wins: it.wins,
+                losses: it.losses,
+              });
+            } catch (e) {
+              const err = e as Error;
+              console.error("upsertPlayer error:", err.message);
+            }
           }
         } catch (err) {
           // 실패해도 다음 조합으로 진행
