@@ -82,9 +82,7 @@ export const puuid = async (
           for (const it of limited) {
             let p: string | null = it.puuid ?? null;
             if (!p && it.summonerId) {
-              // league/v4 entries에는 puuid가 없을 수 있어 summoner-v4로 조회
               p = await fetchPuuidBySummonerId(base, token, it.summonerId);
-              // rate limit 보호: summoner 조회 사이에도 약간의 지연
               await sleep(Math.ceil(DELAY_MS / 2));
             }
             if (!p) continue;
@@ -95,7 +93,6 @@ export const puuid = async (
               wins: it.wins,
               losses: it.losses,
             });
-            // 저장(upsert)
             try {
               await upsertPlayer({
                 puuid: p,
@@ -110,7 +107,7 @@ export const puuid = async (
             }
           }
         } catch (err) {
-          // 실패해도 다음 조합으로 진행
+          console.error("tierControllers error:", err);
         } finally {
           // 초당 9회 이하로 호출 속도 제한
           await sleep(DELAY_MS);
