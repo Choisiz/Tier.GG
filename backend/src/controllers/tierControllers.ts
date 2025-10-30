@@ -78,7 +78,7 @@ export const puuid = async (
             timeout: 10000,
           });
           const items = Array.isArray(response.data) ? response.data : [];
-          const limited = items.slice(0, 10); // 조합당 최대 10명으로 제한
+          const limited = items.slice(0, 4); // 조합당 최대 4명으로 제한
           for (const it of limited) {
             let p: string | null = it.puuid ?? null;
             if (!p && it.summonerId) {

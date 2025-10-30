@@ -38,3 +38,17 @@ export async function insertPlayerMatches(puuid: string, matchIds: string[]) {
     values
   );
 }
+
+export async function getPuuidsFromDb(limit?: number): Promise<string[]> {
+  if (typeof limit === "number" && limit > 0) {
+    const { rows } = await pool.query(
+      `SELECT puuid FROM players ORDER BY updated_at DESC LIMIT $1`,
+      [limit]
+    );
+    return rows.map((r: any) => r.puuid as string);
+  }
+  const { rows } = await pool.query(
+    `SELECT puuid FROM players ORDER BY updated_at DESC`
+  );
+  return rows.map((r: any) => r.puuid as string);
+}
