@@ -1,10 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import axios from "axios";
 import { insertPlayerMatches, getPuuidsFromDb } from "../lib/db";
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const RATE_PER_SEC = 9;
-const DELAY_MS = Math.ceil(1000 / RATE_PER_SEC); // 초당 9회 이하로 제한
+import { riotRateLimiter } from "../lib/rateLimiter";
 
 export const matches10 = async (
   req: Request,
@@ -14,7 +11,7 @@ export const matches10 = async (
   try {
     const token = process.env.RIOT_API_KEY;
 
-    const base = process.env.RIOT_API_ASIA_BASE_URL;
+    const base = process.env.RIOT_API_ASIA_BASE_URL2;
     if (!token) {
       return res.status(500).json({ error: "Missing RIOT_API_KEY" });
     }
@@ -31,13 +28,11 @@ export const matches10 = async (
       isNaN(puuidListLimit) || puuidListLimit <= 0 ? undefined : puuidListLimit
     );
 
-    // 요청 간 최소 지연: 초당 9회 이하로 제한(사용자가 더 큰 값을 넣으면 그 값 사용)
-    const userDelay = Number(req.query.delayMs || DELAY_MS);
-    const delayMs = isNaN(userDelay) ? DELAY_MS : Math.max(userDelay, DELAY_MS);
     const results: Array<{ puuid: string; matchIds: string[] }> = [];
     const seen = new Set<string>();
     for (const p of puuidAll) {
       try {
+        await riotRateLimiter.wait();
         const url = `${base}/lol/match/v5/matches/by-puuid/${encodeURIComponent(
           p
         )}/ids?count=${perPuuidLimit}`;
@@ -64,7 +59,6 @@ export const matches10 = async (
       } catch {
         results.push({ puuid: p, matchIds: [] });
       }
-      await sleep(delayMs);
     }
 
     return res.json({ ok: true, count: results.length, data: results });

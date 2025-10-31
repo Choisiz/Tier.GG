@@ -1,10 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import axios from "axios";
 import { upsertPlayer } from "../lib/db";
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const RATE_PER_SEC = 9;
-const DELAY_MS = Math.ceil(1000 / RATE_PER_SEC); // 초당 9회 이하로 제한
+import { riotRateLimiter } from "../lib/rateLimiter";
 
 async function fetchPuuidBySummonerId(
   base: string,
@@ -15,6 +12,7 @@ async function fetchPuuidBySummonerId(
     const url = `${base}/lol/summoner/v4/summoners/${encodeURIComponent(
       summonerId
     )}`;
+    await riotRateLimiter.wait();
     const resp = await axios.get(url, {
       headers: { "X-Riot-Token": token },
       timeout: 10000,
@@ -83,7 +81,6 @@ export const puuid = async (
             let p: string | null = it.puuid ?? null;
             if (!p && it.summonerId) {
               p = await fetchPuuidBySummonerId(base, token, it.summonerId);
-              await sleep(Math.ceil(DELAY_MS / 2));
             }
             if (!p) continue;
             all.push({
@@ -108,9 +105,6 @@ export const puuid = async (
           }
         } catch (err) {
           console.error("tierControllers error:", err);
-        } finally {
-          // 초당 9회 이하로 호출 속도 제한
-          await sleep(DELAY_MS);
         }
       }
     }
