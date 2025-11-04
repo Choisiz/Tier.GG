@@ -29,7 +29,9 @@ export const gameInfo = async (
 
     let processed = 0;
     let failed = 0;
+    let skipped = 0;
     const processedMatchIds: string[] = [];
+    const seen = new Set<string>();
 
     while (true) {
       const remain = maxTotal > 0 ? maxTotal - processed : batchSize;
@@ -42,7 +44,12 @@ export const gameInfo = async (
       );
       if (!matchIds || matchIds.length === 0) break;
 
-      for (const matchId of matchIds) {
+      // 이번 요청에서 이미 시도한 match_id는 제외하여 무한 루프 회피
+      const freshIds = matchIds.filter((id) => !seen.has(id));
+      freshIds.forEach((id) => seen.add(id));
+      if (freshIds.length === 0) break;
+
+      for (const matchId of freshIds) {
         try {
           await riotRateLimiter.wait();
           const url = `${base}/lol/match/v5/matches/${encodeURIComponent(
@@ -57,6 +64,12 @@ export const gameInfo = async (
           const info = data?.info || {};
           const gameVersion: string | undefined = info.gameVersion;
           const gameMode: string | undefined = info.gameMode;
+
+          // CLASSIC 모드만 수집
+          if (gameMode !== "CLASSIC") {
+            skipped += 1;
+            continue;
+          }
 
           const teams: any[] = Array.isArray(info.teams) ? info.teams : [];
           const teamIdToBans = new Map<number, number[]>();
@@ -135,7 +148,13 @@ export const gameInfo = async (
       if (maxTotal > 0 && processed >= maxTotal) break;
     }
 
-    return res.json({ ok: true, processed, failed, processedMatchIds });
+    return res.json({
+      ok: true,
+      processed,
+      failed,
+      skipped,
+      processedMatchIds,
+    });
   } catch (error) {
     return next(error);
   }
