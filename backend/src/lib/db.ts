@@ -30,6 +30,13 @@ export type MatchDetailBanRow = {
   banChampionId: number;
 };
 
+export type MatchDetailPerkRow = {
+  matchId: string;
+  puuid: string;
+  slotType: "primary" | "sub";
+  perkId: number;
+};
+
 //플레이어 테이블 - 삽입
 export async function upsertPlayer(args: {
   puuid: string;
@@ -153,6 +160,27 @@ export async function insertMatchDetailBans(rows: MatchDetailBanRow[]) {
     `INSERT INTO match_defails_ban (${columns.join(", ")})
      VALUES ${placeholders.join(",")}
      ON CONFLICT (match_id, puuid, ban_champion_id) DO NOTHING`,
+    values
+  );
+}
+
+// 통합 매치 룬 테이블 - 삽입
+export async function insertMatchDetailPerks(rows: MatchDetailPerkRow[]) {
+  if (!rows || rows.length === 0) return;
+  const columns = ["match_id", "puuid", "slot_type", "perk_id"];
+  const values: any[] = [];
+  const placeholders: string[] = [];
+  rows.forEach((r, i) => {
+    values.push(r.matchId, r.puuid, r.slotType, r.perkId);
+    const baseIndex = i * columns.length + 1;
+    const ph = columns.map((_, j) => `$${baseIndex + j}`);
+    placeholders.push(`(${ph.join(",")})`);
+  });
+
+  await pool.query(
+    `INSERT INTO match_details_perks (${columns.join(", ")})
+     VALUES ${placeholders.join(",")}
+     ON CONFLICT (match_id, puuid, slot_type, perk_id) DO NOTHING`,
     values
   );
 }

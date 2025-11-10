@@ -4,6 +4,8 @@ import {
   upsertMatchDetails,
   MatchDetailRow,
   insertMatchDetailBans,
+  insertMatchDetailPerks,
+  MatchDetailPerkRow,
 } from "../lib/db";
 import { riotRateLimiter } from "../lib/rateLimiter";
 import { getUnprocessedMatchIds } from "../lib/db";
@@ -94,6 +96,7 @@ export const gameInfo = async (
             puuid: string;
             banChampionId: number;
           }[] = [];
+          const perkRows: MatchDetailPerkRow[] = [];
           const rows: MatchDetailRow[] = participantsSrc.map((p) => {
             const teamId = typeof p?.teamId === "number" ? p.teamId : null;
             const bansForTeam =
@@ -106,6 +109,43 @@ export const gameInfo = async (
                   matchId: metadata.matchId || matchId,
                   puuid,
                   banChampionId: banId,
+                });
+              }
+            }
+
+            // perks 수집 (primary/sub)
+            const styles = Array.isArray(p?.perks?.styles) ? p.perks.styles : [];
+            const primary =
+              styles.find((s: any) => s?.description === "primaryStyle") ||
+              styles[0] ||
+              {};
+            const sub =
+              styles.find((s: any) => s?.description === "subStyle") ||
+              styles[1] ||
+              {};
+            const primarySelections = Array.isArray(primary?.selections)
+              ? primary.selections
+              : [];
+            const subSelections = Array.isArray(sub?.selections)
+              ? sub.selections
+              : [];
+            for (const sel of primarySelections) {
+              if (typeof sel?.perk === "number") {
+                perkRows.push({
+                  matchId: metadata.matchId || matchId,
+                  puuid,
+                  slotType: "primary",
+                  perkId: sel.perk,
+                });
+              }
+            }
+            for (const sel of subSelections) {
+              if (typeof sel?.perk === "number") {
+                perkRows.push({
+                  matchId: metadata.matchId || matchId,
+                  puuid,
+                  slotType: "sub",
+                  perkId: sel.perk,
                 });
               }
             }
@@ -137,6 +177,7 @@ export const gameInfo = async (
 
           await upsertMatchDetails(rows);
           await insertMatchDetailBans(banRows);
+          await insertMatchDetailPerks(perkRows);
           processed += 1;
           processedMatchIds.push(matchId);
           if (maxTotal > 0 && processed >= maxTotal) break;
