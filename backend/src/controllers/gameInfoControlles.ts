@@ -114,7 +114,9 @@ export const gameInfo = async (
             }
 
             // perks 수집 (primary/sub)
-            const styles = Array.isArray(p?.perks?.styles) ? p.perks.styles : [];
+            const styles = Array.isArray(p?.perks?.styles)
+              ? p.perks.styles
+              : [];
             const primary =
               styles.find((s: any) => s?.description === "primaryStyle") ||
               styles[0] ||
