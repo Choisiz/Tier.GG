@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import axios from "axios";
-import { insertPlayerMatches, getPuuidsFromDb } from "../lib/db";
+import { insertPlayerMatches, getPuuidsFromDb, hasPlayers } from "../lib/db";
 import { riotRateLimiter } from "../lib/rateLimiter";
 
 export const matches10 = async (
@@ -11,12 +11,18 @@ export const matches10 = async (
   try {
     const token = process.env.RIOT_API_KEY;
 
-    const base = process.env.RIOT_API_ASIA_BASE_URL2;
+    const base = process.env.RIOT_API_ASIA_BASE_URL;
     if (!token) {
       return res.status(500).json({ error: "Missing RIOT_API_KEY" });
     }
     if (!base) {
       return res.status(500).json({ error: "Missing RIOT_API_ASIA_BASE_URL" });
+    }
+    // prerequisite: players must exist
+    if (!(await hasPlayers())) {
+      return res
+        .status(409)
+        .json({ error: "No players in DB. Call /info/tier/puuid first." });
     }
 
     // puuid당 matchId 개수

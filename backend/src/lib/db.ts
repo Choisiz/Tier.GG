@@ -200,6 +200,18 @@ export async function getPuuidsFromDb(limit?: number): Promise<string[]> {
   return rows.map((r: any) => r.puuid as string);
 }
 
+// prerequisites
+export async function hasPlayers(): Promise<boolean> {
+  const { rows } = await pool.query(`SELECT EXISTS (SELECT 1 FROM players) AS e`);
+  return Boolean(rows[0]?.e);
+}
+
+export async function hasPlayerMatches(): Promise<boolean> {
+  const { rows } = await pool.query(
+    `SELECT EXISTS (SELECT 1 FROM player_matches) AS e`
+  );
+  return Boolean(rows[0]?.e);
+}
 // get many unprocessed match_ids (distinct), optionally filtered by puuid
 export async function getUnprocessedMatchIds(
   limit?: number,

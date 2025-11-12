@@ -6,9 +6,10 @@ import {
   insertMatchDetailBans,
   insertMatchDetailPerks,
   MatchDetailPerkRow,
+  insertPlayerMatches,
 } from "../lib/db";
 import { riotRateLimiter } from "../lib/rateLimiter";
-import { getUnprocessedMatchIds } from "../lib/db";
+import { getUnprocessedMatchIds, hasPlayerMatches } from "../lib/db";
 
 export const gameInfo = async (
   req: Request,
@@ -23,6 +24,12 @@ export const gameInfo = async (
     }
     if (!base) {
       return res.status(500).json({ error: "Missing RIOT_API_ASIA_BASE_URL" });
+    }
+    // prerequisite: player_matches must exist
+    if (!(await hasPlayerMatches())) {
+      return res.status(409).json({
+        error: "No player_matches in DB. Call /info/matches/matches10 first.",
+      });
     }
 
     const puuidFilter = String(req.query.puuid || "").trim();
@@ -97,11 +104,15 @@ export const gameInfo = async (
             banChampionId: number;
           }[] = [];
           const perkRows: MatchDetailPerkRow[] = [];
+          const participantPuuids: string[] = [];
           const rows: MatchDetailRow[] = participantsSrc.map((p) => {
             const teamId = typeof p?.teamId === "number" ? p.teamId : null;
             const bansForTeam =
               teamId != null ? teamIdToBans.get(teamId) || [] : [];
             const puuid: string = p?.puuid;
+            if (typeof puuid === "string" && puuid) {
+              participantPuuids.push(puuid);
+            }
 
             for (const banId of bansForTeam) {
               if (typeof banId === "number") {
@@ -176,6 +187,14 @@ export const gameInfo = async (
             };
             return row;
           });
+
+          // FK 보장을 위해 참가자 전원의 (puuid, match_id)를 player_matches에 먼저 보강
+          const uniquePuuids = Array.from(new Set(participantPuuids));
+          for (const p of uniquePuuids) {
+            try {
+              await insertPlayerMatches(p, [matchId]);
+            } catch {}
+          }
 
           await upsertMatchDetails(rows);
           await insertMatchDetailBans(banRows);
