@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { puuid } from "../controllers/tierControllers";
+import { player } from "../controllers/tierControllers";
 
 const router = Router();
 
-router.get("/puuid", puuid);
+router.get("/", player);
 
 export default router;

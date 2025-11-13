@@ -37,8 +37,8 @@ export type MatchDetailPerkRow = {
   perkId: number;
 };
 
-//플레이어 테이블 - 삽입
-export async function upsertPlayer(args: {
+//player 테이블
+export async function insertPlayer(args: {
   puuid: string;
   tier?: string;
   rank?: string;
@@ -46,31 +46,38 @@ export async function upsertPlayer(args: {
   losses?: number;
 }) {
   const { puuid, tier, rank, wins, losses } = args;
-  await pool.query(
-    `INSERT INTO players (puuid, tier, rank, wins, losses)
-     VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (puuid)
-     DO UPDATE SET tier = EXCLUDED.tier, rank = EXCLUDED.rank, wins = EXCLUDED.wins, losses = EXCLUDED.losses, updated_at = NOW()`,
-    [puuid, tier ?? null, rank ?? null, wins ?? null, losses ?? null]
-  );
+  await pool.query("BEGIN");
+  try {
+    await pool.query(`DELETE FROM players WHERE puuid = $1`, [puuid]);
+    await pool.query(
+      `INSERT INTO players (puuid, tier, rank, wins, losses)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [puuid, tier ?? null, rank ?? null, wins ?? null, losses ?? null]
+    );
+    await pool.query("COMMIT");
+  } catch (error) {
+    await pool.query("ROLLBACK");
+    throw error;
+  }
 }
 
-// 플레이어 매치 테이블 - 삽입
+//matches 테이블
 export async function insertPlayerMatches(puuid: string, matchIds: string[]) {
   if (matchIds.length === 0) return;
-  const values: any[] = [];
-  const placeholders: string[] = [];
-  matchIds.forEach((mid, i) => {
-    values.push(puuid, mid);
-    placeholders.push(`($${i * 2 + 1}, $${i * 2 + 2})`);
-  });
-  await pool.query(
-    `INSERT INTO player_matches (puuid, match_id) VALUES ${placeholders.join(
-      ","
-    )}
-     ON CONFLICT (puuid, match_id) DO NOTHING`,
-    values
-  );
+  // 트랜잭션으로 원자성 보장
+  await pool.query("BEGIN");
+  try {
+    await pool.query(
+      `INSERT INTO matches (puuid, match_id)
+       SELECT $1, unnest($2::text[])
+       ON CONFLICT (puuid, match_id) DO NOTHING`,
+      [puuid, matchIds]
+    );
+    await pool.query("COMMIT");
+  } catch (error) {
+    await pool.query("ROLLBACK");
+    throw error;
+  }
 }
 
 // 통합 매치 상세 테이블 - 삽입
@@ -186,85 +193,71 @@ export async function insertMatchDetailPerks(rows: MatchDetailPerkRow[]) {
 }
 
 // get puuid list from db
-export async function getPuuidsFromDb(limit?: number): Promise<string[]> {
-  if (typeof limit === "number" && limit > 0) {
-    const { rows } = await pool.query(
-      `SELECT puuid FROM players ORDER BY updated_at DESC LIMIT $1`,
-      [limit]
-    );
-    return rows.map((r: any) => r.puuid as string);
-  }
+export async function getAllPuuids(): Promise<string[]> {
   const { rows } = await pool.query(
     `SELECT puuid FROM players ORDER BY updated_at DESC`
   );
   return rows.map((r: any) => r.puuid as string);
 }
 
-// prerequisites
-export async function hasPlayers(): Promise<boolean> {
-  const { rows } = await pool.query(`SELECT EXISTS (SELECT 1 FROM players) AS e`);
-  return Boolean(rows[0]?.e);
-}
-
-export async function hasPlayerMatches(): Promise<boolean> {
-  const { rows } = await pool.query(
-    `SELECT EXISTS (SELECT 1 FROM player_matches) AS e`
-  );
-  return Boolean(rows[0]?.e);
-}
-// get many unprocessed match_ids (distinct), optionally filtered by puuid
-export async function getUnprocessedMatchIds(
-  limit?: number,
-  puuid?: string
-): Promise<string[]> {
-  if (puuid && puuid.trim() !== "") {
-    if (typeof limit === "number" && limit > 0) {
-      const { rows } = await pool.query(
-        `SELECT DISTINCT ON (pm.match_id) pm.match_id
-         FROM player_matches pm
-         WHERE pm.puuid = $1
-           AND NOT EXISTS (
-             SELECT 1 FROM match_details md WHERE md.match_id = pm.match_id
-           )
-         ORDER BY pm.match_id, pm.created_at DESC
-         LIMIT $2`,
-        [puuid, limit]
-      );
-      return rows.map((r: any) => r.match_id as string);
-    }
-    const { rows } = await pool.query(
-      `SELECT DISTINCT ON (pm.match_id) pm.match_id
-       FROM player_matches pm
-       WHERE pm.puuid = $1
-         AND NOT EXISTS (
-           SELECT 1 FROM match_details md WHERE md.match_id = pm.match_id
-         )
-       ORDER BY pm.match_id, pm.created_at DESC`,
-      [puuid]
-    );
-    return rows.map((r: any) => r.match_id as string);
-  }
-
+export async function getAllMatchIds(limit?: number): Promise<string[]> {
+  const params: any[] = [];
+  let sql = `
+    SELECT DISTINCT ON (m.match_id) m.match_id
+    FROM matches m
+    ORDER BY m.match_id, m.created_at DESC
+  `;
   if (typeof limit === "number" && limit > 0) {
-    const { rows } = await pool.query(
-      `SELECT DISTINCT ON (pm.match_id) pm.match_id
-       FROM player_matches pm
-       WHERE NOT EXISTS (
-         SELECT 1 FROM match_details md WHERE md.match_id = pm.match_id
-       )
-       ORDER BY pm.match_id, pm.created_at DESC
-       LIMIT $1`,
-      [limit]
-    );
-    return rows.map((r: any) => r.match_id as string);
+    params.push(limit);
+    sql += ` LIMIT $${params.length}`;
   }
-  const { rows } = await pool.query(
-    `SELECT DISTINCT ON (pm.match_id) pm.match_id
-     FROM player_matches pm
-     WHERE NOT EXISTS (
-       SELECT 1 FROM match_details md WHERE md.match_id = pm.match_id
-     )
-     ORDER BY pm.match_id, pm.created_at DESC`
-  );
+  const { rows } = await pool.query(sql, params);
   return rows.map((r: any) => r.match_id as string);
+}
+
+//players 테이블 존재여부확인
+export async function hasPlayers(): Promise<boolean> {
+  const { rows } = await pool.query(
+    `SELECT EXISTS (SELECT 1 FROM players) AS e`
+  );
+  return Boolean(rows[0]?.e);
+}
+//matches 테이블 존재여부확인
+export async function hasMatches(): Promise<boolean> {
+  const { rows } = await pool.query(
+    `SELECT EXISTS (SELECT 1 FROM matches) AS e`
+  );
+  return Boolean(rows[0]?.e);
+}
+
+/**
+ * deleteMatchDetailsByMatchIds
+ * - 목적: 주어진 match_id 집합에 대해 상세/부가 테이블 데이터를 삭제한다.
+ * - 대상 테이블:
+ *   - match_details_perks
+ *   - match_defails_ban
+ *   - match_details
+ * - 주의: matches 테이블은 건드리지 않는다(참가자-매치 관계 유지).
+ */
+export async function deleteMatchDetailsByMatchIds(matchIds: string[]) {
+  if (!Array.isArray(matchIds) || matchIds.length === 0) return;
+  await pool.query("BEGIN");
+  try {
+    await pool.query(
+      `DELETE FROM match_details_perks WHERE match_id = ANY($1::text[])`,
+      [matchIds]
+    );
+    await pool.query(
+      `DELETE FROM match_defails_ban WHERE match_id = ANY($1::text[])`,
+      [matchIds]
+    );
+    await pool.query(
+      `DELETE FROM match_details WHERE match_id = ANY($1::text[])`,
+      [matchIds]
+    );
+    await pool.query("COMMIT");
+  } catch (error) {
+    await pool.query("ROLLBACK");
+    throw error;
+  }
 }

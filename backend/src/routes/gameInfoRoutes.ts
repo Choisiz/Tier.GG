@@ -3,6 +3,6 @@ import { gameInfo } from "../controllers/gameInfoControlles";
 
 const router = Router();
 
-router.get("/gameInfo", gameInfo);
+router.get("/", gameInfo);
 
 export default router;

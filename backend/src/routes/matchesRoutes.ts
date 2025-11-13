@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { matches10 } from "../controllers/matchesControllers";
+import { matches } from "../controllers/matchesControllers";
 
 const router = Router();
 
-router.get("/matches10", matches10);
+router.get("/", matches);
 
 export default router;

@@ -1,6 +1,6 @@
 import "dotenv/config";
 import express from "express";
-import tierRoutes from "./routes/tierRoutes";
+import playerRoutes from "./routes/playerRoutes";
 import matchesRoutes from "./routes/matchesRoutes";
 import gameInfoRoutes from "./routes/gameInfoRoutes";
 const app = express();
@@ -19,7 +19,7 @@ app.get("/", (_req, res) => {
   });
 });
 
-app.use("/info/tier", tierRoutes);
+app.use("/info/player", playerRoutes);
 app.use("/info/matches", matchesRoutes);
 app.use("/info/gameInfo", gameInfoRoutes);
 

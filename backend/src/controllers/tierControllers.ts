@@ -1,35 +1,9 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import axios from "axios";
-import { upsertPlayer } from "../lib/db";
+import { insertPlayer } from "../lib/db";
 import { riotRateLimiter } from "../lib/rateLimiter";
 
-async function fetchPuuidBySummonerId(
-  base: string,
-  token: string,
-  summonerId: string
-): Promise<string | null> {
-  try {
-    const url = `${base}/lol/summoner/v4/summoners/${encodeURIComponent(
-      summonerId
-    )}`;
-    await riotRateLimiter.wait();
-    const resp = await axios.get(url, {
-      headers: { "X-Riot-Token": token },
-      timeout: 10000,
-    });
-    return resp.data?.puuid ?? null;
-  } catch (e) {
-    const err = e as Error;
-    console.error("fetchPuuidBySummonerId error:", err.message);
-    return null;
-  }
-}
-
-export const puuid = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const player = async (req: Request, res: Response) => {
   try {
     const token = process.env.RIOT_API_KEY;
     const base = process.env.RIOT_API_BASE_URL;
@@ -63,52 +37,52 @@ export const puuid = async (
       losses: number;
     }> = [];
 
-    for (const t of TIERS) {
-      for (const d of DIVISIONS) {
+    for (const tier of TIERS) {
+      for (const division of DIVISIONS) {
         const url = `${base}/lol/league/v4/entries/${encodeURIComponent(
           queue
-        )}/${encodeURIComponent(t)}/${encodeURIComponent(
-          d
+        )}/${encodeURIComponent(tier)}/${encodeURIComponent(
+          division
         )}?page=${encodeURIComponent(page)}`;
         try {
+          await riotRateLimiter.wait();
           const response = await axios.get(url, {
             headers: { "X-Riot-Token": token },
             timeout: 10000,
           });
           const items = Array.isArray(response.data) ? response.data : [];
-          const limited = items.slice(0, 4); // 조합당 최대 4명으로 제한
-          for (const it of limited) {
-            let p: string | null = it.puuid ?? null;
-            if (!p && it.summonerId) {
-              p = await fetchPuuidBySummonerId(base, token, it.summonerId);
-            }
-            if (!p) continue;
+          const limited = items.slice(0, 4); // 티어당 최대 4명으로 제한
+          for (const player of limited) {
+            const resolvedPuuid: string | null = player.puuid ?? null;
+            if (!resolvedPuuid) continue;
             all.push({
-              puuid: p,
-              tier: it.tier,
-              rank: it.rank,
-              wins: it.wins,
-              losses: it.losses,
+              puuid: resolvedPuuid,
+              tier: player.tier,
+              rank: player.rank,
+              wins: player.wins,
+              losses: player.losses,
             });
             try {
-              await upsertPlayer({
-                puuid: p,
-                tier: it.tier,
-                rank: it.rank,
-                wins: it.wins,
-                losses: it.losses,
+              //DB에 저장
+              await insertPlayer({
+                puuid: resolvedPuuid,
+                tier: player.tier,
+                rank: player.rank,
+                wins: player.wins,
+                losses: player.losses,
               });
-            } catch (e) {
-              const err = e as Error;
-              console.error("upsertPlayer error:", err.message);
+            } catch (err) {
+              console.error("insertPlayer error:", err);
             }
           }
         } catch (err) {
-          console.error("tierControllers error:", err);
+          console.error("tierControllers api error:", err);
         }
       }
     }
-
     return res.json({ ok: true, count: all.length, data: all });
-  } catch (error) {}
+  } catch (err) {
+    console.error("tierControllers error:", err);
+    return res.status(500).json({ ok: false, error: "tierControllers error" });
+  }
 };

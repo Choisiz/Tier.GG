@@ -1,16 +1,15 @@
 import { Request, Response, NextFunction } from "express";
 import axios from "axios";
-import { insertPlayerMatches, getPuuidsFromDb, hasPlayers } from "../lib/db";
+import { insertPlayerMatches, getAllPuuids, hasPlayers } from "../lib/db";
 import { riotRateLimiter } from "../lib/rateLimiter";
 
-export const matches10 = async (
+export const matches = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const token = process.env.RIOT_API_KEY;
-
     const base = process.env.RIOT_API_ASIA_BASE_URL;
     if (!token) {
       return res.status(500).json({ error: "Missing RIOT_API_KEY" });
@@ -18,55 +17,52 @@ export const matches10 = async (
     if (!base) {
       return res.status(500).json({ error: "Missing RIOT_API_ASIA_BASE_URL" });
     }
-    // prerequisite: players must exist
+
+    //players 테이블 존재여부확인
     if (!(await hasPlayers())) {
       return res
         .status(409)
-        .json({ error: "No players in DB. Call /info/tier/puuid first." });
+        .json({ error: "No players in DB. Call /info/player first." });
     }
 
-    // puuid당 matchId 개수
-    const perPuuidLimit = Number(req.query.limit || 5);
+    // puuid당 matchId 개수 5개로 제한(고정)
+    const perPuuidLimit = 5;
 
-    // DB에서 PUUID 목록 가져오기
-    const puuidListLimit = Number(req.query.puuidLimit || 0);
-    const puuidAll: string[] = await getPuuidsFromDb(
-      isNaN(puuidListLimit) || puuidListLimit <= 0 ? undefined : puuidListLimit
-    );
+    // DB에서 모든 PUUID 가져오기
+    const puuidAll: string[] = await getAllPuuids();
 
     const results: Array<{ puuid: string; matchIds: string[] }> = [];
     const seen = new Set<string>();
-    for (const p of puuidAll) {
+
+    for (const puuid of puuidAll) {
       try {
         await riotRateLimiter.wait();
         const url = `${base}/lol/match/v5/matches/by-puuid/${encodeURIComponent(
-          p
+          puuid
         )}/ids?count=${perPuuidLimit}`;
         const response = await axios.get(url, {
           headers: { "X-Riot-Token": token },
           timeout: 10000,
         });
         const matchIds: string[] = Array.isArray(response.data)
-          ? response.data.slice(0, perPuuidLimit)
+          ? response.data
           : [];
 
-        // 이전 puuid에서 이미 포함된 matchId는 제거
+        //플레이어별 중복 matchId 제거
         const filtered = matchIds.filter((id) => !seen.has(id));
         filtered.forEach((id) => seen.add(id));
-        results.push({ puuid: p, matchIds: filtered });
+        results.push({ puuid: puuid, matchIds: filtered });
 
         // DB에 저장
         try {
-          await insertPlayerMatches(p, filtered);
-        } catch (e) {
-          const err = e as Error;
-          console.error("insertPlayerMatches error:", err.message);
+          await insertPlayerMatches(puuid, filtered);
+        } catch (err) {
+          console.error("insertPlayerMatches error:", err);
         }
-      } catch {
-        results.push({ puuid: p, matchIds: [] });
+      } catch (err) {
+        console.error("fetch match ids error:", { puuid, err });
       }
     }
-
     return res.json({ ok: true, count: results.length, data: results });
   } catch (error) {
     return next(error);
