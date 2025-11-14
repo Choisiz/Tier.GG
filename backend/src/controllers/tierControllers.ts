@@ -50,10 +50,12 @@ export const player = async (req: Request, res: Response) => {
             headers: { "X-Riot-Token": token },
             timeout: 10000,
           });
+          console.log("response", response);
           const items = Array.isArray(response.data) ? response.data : [];
           const limited = items.slice(0, 4); // 티어당 최대 4명으로 제한
           for (const player of limited) {
-            const resolvedPuuid: string | null = player.puuid ?? null;
+            // 환경상 entries 응답에 puuid가 항상 포함됨
+            const resolvedPuuid: string | null = (player as any)?.puuid ?? null;
             if (!resolvedPuuid) continue;
             all.push({
               puuid: resolvedPuuid,
@@ -72,17 +74,17 @@ export const player = async (req: Request, res: Response) => {
                 losses: player.losses,
               });
             } catch (err) {
-              console.error("insertPlayer error:", err);
+              //console.error("insertPlayer error:", err);
             }
           }
         } catch (err) {
-          console.error("tierControllers api error:", err);
+          //console.error("tierControllers api error:", err);
         }
       }
     }
     return res.json({ ok: true, count: all.length, data: all });
   } catch (err) {
-    console.error("tierControllers error:", err);
+    //console.error("tierControllers error:", err);
     return res.status(500).json({ ok: false, error: "tierControllers error" });
   }
 };

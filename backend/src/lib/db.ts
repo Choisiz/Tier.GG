@@ -63,16 +63,17 @@ export async function insertPlayer(args: {
 
 //matches 테이블
 export async function insertPlayerMatches(puuid: string, matchIds: string[]) {
-  if (matchIds.length === 0) return;
-  // 트랜잭션으로 원자성 보장
   await pool.query("BEGIN");
   try {
-    await pool.query(
-      `INSERT INTO matches (puuid, match_id)
-       SELECT $1, unnest($2::text[])
-       ON CONFLICT (puuid, match_id) DO NOTHING`,
-      [puuid, matchIds]
-    );
+    await pool.query(`DELETE FROM matches WHERE puuid = $1`, [puuid]);
+    if (Array.isArray(matchIds) && matchIds.length > 0) {
+      await pool.query(
+        `INSERT INTO matches (puuid, match_id)
+         SELECT $1, unnest($2::text[])
+         ON CONFLICT (puuid, match_id) DO NOTHING`,
+        [puuid, matchIds]
+      );
+    }
     await pool.query("COMMIT");
   } catch (error) {
     await pool.query("ROLLBACK");
@@ -81,7 +82,7 @@ export async function insertPlayerMatches(puuid: string, matchIds: string[]) {
 }
 
 // 통합 매치 상세 테이블 - 삽입
-export async function upsertMatchDetails(rows: MatchDetailRow[]) {
+export async function insertMatchDetails(rows: MatchDetailRow[]) {
   if (!rows || rows.length === 0) return;
   const columns = [
     "match_id",
@@ -129,7 +130,7 @@ export async function upsertMatchDetails(rows: MatchDetailRow[]) {
   });
 
   await pool.query(
-    `INSERT INTO match_details (${columns.join(", ")})
+    `INSERT INTO gameinfo (${columns.join(", ")})
      VALUES ${placeholders.join(",")}
      ON CONFLICT (match_id, puuid) DO UPDATE SET
        game_version = EXCLUDED.game_version,
@@ -164,7 +165,7 @@ export async function insertMatchDetailBans(rows: MatchDetailBanRow[]) {
   });
 
   await pool.query(
-    `INSERT INTO match_defails_ban (${columns.join(", ")})
+    `INSERT INTO gameinfo_bans (${columns.join(", ")})
      VALUES ${placeholders.join(",")}
      ON CONFLICT (match_id, puuid, ban_champion_id) DO NOTHING`,
     values
@@ -185,14 +186,14 @@ export async function insertMatchDetailPerks(rows: MatchDetailPerkRow[]) {
   });
 
   await pool.query(
-    `INSERT INTO match_details_perks (${columns.join(", ")})
+    `INSERT INTO gameinfo_perks (${columns.join(", ")})
      VALUES ${placeholders.join(",")}
      ON CONFLICT (match_id, puuid, slot_type, perk_id) DO NOTHING`,
     values
   );
 }
 
-// get puuid list from db
+//puuid 목록 조회
 export async function getAllPuuids(): Promise<string[]> {
   const { rows } = await pool.query(
     `SELECT puuid FROM players ORDER BY updated_at DESC`
@@ -200,7 +201,11 @@ export async function getAllPuuids(): Promise<string[]> {
   return rows.map((r: any) => r.puuid as string);
 }
 
-export async function getAllMatchIds(limit?: number): Promise<string[]> {
+//match_id 목록 조회
+export async function getAllMatchIds(
+  limit?: number,
+  offset?: number
+): Promise<string[]> {
   const params: any[] = [];
   let sql = `
     SELECT DISTINCT ON (m.match_id) m.match_id
@@ -211,8 +216,34 @@ export async function getAllMatchIds(limit?: number): Promise<string[]> {
     params.push(limit);
     sql += ` LIMIT $${params.length}`;
   }
+  if (typeof offset === "number" && offset > 0) {
+    params.push(offset);
+    sql += ` OFFSET $${params.length}`;
+  }
   const { rows } = await pool.query(sql, params);
   return rows.map((r: any) => r.match_id as string);
+}
+
+export async function deleteMatchDetailsByMatchIds(matchIds: string[]) {
+  if (!Array.isArray(matchIds) || matchIds.length === 0) return;
+  await pool.query("BEGIN");
+  try {
+    await pool.query(
+      `DELETE FROM gameinfo_perks WHERE match_id = ANY($1::text[])`,
+      [matchIds]
+    );
+    await pool.query(
+      `DELETE FROM gameinfo_bans WHERE match_id = ANY($1::text[])`,
+      [matchIds]
+    );
+    await pool.query(`DELETE FROM gameinfo WHERE match_id = ANY($1::text[])`, [
+      matchIds,
+    ]);
+    await pool.query("COMMIT");
+  } catch (error) {
+    await pool.query("ROLLBACK");
+    throw error;
+  }
 }
 
 //players 테이블 존재여부확인
@@ -228,36 +259,4 @@ export async function hasMatches(): Promise<boolean> {
     `SELECT EXISTS (SELECT 1 FROM matches) AS e`
   );
   return Boolean(rows[0]?.e);
-}
-
-/**
- * deleteMatchDetailsByMatchIds
- * - 목적: 주어진 match_id 집합에 대해 상세/부가 테이블 데이터를 삭제한다.
- * - 대상 테이블:
- *   - match_details_perks
- *   - match_defails_ban
- *   - match_details
- * - 주의: matches 테이블은 건드리지 않는다(참가자-매치 관계 유지).
- */
-export async function deleteMatchDetailsByMatchIds(matchIds: string[]) {
-  if (!Array.isArray(matchIds) || matchIds.length === 0) return;
-  await pool.query("BEGIN");
-  try {
-    await pool.query(
-      `DELETE FROM match_details_perks WHERE match_id = ANY($1::text[])`,
-      [matchIds]
-    );
-    await pool.query(
-      `DELETE FROM match_defails_ban WHERE match_id = ANY($1::text[])`,
-      [matchIds]
-    );
-    await pool.query(
-      `DELETE FROM match_details WHERE match_id = ANY($1::text[])`,
-      [matchIds]
-    );
-    await pool.query("COMMIT");
-  } catch (error) {
-    await pool.query("ROLLBACK");
-    throw error;
-  }
 }

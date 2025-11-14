@@ -23,7 +23,7 @@
 
 - 3. 매치 상세 배치 수집 및 저장
   - GET http://localhost:5500/info/gameInfo/gameInfo
-  - 설명: `matches`에서 미처리 matchId를 가져와 Riot API 조회 후 `match_details`, `match_defails_ban`, `match_details_perks` 저장
+  - 설명: `matches`에서 미처리 matchId를 가져와 Riot API 조회 후 `gameinfo`, `gameinfo_bans`, `gameinfo_perks` 저장
   - 규칙:
     - gameMode가 CLASSIC인 매치만 저장
     - 레이트리미트 적용: 초당 9회, 2분당 100회 미만
