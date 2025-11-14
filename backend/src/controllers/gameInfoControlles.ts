@@ -30,7 +30,7 @@ function buildRowsFromMatch(info: any, metadata: any, matchIdFallback: string) {
       .map((summoner: any) =>
         typeof summoner?.championId === "number" ? summoner.championId : null
       )
-      .filter((x: number | null) => typeof x === "number") as number[];
+      .filter((x: number | null) => typeof x === "number" && x > 0) as number[];
     teamIdToBans.set(teamId, ban_ids);
   }
 
@@ -72,7 +72,7 @@ function buildRowsFromMatch(info: any, metadata: any, matchIdFallback: string) {
     for (let i = 0; i < pairCount; i++) {
       const puuid: string = players[i].puuid;
       const banId = bans[i];
-      if (typeof banId === "number") {
+      if (typeof banId === "number" && banId > 0) {
         banRows.push({
           matchId,
           puuid,
