@@ -16,6 +16,11 @@ check_health() {
   fi
 }
 
+db_exec() {
+  local sql="$1"
+  docker compose -f docker-compose.db.yml exec -T db psql -U app -d tier -v ON_ERROR_STOP=1 -c "$sql"
+}
+
 call() {
   local url="$1"
   shift || true
@@ -27,17 +32,28 @@ call() {
 main() {
   check_health
 
-  say "[1/3] 티어 → 플레이어 수집"
+  say "[1/4] 티어 → 플레이어 수집"
+  say "CLEAN: players"
+  db_exec "TRUNCATE TABLE players RESTART IDENTITY;"
   call "${BASE_URL}/info/player" \
     -G --data-urlencode "queue=${queue}" \
        --data-urlencode "page=${page}"
 
-  say "[2/3] 플레이어 → 매치ID 수집"
+  say "[2/4] 플레이어 → 매치ID 수집"
+  say "CLEAN: matches"
+  db_exec "TRUNCATE TABLE matches RESTART IDENTITY;"
   call "${BASE_URL}/info/matches"
 
-  say "[3/3] 매치 상세(클래식만) 수집"
+  say "[3/4] 매치 상세(클래식만) 수집"
+  say "CLEAN: gameinfo*, 순서 중요"
+  db_exec "TRUNCATE TABLE gameinfo_perks, gameinfo_bans, gameinfo RESTART IDENTITY;"
   call "${BASE_URL}/info/gameInfo" \
     -G --data-urlencode "batchSize=${batchSize}"
+
+  say "[4/4] 챔피언 집계 저장"
+  say "CLEAN: champion"
+  db_exec "TRUNCATE TABLE champion RESTART IDENTITY;"
+  call "${BASE_URL}/info/champion"
 
   say "DONE"
 }
