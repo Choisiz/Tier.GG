@@ -7,6 +7,10 @@ queue="${QUEUE:-RANKED_SOLO_5x5}"
 page="${PAGE:-1}"
 batchSize="${BATCH_SIZE:-20}"
 
+# script dir and project root (backend/scripts -> project root is parent of backend)
+SCRIPT_DIR="$(cd -- "$(dirname "$0")" >/dev/null 2>&1; pwd -P)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." >/dev/null 2>&1; pwd -P)"
+
 say() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 
 check_health() {
@@ -18,7 +22,7 @@ check_health() {
 
 db_exec() {
   local sql="$1"
-  docker compose -f docker-compose.db.yml exec -T db psql -U app -d tier -v ON_ERROR_STOP=1 -c "$sql"
+  docker compose -f "${ROOT_DIR}/docker-compose.db.yml" exec -T db psql -U app -d tier -v ON_ERROR_STOP=1 -c "$sql"
 }
 
 call() {
