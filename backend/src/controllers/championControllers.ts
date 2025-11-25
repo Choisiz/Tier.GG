@@ -1,6 +1,19 @@
 import { Request, Response } from "express";
 import { pool } from "../lib/db";
 
+// 챔피언 티어 계산에 사용되는 최소 필드 묶음
+type ChampionTierRow = {
+  champion_id: number;
+  position: string;
+  position_pick: number;
+  position_wins: number;
+  rate_position_pick: number;
+  rate_position_win: number;
+  rate_total_ban: number;
+  adjusted_win_rate: number;
+  confidence: number;
+};
+
 export const champion = async (req: Request, res: Response) => {
   try {
     // 기준일: 오늘 날짜(UTC 기준)
@@ -292,6 +305,178 @@ export const champion = async (req: Request, res: Response) => {
     return res.status(500).json({
       ok: false,
       error: "champion aggregation failed",
+      detail: e?.message || String(e),
+    });
+  }
+};
+
+export const championTierList = async (req: Request, res: Response) => {
+  try {
+    const priorPick = Number(process.env.TIER_PRIOR_PICK ?? 15);
+    const priorWinRate = Number(process.env.TIER_PRIOR_WIN_RATE ?? 50);
+    const sampleThreshold = Number(process.env.TIER_SAMPLE_THRESHOLD ?? 30);
+
+    const statDateParam = (req.query.statDate as string) || null;
+
+    let statDate = statDateParam;
+    if (!statDate) {
+      const { rows } = await pool.query(
+        `SELECT MAX(stat_date) AS max_date FROM champion`
+      );
+      statDate = rows[0]?.max_date;
+    }
+
+    if (!statDate) {
+      return res.status(404).json({ ok: false, error: "no champion data" });
+    }
+
+    // champion 테이블에서 포지션별 집계 데이터 조회
+    const { rows } = await pool.query(
+      `
+      SELECT
+        champion_id,
+        position,
+        position_pick,
+        position_wins,
+        rate_position_pick,
+        rate_position_win,
+        rate_total_ban
+      FROM champion
+      WHERE stat_date = $1
+      `,
+      [statDate]
+    );
+
+    if (!rows.length) {
+      return res
+        .status(404)
+        .json({ ok: false, error: "no champion data", statDate });
+    }
+
+    const grouped = new Map<string, ChampionTierRow[]>();
+    for (const r of rows) {
+      const key = r.position || "UNKNOWN";
+      const arr = grouped.get(key) || [];
+      const position_pick = Number(r.position_pick || 0);
+      const rate_position_win = Number(r.rate_position_win || 0);
+      const adjusted_win_rate =
+        position_pick > 0
+          ? (rate_position_win * position_pick + priorWinRate * priorPick) /
+            (position_pick + priorPick)
+          : priorWinRate;
+      const confidence =
+        position_pick > 0
+          ? Math.max(
+              0,
+              Math.min(1, position_pick / Math.max(sampleThreshold, 1))
+            )
+          : 0;
+      arr.push({
+        champion_id: Number(r.champion_id),
+        position: key,
+        position_pick,
+        position_wins: Number(r.position_wins || 0),
+        rate_position_pick: Number(r.rate_position_pick || 0),
+        rate_position_win,
+        rate_total_ban: Number(r.rate_total_ban || 0),
+        adjusted_win_rate,
+        confidence,
+      });
+      grouped.set(key, arr);
+    }
+
+    const result: Array<{
+      statDate: string;
+      position: string;
+      championId: number;
+      tier: string;
+      pickCount: number;
+      winCount: number;
+      pickRate: number;
+      winRate: number;
+      banRate: number;
+      score: number;
+    }> = [];
+
+    // 간단한 퍼센타일 계산기 (0~1 사이 값으로 정규화)
+    const percentile = (
+      items: ChampionTierRow[],
+      selector: (row: ChampionTierRow) => number
+    ): Map<string, number> => {
+      const sorted = [...items]
+        .map((row) => ({ row, value: selector(row) }))
+        .sort((a, b) => a.value - b.value);
+      const map = new Map<string, number>();
+      const n = sorted.length;
+      if (n === 1) {
+        const onlyKey = `${sorted[0].row.champion_id}__${sorted[0].row.position}`;
+        map.set(onlyKey, 1);
+        return map;
+      }
+      sorted.forEach((entry, idx) => {
+        const key = `${entry.row.champion_id}__${entry.row.position}`;
+        map.set(key, idx / (n - 1));
+      });
+      return map;
+    };
+
+    for (const [position, items] of grouped.entries()) {
+      // 승률/픽률/벤률 각각을 퍼센타일로 정규화
+      const winMap = percentile(items, (row) => row.adjusted_win_rate);
+      const pickMap = percentile(items, (row) => row.rate_position_pick);
+      const banMap = percentile(items, (row) => row.rate_total_ban);
+
+      const scored = items
+        .map((row) => {
+          const key = `${row.champion_id}__${row.position}`;
+          const score =
+            (winMap.get(key) || 0) * 0.6 +
+            (pickMap.get(key) || 0) * 0.3 +
+            (banMap.get(key) || 0) * 0.1;
+          const confidenceScore = score * (row.confidence || 0);
+          return { row, score: confidenceScore };
+        })
+        .sort((a, b) => b.score - a.score);
+
+      scored.forEach((entry, idx) => {
+        // 포지션별 최고점 챔피언은 OP, 이후 비율 기준으로 1~4티어 배정
+        const tier = (() => {
+          if (idx === 0) return "OP";
+          if (scored.length === 1) return "OP";
+          const ratio = scored.length > 1 ? idx / (scored.length - 1) : 1;
+          if (ratio <= 0.25) return "1tier";
+          if (ratio <= 0.5) return "2tier";
+          if (ratio <= 0.75) return "3tier";
+          return "4tier";
+        })();
+
+        result.push({
+          statDate,
+          position,
+          championId: entry.row.champion_id,
+          tier,
+          pickCount: entry.row.position_pick,
+          winCount: entry.row.position_wins,
+          pickRate: entry.row.rate_position_pick,
+          winRate: entry.row.rate_position_win,
+          banRate: entry.row.rate_total_ban,
+          score: Math.round(entry.score * 1000) / 1000,
+        });
+      });
+    }
+
+    return res.json({
+      ok: true,
+      statDate,
+      count: result.length,
+      data: result,
+    });
+  } catch (err) {
+    const e = err as any;
+    console.error("champion tier list failed:", e?.message || e, e?.stack);
+    return res.status(500).json({
+      ok: false,
+      error: "champion tier list failed",
       detail: e?.message || String(e),
     });
   }
