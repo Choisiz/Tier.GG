@@ -10,11 +10,18 @@ export async function GET(req: Request) {
 
     try{
         const champions = await getChampionData(version, language);
-        const championNames = Object.keys(champions.data); 
-        const championImageUrls = championNames.map(name=>({
+        type ChampionSummary = { key?: string };
+        const entries = Object.entries(champions.data) as Array<
+          [string, ChampionSummary]
+        >;
+        const championImageUrls = entries.map(([name, info]) => {
+          const championId = Number(info?.key ?? 0);
+          return {
             name,
-            url: getChampionImageUrl(version, name)
-        }));
+            championId,
+            url: getChampionImageUrl(version, name),
+          };
+        });
         return NextResponse.json({ championImageUrls });
     }catch(e){
         console.log('error',e)

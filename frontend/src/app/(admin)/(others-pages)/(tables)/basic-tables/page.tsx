@@ -1,6 +1,6 @@
 import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import BasicTableOne from "@/components/tables/BasicTableOne";
+import ChampionTablePanel from "@/components/tables/ChampionTablePanel";
 import { Metadata } from "next";
 import React from "react";
 
@@ -14,24 +14,145 @@ export const metadata: Metadata = {
 interface ChampionImageData {
   name: string;
   url: string;
+  championId?: number;
+  tier?: string | null;
+  tiersByPosition?: Record<string, string | null>;
+  positionDetails?: Record<string, TierDetail>;
+  pickCount?: number | null;
+  winCount?: number | null;
+  pickRate?: number | null;
+  winRate?: number | null;
+  banRate?: number | null;
 }
 
 interface ApiResponse {
   championImageUrls: ChampionImageData[];
 }
 
+interface ChampionTierResponse {
+  ok: boolean;
+  data: Array<{
+    championId: number;
+    tier: string;
+    position: string;
+    score: number;
+    pickCount: number;
+    winCount: number;
+    pickRate: number;
+    winRate: number;
+    banRate: number;
+  }>;
+}
+
+interface TierDetail {
+  tier: string;
+  position: string;
+  pickCount: number;
+  winCount: number;
+  pickRate: number;
+  winRate: number;
+  banRate: number;
+}
+
+const tierPriority: Record<string, number> = {
+  OP: 0,
+  "1tier": 1,
+  "2tier": 2,
+  "3tier": 3,
+  "4tier": 4,
+};
+
+const buildTierMaps = (tiers: ChampionTierResponse["data"] = []) => {
+  const bestDetail = new Map<number, TierDetail>();
+  const tierByPosition = new Map<number, Record<string, string>>();
+  const detailByPosition = new Map<number, Record<string, TierDetail>>();
+
+  for (const data of tiers) {
+    const detail: TierDetail = {
+      tier: data.tier,
+      position: data.position,
+      pickCount: data.pickCount,
+      winCount: data.winCount,
+      pickRate: data.pickRate,
+      winRate: data.winRate,
+      banRate: data.banRate,
+    };
+
+    const currentBest = bestDetail.get(data.championId);
+    const newRank = tierPriority[data.tier] ?? 99;
+    const currentRank =
+      currentBest != null ? tierPriority[currentBest.tier] ?? 99 : 99;
+    if (currentBest == null || newRank < currentRank) {
+      bestDetail.set(data.championId, detail);
+    }
+
+    const tierMap =
+      tierByPosition.get(data.championId) ?? ({} as Record<string, string>);
+    tierMap[data.position] = data.tier;
+    tierByPosition.set(data.championId, tierMap);
+
+    const detailMap =
+      detailByPosition.get(data.championId) ??
+      ({} as Record<string, TierDetail>);
+    detailMap[data.position] = detail;
+    detailByPosition.set(data.championId, detailMap);
+  }
+
+  return { bestDetail, tierByPosition, detailByPosition };
+};
+
 async function Champion_images() {
-  
-      const response = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/champion_images?version=15.11.1&lang=ko_KR`);
-      
-      if (!response.ok) {
-        throw new Error('API 호출 실패');
+      const backendUrl =
+        process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:5500";
+      const [imageResponse, tierResponse] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_URL}/api/champion_images?version=15.11.1&lang=ko_KR`, { cache: "no-store" }),
+        fetch(
+          `${backendUrl}/info/champion/tierList`,
+          { cache: "no-store" }
+        ),
+      ]);
+
+      if (!imageResponse.ok) {
+        throw new Error('챔피언 이미지 API 호출 실패');
+      }
+      if (!tierResponse.ok) {
+        throw new Error('챔피언 티어 API 호출 실패');
       }
       
-      const data: ApiResponse = await response.json();
+      const [imageData, tierData]: [ApiResponse, ChampionTierResponse] = await Promise.all([
+        imageResponse.json(),
+        tierResponse.json(),
+      ]);
+
+      const { bestDetail, tierByPosition, detailByPosition } = buildTierMaps(
+        tierData?.data ?? []
+      );
+      const enrichedChampions = imageData.championImageUrls.map((champ) => {
+        const tiersByPosition =
+          champ.championId != null
+            ? tierByPosition.get(champ.championId) ?? {}
+            : {};
+        const positionDetails =
+          champ.championId != null
+            ? detailByPosition.get(champ.championId) ?? {}
+            : {};
+        const best = champ.championId != null ? bestDetail.get(champ.championId) : undefined;
+        return {
+          ...champ,
+          tier: best?.tier ?? null,
+          tiersByPosition,
+          positionDetails,
+          pickCount: best?.pickCount ?? null,
+          winCount: best?.winCount ?? null,
+          pickRate: best?.pickRate ?? null,
+          winRate: best?.winRate ?? null,
+          banRate: best?.banRate ?? null,
+        };
+      });
+
       return(
        <>
-       <BasicTableOne champions={data.championImageUrls}/>
+       <ChampionTablePanel champions={enrichedChampions}/>
        </>
       )
 };

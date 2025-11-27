@@ -1,3 +1,5 @@
+'use client';
+
 // components/tables/BasicTableOne.tsx (순수 서버 컴포넌트)
 import {
   Table,
@@ -14,6 +16,15 @@ interface ChampionImageData {
   name: string;
   url: string;
   championName?: string;
+  championId?: number;
+  tier?: string | null;
+  tiersByPosition?: Record<string, string | null>;
+  position?: string | null;
+  pickCount?: number | null;
+  winCount?: number | null;
+  pickRate?: number | null;
+  winRate?: number | null;
+  banRate?: number | null;
 }
 
 interface BasicTableOneProps {
@@ -21,6 +32,27 @@ interface BasicTableOneProps {
 }
 
 export default function BasicTableOne({ champions = [] }: BasicTableOneProps) {
+  const tierColor = (tier?: string | null) => {
+    switch (tier) {
+      case "OP":
+        return "bg-purple-600 text-white";
+      case "1tier":
+        return "bg-emerald-500 text-white";
+      case "2tier":
+        return "bg-blue-500 text-white";
+      case "3tier":
+        return "bg-amber-500 text-white";
+      case "4tier":
+        return "bg-gray-400 text-white";
+      default:
+        return "bg-gray-200 text-gray-700";
+    }
+  };
+
+  const tierLabel = (tier?: string | null) => tier ?? "정보 없음";
+  const formatPercent = (value?: number | null) =>
+    typeof value === "number" ? `${value.toFixed(2)}%` : "-";
+
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
       {/* 총 챔피언 수 표시 */}
@@ -57,11 +89,41 @@ export default function BasicTableOne({ champions = [] }: BasicTableOneProps) {
                   isHeader
                   className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
                 >
-                  챔피언 이름ㄴ
+                  챔피언 이름
                 </TableCell>
                 <TableCell
                   isHeader
                   className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
+                >
+                  포지션
+                </TableCell>
+                <TableCell
+                  isHeader
+                  className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
+                >
+                  티어
+                </TableCell>
+                <TableCell
+                  isHeader
+                  className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
+                >
+                  승률
+                </TableCell>
+                <TableCell
+                  isHeader
+                  className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
+                >
+                  픽률
+                </TableCell>
+                <TableCell
+                  isHeader
+                  className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
+                >
+                  밴률
+                </TableCell>
+                <TableCell
+                  isHeader
+                  className="px-5 py-3 font-medium text-gray-500 text-end text-theme-xs dark:text-gray-400"
                 >
                   스킨 보기
                 </TableCell>
@@ -75,15 +137,15 @@ export default function BasicTableOne({ champions = [] }: BasicTableOneProps) {
                 const championKey = champion.championName || 
                   champion.url.split('/').pop()?.replace('.png', '') || 
                   champion.name;
+                const rowKey = `${champion.championId ?? champion.name}-${champion.position ?? "ALL"}-${index}`;
 
                 return (
-                  <TableRow key={champion.name} className="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors group">
+                  <TableRow key={rowKey} className="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors group">
                     <TableCell className="px-5 py-4 text-start">
                       <span className="text-gray-500 text-theme-sm dark:text-gray-400">
                         {index + 1}
                       </span>
                     </TableCell>
-                    
                     <TableCell className="px-5 py-4 text-start">
                       <Link href={`champions/info/${championKey}`}>
                         <div className="w-14 h-14 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer">
@@ -106,13 +168,42 @@ export default function BasicTableOne({ champions = [] }: BasicTableOneProps) {
                         {champion.name}
                       </Link>
                     </TableCell>
+                    <TableCell className="px-4 py-3 text-start">
+                      <span className="text-theme-sm text-gray-600 dark:text-gray-300">
+                        {champion.position ?? "전체"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-start">
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${tierColor(
+                          champion.tier
+                        )}`}
+                      >
+                        {tierLabel(champion.tier)}
+                      </span>
+                    </TableCell>
                     
                     <TableCell className="px-4 py-3 text-start">
+                      <span className="text-theme-sm text-gray-600 dark:text-gray-300">
+                        {formatPercent(champion.winRate)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-start">
+                      <span className="text-theme-sm text-gray-600 dark:text-gray-300">
+                        {formatPercent(champion.pickRate)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-start">
+                      <span className="text-theme-sm text-gray-600 dark:text-gray-300">
+                        {formatPercent(champion.banRate)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-end">
                       <Link
                         href={`champions/skins/${championKey}`}
-                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200"
                       >
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
