@@ -1,19 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLatestVersion } from "../../../lib/champions";
 import { getItem_Image } from "../../../lib/itemAssets";
-
-type RuneDefinition = {
-  id: number;
-  icon: string;
-};
-
-type RuneSlot = {
-  runes?: RuneDefinition[];
-};
-
-type RuneTree = {
-  slots?: RuneSlot[];
-};
+import { fetchRunes } from "../../../lib/runes";
 
 type ChampionTierEntry = {
   championId: number;
@@ -31,6 +19,13 @@ type ChampionTierEntry = {
 };
 
 const runeCache = new Map<string, Map<number, string>>();
+const RUNE_PRIORITY_ORDER = [
+  8112, 8128, 9923, 8351, 8360, 8369, 8005, 8008, 8021, 8437, 8439, 8465, 8214,
+  8229, 8230,
+];
+const RUNE_PRIORITY_MAP = new Map(
+  RUNE_PRIORITY_ORDER.map((id, idx) => [id, idx])
+);
 
 async function getRuneIconMap(
   version: string,
@@ -42,14 +37,7 @@ async function getRuneIconMap(
     return cached;
   }
 
-  const response = await fetch(
-    `https://ddragon.leagueoflegends.com/cdn/${version}/data/${language}/runesReforged.json`,
-    { cache: "force-cache" }
-  );
-  if (!response.ok) {
-    throw new Error("룬 정보를 가져오지 못했습니다.");
-  }
-  const data: RuneTree[] = await response.json();
+  const data = await fetchRunes(version, language);
   const map = new Map<number, string>();
   data.forEach((tree) => {
     tree.slots?.forEach((slot) => {
@@ -105,15 +93,21 @@ export async function GET(req: Request) {
       );
     }
 
-    const mapRunes = (list?: number[]) =>
-      Array.isArray(list)
-        ? list
-            .filter((id) => typeof id === "number" && id > 0)
-            .map((id) => ({
-              id,
-              image: runeIcons.get(id) ?? null,
-            }))
-        : [];
+    const mapRunes = (list?: number[]) => {
+      if (!Array.isArray(list)) return [];
+      const mapped = list
+        .filter((id) => typeof id === "number" && id > 0)
+        .map((id) => ({
+          id,
+          image: runeIcons.get(id) ?? null,
+        }));
+      mapped.sort((a, b) => {
+        const pa = RUNE_PRIORITY_MAP.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+        const pb = RUNE_PRIORITY_MAP.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+        return pa - pb;
+      });
+      return mapped;
+    };
 
     const positions = filtered.map((entry) => {
       const items: Array<{ id: number; image: string }> = Array.isArray(
