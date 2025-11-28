@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { notFound, useParams } from 'next/navigation';
+import {  useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -13,6 +13,22 @@ const ChevronLeft = ({ className }: { className?: string }) => (
 );
 
 
+
+
+interface ChampionPositionInsight {
+  position: string;
+  tier: string | null;
+  pickCount: number;
+  winCount: number;
+  pickRate: number;
+  winRate: number;
+  banRate: number;
+  items: Array<{ id: number; image: string }>;
+  runes: {
+    primary: Array<{ id: number; image: string | null }>;
+    sub: Array<{ id: number; image: string | null }>;
+  };
+}
 
 interface ChampionData {
   id: string;
@@ -109,6 +125,46 @@ interface ChampionData {
   };
 }
 
+type ActiveSpell = ChampionData["spells"][number];
+type PassiveSkill = ChampionData["passive"];
+
+const POSITION_ICON_FILES: Record<string, string> = {
+  TOP: "Position_Diamond-Top.png",
+  JUNGLE: "Position_Diamond-Jungle.png",
+  MIDDLE: "Position_Diamond-Mid.png",
+  MID: "Position_Diamond-Mid.png",
+  BOTTOM: "Position_Diamond-Bot.png",
+  BOT: "Position_Diamond-Bot.png",
+  ADC: "Position_Diamond-Bot.png",
+  UTILITY: "Position_Diamond-Support.png",
+  SUPPORT: "Position_Diamond-Support.png",
+};
+
+const POSITION_LABELS: Record<string, string> = {
+  TOP: "TOP",
+  JUNGLE: "JUNGLE",
+  MIDDLE: "MIDDLE",
+  MID: "MIDDLE",
+  BOTTOM: "BOTTOM",
+  BOT: "BOTTOM",
+  ADC: "BOTTOM",
+  UTILITY: "SUPPORT",
+  SUPPORT: "SUPPORT",
+};
+
+const getPositionIcon = (position?: string | null) => {
+  const key = position?.toUpperCase();
+  const file =
+    POSITION_ICON_FILES[key ?? ""] ?? "Position_Diamond-Mid.png";
+  return `/images/position/${file}`;
+};
+
+const getPositionLabel = (position?: string | null) => {
+  if (!position) return "전체";
+  const key = position.toUpperCase();
+  return POSITION_LABELS[key] ?? key;
+};
+
 function StatBar({ value, max = 10 }: { value: number; max?: number }) {
   const percentage = (value / max) * 100;
   return (
@@ -122,7 +178,7 @@ function StatBar({ value, max = 10 }: { value: number; max?: number }) {
 }
 
 function SkillIcon({ skill, skillKey, version, isPassive = false }: { 
-  skill: any; 
+  skill: ActiveSpell | PassiveSkill; 
   skillKey: string; 
   version: string;
   isPassive?: boolean;
@@ -152,9 +208,11 @@ function SkillIcon({ skill, skillKey, version, isPassive = false }: {
         <div className="text-gray-300 leading-relaxed">
           {skill.description ? skill.description.replace(/<[^>]*>/g, '') : '스킬 설명이 없습니다.'}
         </div>
-        {!isPassive && skill.cooldownBurn && (
+        {!isPassive &&
+          "cooldownBurn" in skill &&
+          skill.cooldownBurn && (
           <div className="mt-2 text-xs text-gray-400">
-            쿨다운: {skill.cooldownBurn}초 | 소모: {skill.costBurn} | 사거리: {skill.rangeBurn}
+            쿨다운: {skill.cooldownBurn}초 | 소모: {"costBurn" in skill ? skill.costBurn : "-"} | 사거리: {"rangeBurn" in skill ? skill.rangeBurn : "-"}
           </div>
         )}
         {/* 툴팁 화살표 */}
@@ -170,6 +228,10 @@ export default function ChampionDetailPage() {
   const [championData, setChampionData] = useState<ChampionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [positionData, setPositionData] = useState<ChampionPositionInsight[]>([]);
+  const [positionLoading, setPositionLoading] = useState(false);
+  const [positionError, setPositionError] = useState<string | null>(null);
+  const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
   const version = "15.11.1";
 
   useEffect(() => {
@@ -204,6 +266,56 @@ export default function ChampionDetailPage() {
     }
   }, [championName]);
 
+  useEffect(() => {
+    if (!championData) {
+      return;
+    }
+    const champId = Number(championData.key);
+    if (!champId) {
+      return;
+    }
+    const controller = new AbortController();
+
+    async function fetchPositionData() {
+      try {
+        setPositionLoading(true);
+        setPositionError(null);
+        const response = await fetch(
+          `/api/champion_item?championId=${champId}`,
+          { signal: controller.signal }
+        );
+        if (!response.ok) {
+          throw new Error(`포지션 데이터 호출 실패: ${response.status}`);
+        }
+        const payload = await response.json();
+        if (!payload?.ok) {
+          throw new Error(payload?.error || "포지션 데이터를 찾을 수 없습니다");
+        }
+        const positions: ChampionPositionInsight[] = payload.positions || [];
+        setPositionData(positions);
+        setSelectedPosition(positions[0]?.position ?? null);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return;
+        }
+        console.error("포지션 데이터 로딩 실패:", err);
+        setPositionError(
+          err instanceof Error
+            ? err.message
+            : "포지션 데이터를 불러오는 중 문제가 발생했습니다"
+        );
+        setPositionData([]);
+        setSelectedPosition(null);
+      } finally {
+        setPositionLoading(false);
+      }
+    }
+
+    fetchPositionData();
+
+    return () => controller.abort();
+  }, [championData]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -236,6 +348,14 @@ export default function ChampionDetailPage() {
 
   
   const championImageUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championData.image.full}`;
+  const formatPercent = (value?: number | null) =>
+    typeof value === "number" ? `${value.toFixed(2)}%` : "-";
+  const formatNumber = (value?: number | null) =>
+    typeof value === "number" ? value.toLocaleString() : "-";
+  const activePosition =
+    positionData.find((pos) => pos.position === selectedPosition) ??
+    positionData[0] ??
+    null;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -253,6 +373,203 @@ export default function ChampionDetailPage() {
           </h1>
         </div>
       </header>
+
+      <section className="border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              포지션별 빌드 정보
+            </h2>
+            {positionLoading && (
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <span className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                불러오는 중...
+              </div>
+            )}
+          </div>
+          {positionError && (
+            <p className="text-sm text-red-500 dark:text-red-400 mb-4">
+              {positionError}
+            </p>
+          )}
+          {!positionLoading && !positionError && positionData.length === 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              아직 수집된 포지션 통계가 없습니다.
+            </p>
+          )}
+          {!positionLoading && positionData.length > 0 && (
+            <>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {positionData.map((pos) => {
+                  const label = getPositionLabel(pos.position);
+                  const icon = getPositionIcon(pos.position, version);
+                  const isActive = selectedPosition
+                    ? selectedPosition === pos.position
+                    : positionData[0]?.position === pos.position;
+                  return (
+                    <button
+                      key={pos.position}
+                      type="button"
+                      onClick={() => setSelectedPosition(pos.position)}
+                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                        isActive
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-200 text-gray-700 dark:bg-white/10 dark:text-gray-300"
+                      }`}
+                    >
+                      <Image
+                        src={icon}
+                        alt={label}
+                        width={20}
+                        height={20}
+                        className="rounded-full"
+                      />
+                      <span>{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {activePosition && (
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                      포지션 통계
+                    </h3>
+                    <dl className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                      <div className="flex justify-between">
+                        <dt>포지션</dt>
+                        <dd>{getPositionLabel(activePosition.position)}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt>티어</dt>
+                        <dd>{activePosition.tier ?? "정보 없음"}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt>승률</dt>
+                        <dd>{formatPercent(activePosition.winRate)}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt>픽률</dt>
+                        <dd>{formatPercent(activePosition.pickRate)}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt>밴률</dt>
+                        <dd>{formatPercent(activePosition.banRate)}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt>승수 / 픽수</dt>
+                        <dd>
+                          {formatNumber(activePosition.winCount)} /{" "}
+                          {formatNumber(activePosition.pickCount)}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                      핵심 아이템
+                    </h3>
+                    {activePosition.items.length ? (
+                      <div className="flex flex-wrap gap-3">
+                        {activePosition.items.map((item, idx) => (
+                          <div
+                            key={`${item.id}-${idx}`}
+                            className="flex flex-col items-center text-xs text-gray-600 dark:text-gray-300"
+                          >
+                            <div className="w-12 h-12 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                              <Image
+                                src={item.image}
+                                alt={`item-${item.id}`}
+                                width={48}
+                                height={48}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <span className="mt-1 font-medium">
+                              #{idx + 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        아이템 데이터가 없습니다.
+                      </p>
+                    )}
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                      추천 룬
+                    </h3>
+                    <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
+                      <div>
+                        <p className="font-semibold mb-2">주요 룬</p>
+                        <div className="flex flex-wrap gap-2">
+                          {activePosition.runes.primary.length ? (
+                            activePosition.runes.primary.map((rune) =>
+                              rune.image ? (
+                                <Image
+                                  key={`primary-${rune.id}`}
+                                  src={rune.image}
+                                  alt={`rune-${rune.id}`}
+                                  width={40}
+                                  height={40}
+                                  className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
+                                />
+                              ) : (
+                                <span
+                                  key={`primary-${rune.id}`}
+                                  className="px-3 py-1 rounded-full bg-gray-200 dark:bg-gray-700"
+                                >
+                                  {rune.id}
+                                </span>
+                              )
+                            )
+                          ) : (
+                            <span className="text-xs text-gray-500">
+                              정보 없음
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="font-semibold mb-2">보조 룬</p>
+                        <div className="flex flex-wrap gap-2">
+                          {activePosition.runes.sub.length ? (
+                            activePosition.runes.sub.map((rune) =>
+                              rune.image ? (
+                                <Image
+                                  key={`sub-${rune.id}`}
+                                  src={rune.image}
+                                  alt={`rune-${rune.id}`}
+                                  width={40}
+                                  height={40}
+                                  className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900"
+                                />
+                              ) : (
+                                <span
+                                  key={`sub-${rune.id}`}
+                                  className="px-3 py-1 rounded-full bg-gray-200 dark:bg-gray-700"
+                                >
+                                  {rune.id}
+                                </span>
+                              )
+                            )
+                          ) : (
+                            <span className="text-xs text-gray-500">
+                              정보 없음
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </section>
 
       <div className="container mx-auto px-4 py-8">
         {/* 메인 정보 섹션 */}

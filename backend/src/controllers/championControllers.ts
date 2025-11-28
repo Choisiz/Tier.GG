@@ -12,6 +12,9 @@ type ChampionTierRow = {
   rate_total_ban: number;
   adjusted_win_rate: number;
   confidence: number;
+  items: number[];
+  primaryRunes: number[];
+  subRunes: number[];
 };
 
 export const champion = async (req: Request, res: Response) => {
@@ -340,7 +343,19 @@ export const championTierList = async (req: Request, res: Response) => {
         position_wins,
         rate_position_pick,
         rate_position_win,
-        rate_total_ban
+        rate_total_ban,
+        item1,
+        item2,
+        item3,
+        item4,
+        item5,
+        item6,
+        rune_primary1,
+        rune_primary2,
+        rune_primary3,
+        rune_primary4,
+        rune_sub1,
+        rune_sub2
       FROM champion
       WHERE stat_date = $1
       `,
@@ -356,7 +371,7 @@ export const championTierList = async (req: Request, res: Response) => {
     const grouped = new Map<string, ChampionTierRow[]>();
     for (const r of rows) {
       const key = r.position || "UNKNOWN";
-      const arr = grouped.get(key) || [];
+    const arr = grouped.get(key) || [];
       const position_pick = Number(r.position_pick || 0);
       const rate_position_win = Number(r.rate_position_win || 0);
       const adjusted_win_rate =
@@ -371,6 +386,30 @@ export const championTierList = async (req: Request, res: Response) => {
               Math.min(1, position_pick / Math.max(sampleThreshold, 1))
             )
           : 0;
+    const itemsRaw = [
+      r.item1,
+      r.item2,
+      r.item3,
+      r.item4,
+      r.item5,
+      r.item6,
+    ];
+    const primaryRunesRaw = [
+      r.rune_primary1,
+      r.rune_primary2,
+      r.rune_primary3,
+      r.rune_primary4,
+    ];
+    const subRunesRaw = [r.rune_sub1, r.rune_sub2];
+    const items = itemsRaw
+      .filter((id: number | null) => typeof id === "number" && id > 0)
+      .map((id: number) => Number(id));
+    const primaryRunes = primaryRunesRaw
+      .filter((id: number | null) => typeof id === "number" && id > 0)
+      .map((id: number) => Number(id));
+    const subRunes = subRunesRaw
+      .filter((id: number | null) => typeof id === "number" && id > 0)
+      .map((id: number) => Number(id));
       arr.push({
         champion_id: Number(r.champion_id),
         position: key,
@@ -381,6 +420,9 @@ export const championTierList = async (req: Request, res: Response) => {
         rate_total_ban: Number(r.rate_total_ban || 0),
         adjusted_win_rate,
         confidence,
+      items,
+      primaryRunes,
+      subRunes,
       });
       grouped.set(key, arr);
     }
@@ -396,6 +438,9 @@ export const championTierList = async (req: Request, res: Response) => {
       winRate: number;
       banRate: number;
       score: number;
+    items: number[];
+    primaryRunes: number[];
+    subRunes: number[];
     }> = [];
 
     // 간단한 퍼센타일 계산기 (0~1 사이 값으로 정규화)
@@ -461,6 +506,9 @@ export const championTierList = async (req: Request, res: Response) => {
           winRate: entry.row.rate_position_win,
           banRate: entry.row.rate_total_ban,
           score: Math.round(entry.score * 1000) / 1000,
+          items: entry.row.items,
+          primaryRunes: entry.row.primaryRunes,
+          subRunes: entry.row.subRunes,
         });
       });
     }

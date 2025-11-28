@@ -11,6 +11,42 @@ import {
 
 import Image from "next/image";
 import Link from "next/link";
+const POSITION_ICON_FILES: Record<string, string> = {
+  TOP: "Position_Diamond-Top.png",
+  JUNGLE: "Position_Diamond-Jungle.png",
+  MIDDLE: "Position_Diamond-Mid.png",
+  MID: "Position_Diamond-Mid.png",
+  BOTTOM: "Position_Diamond-Bot.png",
+  BOT: "Position_Diamond-Bot.png",
+  ADC: "Position_Diamond-Bot.png",
+  UTILITY: "Position_Diamond-Support.png",
+  SUPPORT: "Position_Diamond-Support.png",
+};
+
+const POSITION_LABELS: Record<string, string> = {
+  TOP: "TOP",
+  JUNGLE: "JUNGLE",
+  MIDDLE: "MIDDLE",
+  MID: "MIDDLE",
+  BOTTOM: "BOTTOM",
+  BOT: "BOTTOM",
+  ADC: "BOTTOM",
+  UTILITY: "SUPPORT",
+  SUPPORT: "SUPPORT",
+};
+
+const getPositionIcon = (position?: string | null) => {
+  const key = position?.toUpperCase();
+  const file =
+    POSITION_ICON_FILES[key ?? ""] ?? "Position_Diamond-Mid.png";
+  return `/images/position/${file}`;
+};
+
+const getPositionLabel = (position?: string | null) => {
+  if (!position) return "전체";
+  const key = position.toUpperCase();
+  return POSITION_LABELS[key] ?? key;
+};
 
 interface ChampionImageData {
   name: string;
@@ -18,7 +54,6 @@ interface ChampionImageData {
   championName?: string;
   championId?: number;
   tier?: string | null;
-  tiersByPosition?: Record<string, string | null>;
   position?: string | null;
   pickCount?: number | null;
   winCount?: number | null;
@@ -31,7 +66,9 @@ interface BasicTableOneProps {
   champions?: ChampionImageData[];
 }
 
-export default function BasicTableOne({ champions = [] }: BasicTableOneProps) {
+export default function BasicTableOne({
+  champions = [],
+}: BasicTableOneProps) {
   const tierColor = (tier?: string | null) => {
     switch (tier) {
       case "OP":
@@ -169,9 +206,17 @@ export default function BasicTableOne({ champions = [] }: BasicTableOneProps) {
                       </Link>
                     </TableCell>
                     <TableCell className="px-4 py-3 text-start">
-                      <span className="text-theme-sm text-gray-600 dark:text-gray-300">
-                        {champion.position ?? "전체"}
-                      </span>
+                      <div className="flex items-center gap-2 text-theme-sm text-gray-600 dark:text-gray-300">
+                        <div className="w-6 h-6 rounded-full overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                          <Image
+                            src={getPositionIcon(champion.position)}
+                            alt={champion.position ?? "전체"}
+                            width={24}
+                            height={24}
+                          />
+                        </div>
+                        <span>{getPositionLabel(champion.position)}</span>
+                      </div>
                     </TableCell>
                     <TableCell className="px-4 py-3 text-start">
                       <span

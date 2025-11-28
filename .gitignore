@@ -26,6 +26,9 @@ docker-compose.override.yml
 database/data/
 *.db
 *.sqlite
+# Ensure DB schema/migrations are tracked
+!db/*.sql
+!db/**/*.sql
 
 # Docker volumes data
 postgres_data/

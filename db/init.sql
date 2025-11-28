@@ -10,8 +10,7 @@ CREATE TABLE IF NOT EXISTS players (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- 플레이어 매치 테이블
-CREATE TABLE IF NOT EXISTS player_matches (
+CREATE TABLE IF NOT EXISTS matches (
   id SERIAL PRIMARY KEY,
   puuid TEXT NOT NULL,
   match_id TEXT NOT NULL,
@@ -20,7 +19,7 @@ CREATE TABLE IF NOT EXISTS player_matches (
 );
 
 -- 통합 매치 상세 테이블
-CREATE TABLE IF NOT EXISTS match_details (
+CREATE TABLE IF NOT EXISTS gameinfo (
   id SERIAL PRIMARY KEY,
   match_id TEXT NOT NULL,      --매치id
   puuid TEXT NOT NULL,         --참가자puuid
@@ -39,16 +38,53 @@ CREATE TABLE IF NOT EXISTS match_details (
   spell1_casts INTEGER,        --스펠1 캐스트
   spell2_casts INTEGER,        --스펠2 캐스트
   created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE (match_id, puuid)
+  UNIQUE (match_id, puuid),
+  -- FK 제거: 파이프라인 단계별 독립 동작을 위해 애플리케이션 레벨에서 정합성 관리
+  -- FOREIGN KEY (puuid, match_id) REFERENCES matches(puuid, match_id) ON DELETE CASCADE
 );
 
 -- 통합 매치 벤픽 테이블
-CREATE TABLE IF NOT EXISTS match_defails_ban (
+CREATE TABLE IF NOT EXISTS gameinfo_bans (
   match_id TEXT NOT NULL,
   ban_champion_id INTEGER NOT NULL,
   puuid TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE (match_id, puuid, ban_champion_id)
+);
+
+-- 통합 매치 룬 테이블
+CREATE TABLE IF NOT EXISTS gameinfo_perks (
+  id SERIAL PRIMARY KEY,
+  match_id TEXT NOT NULL,
+  puuid TEXT NOT NULL,
+  slot_type TEXT NOT NULL,         -- 'primary' | 'sub'
+  perk_id INTEGER NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (match_id, puuid, slot_type, perk_id)
+);
+
+-- 챔피언 집계 테이블
+CREATE TABLE IF NOT EXISTS champion (
+  id SERIAL PRIMARY KEY,
+  stat_date DATE NOT NULL,
+  champion_id INTEGER NOT NULL,
+  position TEXT NOT NULL, -- 포지션별 1행
+  total_win INTEGER NOT NULL,
+  total_pick INTEGER NOT NULL,
+  total_ban INTEGER NOT NULL,
+  rate_total_pick NUMERIC(5,2) NOT NULL,
+  rate_total_win NUMERIC(5,2) NOT NULL,
+  rate_total_ban NUMERIC(5,2) NOT NULL,
+  total_matches INTEGER NOT NULL,
+  position_pick INTEGER NOT NULL,
+  position_wins INTEGER NOT NULL,
+  rate_position_pick NUMERIC(5,2) NOT NULL,
+  rate_position_win NUMERIC(5,2) NOT NULL,
+  item1 INTEGER, item2 INTEGER, item3 INTEGER, item4 INTEGER, item5 INTEGER, item6 INTEGER,
+  rune_primary1 INTEGER, rune_primary2 INTEGER, rune_primary3 INTEGER, rune_primary4 INTEGER,
+  rune_sub1 INTEGER, rune_sub2 INTEGER,
+  create_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (stat_date, champion_id, position)
 );
 
 -- 업데이트 트리거용 함수(선택)

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -105,7 +105,7 @@ export default function ChampionSkinsClient({ championName, version, language = 
   const [error, setError] = useState<string | null>(null);
   const [selectedSkin, setSelectedSkin] = useState<number>(0);
 
-  const fetchSkins = async () => {
+  const fetchSkins = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -132,13 +132,13 @@ export default function ChampionSkinsClient({ championName, version, language = 
     } finally {
       setLoading(false);
     }
-  };
+  }, [championName, version, language]);
 
   useEffect(() => {
     if (championName) {
       fetchSkins();
     }
-  }, [championName, version, language]);
+  }, [championName, fetchSkins]);
 
   // 키보드 네비게이션
   useEffect(() => {

@@ -16,7 +16,6 @@ interface ChampionImageData {
   url: string;
   championId?: number;
   tier?: string | null;
-  tiersByPosition?: Record<string, string | null>;
   positionDetails?: Record<string, TierDetail>;
   pickCount?: number | null;
   winCount?: number | null;
@@ -41,6 +40,9 @@ interface ChampionTierResponse {
     pickRate: number;
     winRate: number;
     banRate: number;
+    items: number[];
+    primaryRunes: number[];
+    subRunes: number[];
   }>;
 }
 
@@ -52,6 +54,9 @@ interface TierDetail {
   pickRate: number;
   winRate: number;
   banRate: number;
+  items: number[];
+  primaryRunes: number[];
+  subRunes: number[];
 }
 
 const tierPriority: Record<string, number> = {
@@ -64,7 +69,6 @@ const tierPriority: Record<string, number> = {
 
 const buildTierMaps = (tiers: ChampionTierResponse["data"] = []) => {
   const bestDetail = new Map<number, TierDetail>();
-  const tierByPosition = new Map<number, Record<string, string>>();
   const detailByPosition = new Map<number, Record<string, TierDetail>>();
 
   for (const data of tiers) {
@@ -76,6 +80,11 @@ const buildTierMaps = (tiers: ChampionTierResponse["data"] = []) => {
       pickRate: data.pickRate,
       winRate: data.winRate,
       banRate: data.banRate,
+      items: Array.isArray(data.items) ? data.items : [],
+      primaryRunes: Array.isArray(data.primaryRunes)
+        ? data.primaryRunes
+        : [],
+      subRunes: Array.isArray(data.subRunes) ? data.subRunes : [],
     };
 
     const currentBest = bestDetail.get(data.championId);
@@ -86,11 +95,6 @@ const buildTierMaps = (tiers: ChampionTierResponse["data"] = []) => {
       bestDetail.set(data.championId, detail);
     }
 
-    const tierMap =
-      tierByPosition.get(data.championId) ?? ({} as Record<string, string>);
-    tierMap[data.position] = data.tier;
-    tierByPosition.set(data.championId, tierMap);
-
     const detailMap =
       detailByPosition.get(data.championId) ??
       ({} as Record<string, TierDetail>);
@@ -98,14 +102,16 @@ const buildTierMaps = (tiers: ChampionTierResponse["data"] = []) => {
     detailByPosition.set(data.championId, detailMap);
   }
 
-  return { bestDetail, tierByPosition, detailByPosition };
+  return { bestDetail, detailByPosition };
 };
+
+const DDRAGON_VERSION = "15.11.1";
 
 async function Champion_images() {
       const backendUrl =
         process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:5500";
       const [imageResponse, tierResponse] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_URL}/api/champion_images?version=15.11.1&lang=ko_KR`, { cache: "no-store" }),
+        fetch(`${process.env.NEXT_PUBLIC_URL}/api/champion_images?version=${DDRAGON_VERSION}&lang=ko_KR`, { cache: "no-store" }),
         fetch(
           `${backendUrl}/info/champion/tierList`,
           { cache: "no-store" }
@@ -124,14 +130,13 @@ async function Champion_images() {
         tierResponse.json(),
       ]);
 
-      const { bestDetail, tierByPosition, detailByPosition } = buildTierMaps(
+      //bestDetail: 챔피언 티어 최고점
+      //detailByPosition: 챔피언 포지션별 티어
+      const { bestDetail, detailByPosition } = buildTierMaps(
         tierData?.data ?? []
       );
       const enrichedChampions = imageData.championImageUrls.map((champ) => {
-        const tiersByPosition =
-          champ.championId != null
-            ? tierByPosition.get(champ.championId) ?? {}
-            : {};
+        
         const positionDetails =
           champ.championId != null
             ? detailByPosition.get(champ.championId) ?? {}
@@ -140,7 +145,6 @@ async function Champion_images() {
         return {
           ...champ,
           tier: best?.tier ?? null,
-          tiersByPosition,
           positionDetails,
           pickCount: best?.pickCount ?? null,
           winCount: best?.winCount ?? null,

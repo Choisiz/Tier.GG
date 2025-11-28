@@ -10,6 +10,9 @@ interface PositionDetail {
   pickRate?: number | null;
   winRate?: number | null;
   banRate?: number | null;
+  items?: number[];
+  primaryRunes?: number[];
+  subRunes?: number[];
 }
 
 interface ChampionImageData {
@@ -18,7 +21,6 @@ interface ChampionImageData {
   championName?: string;
   championId?: number;
   tier?: string | null;
-  tiersByPosition?: Record<string, string | null>;
   position?: string | null;
   positionDetails?: Record<string, PositionDetail>;
   pickCount?: number | null;
@@ -50,14 +52,15 @@ interface ChampionTablePanelProps {
 
 const resolveBestTier = (champ: ChampionImageData) => {
   if (champ.tier) return champ.tier;
-  if (!champ.tiersByPosition) return null;
-  const entries = Object.entries(champ.tiersByPosition);
+  if (!champ.positionDetails) return null;
+  const entries = Object.entries(champ.positionDetails);
   if (!entries.length) return null;
   entries.sort(
     (a, b) =>
-      (TIER_ORDER[a[1] ?? ""] ?? 99) - (TIER_ORDER[b[1] ?? ""] ?? 99)
+      (TIER_ORDER[a[1]?.tier ?? ""] ?? 99) -
+      (TIER_ORDER[b[1]?.tier ?? ""] ?? 99)
   );
-  return entries[0]?.[1] ?? null;
+  return entries[0]?.[1]?.tier ?? null;
 };
 
 export default function ChampionTablePanel({
@@ -70,13 +73,12 @@ export default function ChampionTablePanel({
 
     if (position === "ALL") {
       champions.forEach((champ) => {
-        const details = champ.positionDetails || {};
-        const detailEntries = Object.entries(details);
+        const detailEntries = Object.entries(champ.positionDetails || {});
         if (detailEntries.length) {
           detailEntries.forEach(([pos, detail]) => {
             baseList.push({
               ...champ,
-              tier: detail.tier ?? champ.tiersByPosition?.[pos] ?? resolveBestTier(champ),
+              tier: detail.tier ?? resolveBestTier(champ),
               position: pos,
               pickCount: detail.pickCount ?? champ.pickCount ?? null,
               winCount: detail.winCount ?? champ.winCount ?? null,
@@ -101,7 +103,7 @@ export default function ChampionTablePanel({
     } else {
       champions.forEach((champ) => {
         const detail = champ.positionDetails?.[position];
-        const tier = detail?.tier ?? champ.tiersByPosition?.[position] ?? null;
+        const tier = detail?.tier ?? null;
         if (!tier) return;
         baseList.push({
           ...champ,

@@ -11,7 +11,9 @@ export default async function Page({
         //1. params로 puuId찾기
         //2. puuId로 게임전적찾기(10개)
         //3. 10개모두 게임전적id검색하기
-    } catch (e) {}
+    } catch {
+        // TODO: handle error
+    }
 
   return (
     <div>
