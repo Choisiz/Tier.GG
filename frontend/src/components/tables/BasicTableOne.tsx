@@ -160,7 +160,7 @@ export default function BasicTableOne({
                 </TableCell>
                 <TableCell
                   isHeader
-                  className="px-5 py-3 font-medium text-gray-500 text-end text-theme-xs dark:text-gray-400"
+                  className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
                 >
                   스킨 보기
                 </TableCell>
@@ -243,7 +243,7 @@ export default function BasicTableOne({
                         {formatPercent(champion.banRate)}
                       </span>
                     </TableCell>
-                    <TableCell className="px-4 py-3 text-end">
+                    <TableCell className="px-4 py-3 text-start">
                       <Link
                         href={`champions/skins/${championKey}`}
                         className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200"
