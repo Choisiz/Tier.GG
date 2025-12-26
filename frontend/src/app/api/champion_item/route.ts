@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getLatestVersion } from "../../../lib/champions";
+import { getVersions_Url } from "../../../lib/champions";
 import { getItem_Image } from "../../../lib/itemAssets";
-import { fetchRunes } from "../../../lib/runes";
+import { getRunes_Url, RuneDefinition } from "../../../lib/runes";
 
 type ChampionTierEntry = {
   championId: number;
@@ -37,7 +37,14 @@ async function getRuneIconMap(
     return cached;
   }
 
-  const data = await fetchRunes(version, language);
+  const runeRes = await fetch(getRunes_Url(version, language), {
+    cache: "force-cache",
+  });
+  if (!runeRes.ok) throw new Error("룬 정보를 가져오지 못했습니다.");
+  const data = (await runeRes.json()) as Array<{
+    slots?: Array<{ runes?: RuneDefinition[] }>;
+  }>;
+
   const map = new Map<number, string>();
   data.forEach((tree) => {
     tree.slots?.forEach((slot) => {
@@ -66,11 +73,16 @@ export async function GET(req: Request) {
   try {
     const backendUrl =
       process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:5500";
-    const version = await getLatestVersion();
-    const tierResponse = await fetch(
-      `${backendUrl}/info/champion/tierList`,
-      { cache: "no-store" }
-    );
+
+    // 최신 버전 가져오기
+    const versionRes = await fetch(getVersions_Url());
+    if (!versionRes.ok) throw new Error("버전 정보를 가져올 수 없습니다.");
+    const versions = await versionRes.json();
+    const version = versions[0];
+
+    const tierResponse = await fetch(`${backendUrl}/info/champion/tierList`, {
+      cache: "no-store",
+    });
     if (!tierResponse.ok) {
       throw new Error("백엔드 챔피언 데이터 조회 실패");
     }
@@ -157,4 +169,3 @@ export async function GET(req: Request) {
     );
   }
 }
-

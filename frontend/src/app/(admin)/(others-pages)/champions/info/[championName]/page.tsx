@@ -239,7 +239,6 @@ export default function ChampionDetailPage() {
         setError(null);
         
         const response = await fetch(`/api/champion_info?version=${version}&lang=ko_KR&name=${championName}`);
-        console.log('res',response)
         
         if (!response.ok) {
           throw new Error(`API 호출 실패: ${response.status}`);

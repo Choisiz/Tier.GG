@@ -1,4 +1,4 @@
-//미니맵 이미지
-export const getSpells_Image= (version: string, number:number): string =>{
-    return `https://ddragon.leagueoflegends.com/cdn/${version}/img/map/map${number}.png`;
-  }
+// 미니맵 이미지 URL
+export const getMinimap_Image = (version: string, mapNumber: number): string => {
+  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/map/map${mapNumber}.png`;
+};
