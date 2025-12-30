@@ -1,15 +1,19 @@
-// 최신 버전 URL
+/* 패치버전_리스트 */
 export const getVersions_Url = (): string => {
   return "https://ddragon.leagueoflegends.com/api/versions.json";
 };
 
-// 챔피언 데이터 URL (간략)
-export const getChampionData_Url = (version: string, language: string): string => {
+/* 챔피언_데이터_(간략)
+ex) https://ddragon.leagueoflegends.com/cdn/15.24.1/data/ko_KR/champion.json
+*/
+export const getChampion_Data = (version: string, language: string): string => {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/data/${language}/champion.json`;
 };
 
-// 챔피언 데이터 URL (상세)
-export const getChampionData_Detail_Url = (
+/* 챔피언_데이터_(상세)
+ex) https://ddragon.leagueoflegends.com/cdn/15.13.1/data/ko_KR/champion/Aatrox.json
+*/
+export const getChampion_Data_Detail = (
   version: string,
   language: string,
   name: string
@@ -17,41 +21,49 @@ export const getChampionData_Detail_Url = (
   return `https://ddragon.leagueoflegends.com/cdn/${version}/data/${language}/champion/${name}.json`;
 };
 
-// 챔피언 이미지_스퀘어
-export const getChampionImageUrl = (
+/* 챔피언_이미지_스퀘어 
+ex) https://ddragon.leagueoflegends.com/cdn/14.18.1/img/champion/Aatrox.png
+*/
+export const getChampion_Image_Square = (
   version: string,
   championName: string
 ): string => {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championName}.png`;
 };
 
-// 챔피언 이미지_스킨
-export const getChampionImageUrl_Skin = (
+/* 챔피언_이미지_로딩
+ex) https://ddragon.leagueoflegends.com/cdn/img/champion/loading/Aatrox_0.jpg
+*/
+export const getChampion_Image_Loading = (
   version: string,
   championName: string,
   number: number
 ): string => {
-  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/loading/${championName}_${number}.jpg`;
+  return `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${championName}_${number}.jpg`;
 };
 
-// 챔피언 이미지_스킨_full
-export const getChampionImageUrl_Skin_Full = (
+/* 챔피언_이미지_full */
+export const getChampion_Image_Full = (
   championName: string,
   number: number
 ): string => {
   return `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championName}_${number}.jpg`;
 };
 
-// 챔피언 이미지_스킬
-export const getChampionImageUrl_Skill = (
+/* 챔피언_이미지_스킬
+ex) https://ddragon.leagueoflegends.com/cdn/14.18.1/img/spell/AatroxQ.png
+*/
+export const getChampion_Image_Skill = (
   version: string,
   name: string
 ): string => {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/spell/${name}.png`;
 };
 
-// 챔피언 이미지_패시브
-export const getChampionImageUrl_Passive = (
+/* 챔피언_이미지_패시브
+ex) https://ddragon.leagueoflegends.com/cdn/14.18.1/img/passive/Aatrox_Passive.png
+*/
+export const getChampion_Image_Passive = (
   version: string,
   name: string
 ): string => {

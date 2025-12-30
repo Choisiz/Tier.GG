@@ -21,7 +21,6 @@ export default function Modals() {
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 xl:gap-6">
         <DefaultModal />
         <VerticallyCenteredModal />
-        <FormInModal />
         <FullScreenModal />
         <ModalBasedAlerts />
       </div>

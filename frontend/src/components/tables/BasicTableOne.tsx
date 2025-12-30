@@ -1,6 +1,5 @@
 'use client';
 
-// components/tables/BasicTableOne.tsx (순수 서버 컴포넌트)
 import {
   Table,
   TableBody,
@@ -8,9 +7,10 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
-
 import Image from "next/image";
 import Link from "next/link";
+import type { ChampionImageData } from "@/types/champion";
+
 const POSITION_ICON_FILES: Record<string, string> = {
   TOP: "Position_Diamond-Top.png",
   JUNGLE: "Position_Diamond-Jungle.png",
@@ -48,27 +48,11 @@ const getPositionLabel = (position?: string | null) => {
   return POSITION_LABELS[key] ?? key;
 };
 
-interface ChampionImageData {
-  name: string;
-  url: string;
-  championName?: string;
-  championId?: number;
-  tier?: string | null;
-  position?: string | null;
-  pickCount?: number | null;
-  winCount?: number | null;
-  pickRate?: number | null;
-  winRate?: number | null;
-  banRate?: number | null;
-}
-
-interface BasicTableOneProps {
-  champions?: ChampionImageData[];
-}
-
 export default function BasicTableOne({
   champions = [],
-}: BasicTableOneProps) {
+}: {
+  champions?: ChampionImageData[];
+}) {
   const tierColor = (tier?: string | null) => {
     switch (tier) {
       case "OP":

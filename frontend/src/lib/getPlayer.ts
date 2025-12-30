@@ -1,48 +1,7 @@
+import type { MatchData } from "@/types/match";
+
 const RIOT_API_KEY = process.env.RIOT_API_KEY;
 const RIOT_API_ASIA_BASE_URL = "https://asia.api.riotgames.com";
-
-export interface MatchParticipant {
-  puuid: string;
-  summonerName: string;
-  riotIdGameName: string;
-  riotIdTagline: string;
-  championId: number;
-  championName: string;
-  teamId: number;
-  win: boolean;
-  kills: number;
-  deaths: number;
-  assists: number;
-  totalMinionsKilled: number;
-  neutralMinionsKilled: number;
-  goldEarned: number;
-  totalDamageDealtToChampions: number;
-  item0: number;
-  item1: number;
-  item2: number;
-  item3: number;
-  item4: number;
-  item5: number;
-  item6: number;
-  summoner1Id: number;
-  summoner2Id: number;
-  teamPosition: string;
-}
-
-export interface MatchInfo {
-  gameCreation: number;
-  gameDuration: number;
-  gameMode: string;
-  queueId: number;
-  participants: MatchParticipant[];
-}
-
-export interface MatchData {
-  metadata: {
-    matchId: string;
-  };
-  info: MatchInfo;
-}
 
 // PUUID로 매치 ID 리스트 조회
 export const getMatchIdsByPuuid = async (

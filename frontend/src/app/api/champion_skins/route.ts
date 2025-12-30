@@ -1,38 +1,17 @@
 // app/api/champion_skins/route.ts
-import { getVersions_Url, getChampionData_Detail_Url } from "@/lib/champions";
+import {
+  getVersions_Url,
+  getChampion_Data_Detail,
+  getChampion_Image_Full,
+  getChampion_Image_Loading,
+} from "@/lib/champions";
 import { NextRequest, NextResponse } from "next/server";
-
-// Data Dragon에서 받아오는 원본 스킨 타입
-interface RawChampionSkin {
-  id: string;
-  num: number;
-  name: string;
-  chromas?: boolean;
-}
-
-// Data Dragon에서 받아오는 원본 챔피언 타입
-interface RawChampionData {
-  id: string;
-  key: string;
-  name: string;
-  title: string;
-  skins: RawChampionSkin[];
-}
-
-interface ChampionSkinData {
-  id: string;
-  num: number;
-  name: string;
-  splashUrl: string;
-  loadingUrl: string;
-  chromas?: boolean;
-}
-
-interface ChampionSkinsResponse {
-  championId: string;
-  championName: string;
-  skins: ChampionSkinData[];
-}
+import type {
+  RawChampionSkin,
+  RawChampionData,
+  ChampionSkinData,
+  ChampionSkinsResponse,
+} from "@/types/skin";
 
 //GET http://localhost:3001/api/champion_skins?championName=Ahri&version=15.11.1&language=ko_KR
 export async function GET(request: NextRequest) {
@@ -58,7 +37,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Data Dragon에서 특정 챔피언 데이터 가져오기
-    const detailRes = await fetch(getChampionData_Detail_Url(version, lang, championName));
+    const detailRes = await fetch(getChampion_Data_Detail(version, lang, championName));
     if (!detailRes.ok) throw new Error("챔피언 데이터를 불러올 수 없습니다.");
     const championData = await detailRes.json();
     const champion: RawChampionData = championData.data[championName];
@@ -76,8 +55,8 @@ export async function GET(request: NextRequest) {
         id: skin.id,
         num: skin.num,
         name: skin.name === "default" ? `기본 ${champion.name}` : skin.name,
-        splashUrl: `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championName}_${skin.num}.jpg`,
-        loadingUrl: `https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${championName}_${skin.num}.jpg`,
+        splashUrl: getChampion_Image_Full(championName, skin.num),
+        loadingUrl: getChampion_Image_Loading(version!, championName, skin.num),
         chromas: skin.chromas,
       })
     );

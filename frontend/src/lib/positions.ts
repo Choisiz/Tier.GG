@@ -1,5 +1,4 @@
-const DEFAULT_VERSION =
-  process.env.NEXT_PUBLIC_DDRAGON_VERSION ?? "15.11.1";
+
 
 const POSITION_FILENAME: Record<string, string> = {
   TOP: "Position_Top.png",
@@ -25,21 +24,19 @@ const POSITION_LABELS: Record<string, string> = {
   SUPPORT: "SUPPORT",
 };
 
-// 포지션 아이콘 URL
+// 포지션_아이콘
 export const getPositionIcon = (
   position?: string | null,
-  version: string = DEFAULT_VERSION
+  version?: string| null,
 ): string => {
   const key = position?.toUpperCase();
   const file = POSITION_FILENAME[key ?? ""] ?? "Position_Middle.png";
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/ui/${file}`;
 };
 
-// 포지션 라벨
+// 포지션_라벨
 export const getPositionLabel = (position?: string | null): string => {
   if (!position) return "전체";
   const key = position.toUpperCase();
   return POSITION_LABELS[key] ?? key;
 };
-
-export const DEFAULT_POSITION_ICON_VERSION = DEFAULT_VERSION;

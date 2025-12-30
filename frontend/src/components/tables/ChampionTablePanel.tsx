@@ -2,33 +2,7 @@
 
 import { useMemo, useState } from "react";
 import BasicTableOne from "./BasicTableOne";
-
-interface PositionDetail {
-  tier: string | null;
-  pickCount?: number | null;
-  winCount?: number | null;
-  pickRate?: number | null;
-  winRate?: number | null;
-  banRate?: number | null;
-  items?: number[];
-  primaryRunes?: number[];
-  subRunes?: number[];
-}
-
-interface ChampionImageData {
-  name: string;
-  url: string;
-  championName?: string;
-  championId?: number;
-  tier?: string | null;
-  position?: string | null;
-  positionDetails?: Record<string, PositionDetail>;
-  pickCount?: number | null;
-  winCount?: number | null;
-  pickRate?: number | null;
-  winRate?: number | null;
-  banRate?: number | null;
-}
+import type { ChampionImageData, PositionDetail } from "@/types/champion";
 
 const POSITIONS = [
   { key: "ALL", label: "전체" },
@@ -38,7 +12,8 @@ const POSITIONS = [
   { key: "BOTTOM", label: "BOTTOM" },
   { key: "UTILITY", label: "SUPPORT" },
 ];
-const TIER_ORDER: Record<string, number> = {
+
+const TIER_PRIORITY: Record<string, number> = {
   OP: 0,
   "1tier": 1,
   "2tier": 2,
@@ -46,26 +21,24 @@ const TIER_ORDER: Record<string, number> = {
   "4tier": 4,
 };
 
-interface ChampionTablePanelProps {
-  champions: ChampionImageData[];
-}
-
-const resolveBestTier = (champ: ChampionImageData) => {
+const getBestTier = (champ: ChampionImageData) => {
   if (champ.tier) return champ.tier;
   if (!champ.positionDetails) return null;
   const entries = Object.entries(champ.positionDetails);
   if (!entries.length) return null;
   entries.sort(
     (a, b) =>
-      (TIER_ORDER[a[1]?.tier ?? ""] ?? 99) -
-      (TIER_ORDER[b[1]?.tier ?? ""] ?? 99)
+      (TIER_PRIORITY[a[1]?.tier ?? ""] ?? 99) -
+      (TIER_PRIORITY[b[1]?.tier ?? ""] ?? 99)
   );
   return entries[0]?.[1]?.tier ?? null;
 };
 
 export default function ChampionTablePanel({
   champions,
-}: ChampionTablePanelProps) {
+}: {
+  champions: ChampionImageData[];
+}) {
   const [position, setPosition] = useState<string>("ALL");
 
   const filtered = useMemo(() => {
@@ -75,10 +48,10 @@ export default function ChampionTablePanel({
       champions.forEach((champ) => {
         const detailEntries = Object.entries(champ.positionDetails || {});
         if (detailEntries.length) {
-          detailEntries.forEach(([pos, detail]) => {
+          detailEntries.forEach(([pos, detail]: [string, PositionDetail]) => {
             baseList.push({
               ...champ,
-              tier: detail.tier ?? resolveBestTier(champ),
+              tier: detail.tier ?? getBestTier(champ),
               position: pos,
               pickCount: detail.pickCount ?? champ.pickCount ?? null,
               winCount: detail.winCount ?? champ.winCount ?? null,
@@ -90,7 +63,7 @@ export default function ChampionTablePanel({
         } else {
           baseList.push({
             ...champ,
-            tier: resolveBestTier(champ),
+            tier: getBestTier(champ),
             position: "전체",
             pickCount: champ.pickCount ?? null,
             winCount: champ.winCount ?? null,
@@ -102,7 +75,7 @@ export default function ChampionTablePanel({
       });
     } else {
       champions.forEach((champ) => {
-        const detail = champ.positionDetails?.[position];
+        const detail = champ.positionDetails?.[position] as PositionDetail | undefined;
         const tier = detail?.tier ?? null;
         if (!tier) return;
         baseList.push({
@@ -119,8 +92,8 @@ export default function ChampionTablePanel({
     }
 
     return [...baseList].sort((a, b) => {
-      const aRank = TIER_ORDER[a.tier ?? ""] ?? 99;
-      const bRank = TIER_ORDER[b.tier ?? ""] ?? 99;
+      const aRank = TIER_PRIORITY[a.tier ?? ""] ?? 99;
+      const bRank = TIER_PRIORITY[b.tier ?? ""] ?? 99;
       if (aRank !== bRank) return aRank - bRank;
       return (a.name || "").localeCompare(b.name || "");
     });
@@ -148,4 +121,3 @@ export default function ChampionTablePanel({
     </div>
   );
 }
-

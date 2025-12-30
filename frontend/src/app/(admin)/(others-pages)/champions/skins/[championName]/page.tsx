@@ -1,6 +1,6 @@
-// app/champions/[championName]/page.tsx
 import { Metadata } from 'next';
-import ChampionSkinsClient from './ChampionSkinsClient';
+import ChampionSkinsClient from '@/components/champions/ChampionSkinsClient';
+import { getChampionSkins } from '@/services/skinData';
 
 interface Props {
   params: {
@@ -19,12 +19,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default function ChampionSkinsPage({ params, searchParams }: Props) {
-  return (
-    <ChampionSkinsClient
-      championName={params.championName}
-      version={searchParams.version}
-      language={searchParams.language}
-    />
+export default async function ChampionSkinsPage({ params, searchParams }: Props) {
+  const skinData = await getChampionSkins(
+    params.championName,
+    searchParams.version,
+    searchParams.language
   );
+
+  return <ChampionSkinsClient initialData={skinData} />;
 }

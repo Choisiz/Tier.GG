@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getVersions_Url } from "../../../lib/champions";
 import { getItem_Image } from "../../../lib/itemAssets";
-import { getRunes_Url, RuneDefinition } from "../../../lib/runes";
+import { getRunes } from "../../../lib/runes";
 
 type ChampionTierEntry = {
   championId: number;
@@ -16,6 +16,11 @@ type ChampionTierEntry = {
   items?: number[];
   primaryRunes?: number[];
   subRunes?: number[];
+};
+
+type RuneDefinition = {
+  id: number;
+  icon: string;
 };
 
 const runeCache = new Map<string, Map<number, string>>();
@@ -37,7 +42,7 @@ async function getRuneIconMap(
     return cached;
   }
 
-  const runeRes = await fetch(getRunes_Url(version, language), {
+  const runeRes = await fetch(getRunes(version, language), {
     cache: "force-cache",
   });
   if (!runeRes.ok) throw new Error("룬 정보를 가져오지 못했습니다.");
