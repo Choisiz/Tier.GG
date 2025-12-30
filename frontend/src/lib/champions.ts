@@ -69,3 +69,20 @@ export const getChampion_Image_Passive = (
 ): string => {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/passive/${name}.png`;
 };
+
+/* DDragon 공용 이미지 헬퍼 (파일명 그대로 사용)
+ex) getDdragonImageByFile("15.11.1", "spell", "AatroxQ.png")
+*/
+export const getDdragonImageByFile = (
+  version: string,
+  category: "champion" | "spell" | "passive",
+  filename: string
+): string => {
+  const pathMap = {
+    champion: "champion",
+    spell: "spell",
+    passive: "passive",
+  };
+  const dir = pathMap[category];
+  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/${dir}/${filename}`;
+};
