@@ -1,6 +1,0 @@
-BEGIN;
-ALTER TABLE IF EXISTS champion
-  DROP COLUMN IF EXISTS position_count;
-COMMIT;
-
-

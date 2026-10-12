@@ -1,102 +1,138 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 1. 프로젝트 개요
 
-## Project Overview
+- 라이엇 게임즈 리그 오브 레전드(LoL) 전적 사이트
+- 참고 사이트: lol.ps, op.gg
+- 참고 사이트의 흐름과 구성을 분석하되, 디자인과 코드를 그대로 복사하지 않는다.
+- 최종 목표: AI, LLM, LangChain, RAG 등을 복합적으로 활용해 사용자에게 피드백을 제공하는 웹사이트
+- 모든 기능을 동시에 개발하지 않는다.
+- 단계별로 구성하고 검증한 뒤 다음 단계로 진행한다.
 
-Tier.GG is a League of Legends champion tier data aggregation and visualization platform. It collects ranked game data from the Riot API, processes statistics, and displays champion tier lists with detailed analytics.
 
-## Development Commands
+## 2. 프로젝트 스택
 
-### Frontend (Next.js 15 + React 19)
-```bash
-cd frontend
-npm run dev      # Start dev server on port 3000 (--hostname 0.0.0.0)
-npm run build    # Production build
-npm run lint     # ESLint
+| 영역 | 스택 |
+|------|------|
+| 프론트엔드 | Next.js, TypeScript, Tailwind CSS |
+| 백엔드 | Node.js, Express |
+| DB | Supabase |
+| AI | 미정 |
+
+- 새로운 기술이나 의존성을 도입할 때는 목적과 이유를 설명한다.
+
+
+## 3. 공통 규칙
+
+- 계획 승인 전에는 구현하지 않는다.
+- 승인된 범위 안의 수정과 검증은 추가 승인 없이 진행한다.
+- 기능 추가나 큰 구조 변경은 재승인을 받는다.
+- 요청과 관계없는 코드는 수정하지 않는다.
+- 막히면 원인과 필요한 조치를 사용자에게 알린다.
+- 완료 시 구현 결과, 검증 결과, 남은 문제를 간단히 보고한다.
+
+
+## 4. 명령
+
+사용자가 아래 명령을 요청하면 해당 영역의 작업 흐름을 실행한다.
+
+| 명령 | 영역 |
+|------|------|
+| `!프론트` | 프론트엔드 작업 |
+| `!백엔드` | 백엔드 작업 |
+| `!db` | 데이터베이스 작업 |
+| `!ai` | AI 작업 |
+
+
+## 5. 메인 에이전트 역할
+
+- 사용자 요청을 구체적인 작업 범위로 정리한다.
+- 서브에이전트에게 작업 범위와 기준 문서를 프롬프트로 전달한다.
+- Plan → 사용자 승인 → Build → Review 순서로 작업을 조율한다.
+- 각 단계의 결과가 승인된 계획과 일치하는지 확인한다.
+- 작업 종료 시 구현 결과, 검증 결과, 남은 문제를 보고한다.
+
+
+## 6. 서브에이전트 규칙
+
+- 별도 지침 파일은 만들지 않는다. 승인된 계획 문서(`front_spec.md` 등)를 작업 기준으로 삼는다.
+- 계획 문서가 아직 없는 Plan 단계에서는 작업 내용과 범위를 프롬프트로 전달한다.
+- 서브에이전트는 지정된 범위만 수정한다.
+- 범위 밖 수정이 필요하면 메인 에이전트에게 보고한다.
+
+
+## 7. 프론트엔드 작업 흐름
+
+### 경로
+
+| 구분 | 경로 |
+|------|------|
+| 작업 경로 | `frontend/` |
+| 계획 | `frontend/docs/front_spec.md` |
+| 구현 기록 | `frontend/docs/front_build.md` |
+| 검토 기록 | `frontend/docs/front_review.md` |
+
+### 단계별 서브에이전트
+
+- Plan, Build, Review 역할의 서브에이전트 3개를 사용한다.
+- 각 단계는 순서대로 진행하며, Build와 Review는 반드시 분리한다.
+
+### Plan
+
+- 요약: 구현할 기능, 구조, 완료 기준을 정하고 승인을 받는다.
+- Plan 에이전트는 `front_spec.md`에 기능, 구조, 완료 기준, 작업 범위(단계별 수정 가능한 경로)를 작성한다.
+- 각 소제목에 쉬운 요약을 포함한다.
+- 사용자 승인 후 Build 단계로 진행한다.
+- 승인 전에는 코드 구현을 시작하지 않는다.
+
+### Build
+
+- 요약: 승인된 계획에 따라 구현하고 결과를 기록한다.
+- `front_build.md`에 기능별 결과를 기록한다.
+- 기록 형식: 기능 / 구현 내용 / 상태
+- 상태 표기
+
+| 표기 | 의미 |
+|------|------|
+| ✅ | 완료 |
+| ⚠️ | 부분 완료 |
+| ❌ | 실패 |
+| ⏸️ | 보류 |
+
+### Review
+
+- 요약: 코드와 브라우저 동작을 독립적으로 확인한다.
+- Build와 별도의 에이전트가 검토한다.
+- `front_review.md`에 결과를 기록한다.
+- 수정한 기능은 `front_build.md`에도 반영한다.
+- 검토가 완료되면 `docs/career_log.md`에 이번 작업의 판단 기록을 추가한다. (8장 참고)
+- Review 에이전트는 다음을 확인한다.
+  - 승인된 요구사항과 완료 기준 충족 여부
+  - 코드 오류와 유지보수상 문제
+  - 주요 사용자 흐름의 브라우저 동작
+  - 로딩, 빈 결과, 오류 상태
+  - 모바일 및 데스크톱 화면
+  - 기본 접근성
+  - 타입 검사, 린트, 빌드 등 관련 검증 결과
+
+
+## 8. 커리어 기록
+
+- 요약: 이력서·면접에 쓸 수 있도록 작업 중 내린 **판단**을 기록한다.
+- 파일: `docs/career_log.md` (저장소 루트, `.gitignore`에 포함되어 git에 올리지 않는다)
+- 작성 시점: Review 서브에이전트가 검토를 완료한 뒤 작성한다. 계획·구현·검토 기록(`front_spec.md`, `front_build.md`, `front_review.md`)을 근거로 쓰고, 검토에서 나온 문제와 수치도 반영한다.
+- 작업 범위: 각 계획서의 작업 범위(수정 가능한 경로)에 Review 단계의 `docs/career_log.md`를 포함한다.
+- 기록 대상: 기능 구현 자체보다 설계·판단이 드러나는 내용
+  - AI 활용·작업 구조 설계, 자동화 구조, 데이터 기반 의사결정, 시스템 통합
+  - 하지 않기로 한 결정과 그 이유도 기록한다.
+- 기존 기록은 수정하지 않고 아래에 추가한다.
+- 기록 형식 (항목마다)
+
 ```
-
-### Backend (Express.js + TypeScript)
-```bash
-cd backend
-npm run dev      # Start with tsx watch on port 5500
-npm run build    # Compile TypeScript to dist/
-npm run collect  # Run full data collection pipeline
+### [날짜] 제목
+- 상황/문제: 무엇이 문제였나
+- 선택지: 어떤 방법들이 있었나
+- 판단 근거: 왜 이걸 골랐나 (데이터, 제약 조건)
+- 결과: 무엇이 좋아졌나 (가능하면 수치)
+- 배운 점 / 한계
 ```
-
-### Database
-```bash
-docker compose -f docker-compose.db.yml up -d  # Start PostgreSQL on port 5433
-```
-
-## Architecture
-
-### Data Collection Pipeline
-
-The backend runs a 4-step data collection pipeline orchestrated by `backend/scripts/collect_all.sh`:
-
-1. **Player Collection** (`/info/player`) - Fetches ranked players from Riot API
-2. **Match Collection** (`/info/matches`) - Gets recent match IDs for each player
-3. **Game Info Collection** (`/info/gameInfo`) - Fetches detailed match data (items, runes, bans)
-4. **Champion Aggregation** (`/info/champion`) - Computes champion tier statistics (pick%, win%, ban%)
-
-Rate limiting is handled in-memory via `backend/src/lib/rateLimiter.ts` (9 req/sec, 100 req/120sec for Riot API compliance).
-
-### Database Schema (PostgreSQL)
-
-| Table | Purpose |
-|-------|---------|
-| `players` | Ranked player data |
-| `matches` | Player → Match ID mapping |
-| `gameinfo` | Match details (champion, position, items, spells) |
-| `gameinfo_bans` | Champion ban data |
-| `gameinfo_perks` | Rune/perk selections |
-| `champion` | Daily aggregated champion statistics by position |
-
-Schema migrations are in `/db/` directory.
-
-### Frontend Structure
-
-```
-frontend/src/
-├── app/                    # Next.js App Router
-│   ├── (admin)/           # Dashboard layout group
-│   │   └── (others-pages)/
-│   │       ├── basic-tables/     # Champion tier list page
-│   │       └── champions/
-│   │           ├── info/[championName]/   # Champion details
-│   │           └── skins/[championName]/  # Skins showcase
-│   └── api/               # API routes (champion data from DDragon)
-├── components/
-│   └── tables/            # ChampionTablePanel - main tier list component
-├── context/               # ThemeContext (dark/light), SidebarContext
-└── lib/                   # Utility functions (champions, runes, items, spells)
-```
-
-### Key Patterns
-
-- **Theme Toggle**: Uses `ThemeContext` with localStorage persistence and DOM class toggling
-- **Sidebar State**: `SidebarContext` manages navigation, submenus, and mobile responsiveness
-- **External Assets**: Champion images, item icons, and spell icons are fetched from `ddragon.leagueoflegends.com`
-- **Path Alias**: Use `@/*` to import from `frontend/src/*`
-
-## API Endpoints
-
-### Backend API (port 5500)
-- `GET /info/player?queue=RANKED_SOLO_5x5&page=1` - Collect ranked players
-- `GET /info/matches?limit=20&puuidLimit=100` - Collect match IDs
-- `GET /info/gameInfo?max=1000&batchSize=10` - Collect game details
-- `GET /info/champion` - Aggregate champion statistics
-
-### Frontend API Routes
-- `/api/champion_info?name=Aatrox` - Champion data from DDragon
-- `/api/champion_images?name=Aatrox` - Champion images
-- `/api/champion_skins?name=Aatrox` - Champion skins
-- `/api/champion_item?itemId=1001` - Item data
-
-## Environment Variables
-
-Required in `.env`:
-- `RIOT_API_KEY` - Riot Games API key
-- `DATABASE_URL` - PostgreSQL connection string
-- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` - Database credentials
