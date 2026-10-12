@@ -66,3 +66,6 @@ api/prisma/dev.db*
 # Temporary files
 tmp/
 temp/
+
+# 개인 커리어 기록 (git에 올리지 않음)
+docs/career_log.md
