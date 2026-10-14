@@ -2,28 +2,47 @@
 
 > 이 문서는 `!백엔드`가 작성하고 `!프론트`가 읽는 계약 문서다. 엔드포인트, 파라미터, 응답 형식, 오류 형식을 정한다. (CLAUDE.md 9장)
 
-- 상태: **승인됨 (2026-10-14)** — `backend/docs/back_spec.md`와 함께 승인
-- 근거: `docs/contracts/db_contract.md` v6 (집계 테이블, `champion_tier_view`)
-- 범위: 챔피언 티어리스트(포지션별) + 챔피언 상세(포지션, 빌드). 전적 검색·SSE는 포함하지 않는다.
+- 상태: **v2 승인됨 (구현 반영)** — `backend/docs/back_spec.md` "변경 01"과 함께 승인 (2026-10-15). Build 구현 결과 내용 변경 없음 (`backend/docs/back_build.md` 변경 01).
+- 근거: `docs/contracts/db_contract.md` **v7** (`stats_window`, `stats_window_patch`, `champion_tier_view`, 매일 05:00 KST 집계)
+- 범위: 챔피언 티어리스트(포지션별) + 챔피언 상세(포지션, 빌드). 통계는 **최근 14일에 시작한 게임** 기준. 전적 검색·SSE는 포함하지 않는다.
+
+### v1 → v2 변경 (2026-10-15, 백엔드 변경 01)
+
+| 변경 | v1 | v2 | 이유 |
+|------|----|----|------|
+| 통계 단위 | 패치 1개 | 최근 14일 창 1개 (하루 1번 05:00 KST 갱신) | DB v7 (db_spec 변경 03) |
+| `patch` 쿼리 (`/champions`, 상세) | 있음 | **없음** (보내도 무시) | 창이 1개뿐 |
+| 직전 패치 대체 규칙 (2-0, `isFallback`, `fallbackMinGames`) | 있음 | **없음** | 14일 창이라 새 패치 직후 표본 급감이 없음 |
+| 통계 응답의 `patch` 객체 | `{data, latest, requested, isFallback, games}` | **`window` 객체** `{days, start, end, games, aggregatedAt, isStale, patches[]}` (2-0) | 어느 기간의 숫자인지, 패치가 어떻게 섞였는지 보여줌 |
+| 패치 이름 | 내부 값만 (`16.20`) | `patch`(내부) + **`displayName`**(공개, 메이저 + 10 → `26.20`) | 공개 패치 이름과 맞춤 (사용자 결정) |
+| 패치 구성 비율 | 없음 | `window.patches[].share` (백엔드 계산, 소수 2자리) | 두 패치가 섞이는 시기를 투명하게 |
+| 집계 멈춤 표시 | 없음 | `window.isStale` (26시간), `/health`의 `stats` | 예약 작업 실패에 알림이 없음 (db_review L7) |
+| `/meta` | `latestPatch`, `defaultPatch`, `isFallback`, `patches[]` | `window`. `rules`에 `windowDays`, `staleAfterHours` (`fallbackMinGames` 삭제) | 위와 같음 |
+| 오류 `PATCH_NOT_FOUND` | 있음 | **삭제**. `STATS_NOT_FOUND`의 `details.patch` 삭제 | `patch` 쿼리가 없음 |
+| `STATS_NOT_READY` 뜻 | 집계된 패치 없음 | 집계된 창 없음 (첫 집계 전) | |
+| 읽기 일관성 | (규칙 없음) | 한 응답의 숫자는 모두 한 스냅숏에서 나옴 (1장) | 05:00 집계 커밋 순간 섞임 방지 (db_review L11) |
+| 경로 | `/api/v1` | `/api/v1` 그대로 | 아직 이 API를 쓰는 화면이 없음 (back_spec 변경 01 D14) |
 
 ---
 
 ## 1. 기본 규칙
 
-> 요약: 읽기 전용 GET만 있고, JSON으로 답한다. 숫자 ID만 주므로 이름·이미지는 프론트가 Data Dragon으로 붙인다.
+> 요약: 읽기 전용 GET만 있고, JSON으로 답한다. 숫자 ID만 주므로 이름·이미지는 프론트가 Data Dragon으로 붙인다. 통계는 최근 14일 창 하나이고, 한 응답 안의 숫자는 모두 같은 집계에서 나온다.
 
 | 항목 | 규칙 |
 |------|------|
 | 기본 URL | 개발: `http://localhost:4000/api/v1` (`API_PORT`, 기본 4000). 프론트는 서버 환경 변수로 기본 URL을 받는다 |
-| 버전 | 경로 앞 `/api/v1`. 호환이 깨지는 변경은 `/api/v2`로. 필드 추가는 같은 버전에서 할 수 있으므로 프론트는 모르는 필드를 무시한다 |
+| 버전 | 경로 앞 `/api/v1`. 필드 추가는 같은 버전에서 할 수 있으므로 프론트는 모르는 필드를 무시한다. 백엔드도 모르는 쿼리 파라미터를 무시한다 |
 | 메서드 | `GET`만 |
 | 형식 | `Content-Type: application/json; charset=utf-8`. 필드 이름은 camelCase |
 | 인증 | 없음 (공개 통계). Riot 키·DB 정보는 백엔드에만 있다 |
 | 호출 위치 | Next.js 서버 컴포넌트에서 호출 (서버 간). CORS 헤더는 주지 않는다 |
 | 비율 | 퍼센트 숫자, 소수 2자리 (`52.31` = 52.31%) |
-| 패치 | `"16.19"` 형식 문자열 (`^[0-9]+\.[0-9]+$`). 순서는 숫자 비교 (`16.9` < `16.19`) |
+| 통계 기간 | 최근 14일에 시작한 게임 (`window.start` 포함 ~ `window.end` 제외). DB 예약 작업이 **매일 05:00 KST(20:00 UTC)** 에 다시 집계한다 |
+| 패치 | `patch`: 내부 값 `"16.20"` (`^[0-9]+\.[0-9]+$`, Data Dragon 버전에 씀). `displayName`: 화면에 쓰는 공개 이름 `"26.20"` (= 메이저 + 10). **화면에는 `displayName`만 쓴다** |
 | 포지션 | `TOP` `JUNGLE` `MIDDLE` `BOTTOM` `UTILITY` (대문자만) |
-| 날짜 | ISO 8601 UTC (`2026-10-14T09:12:33.000Z`) |
+| 날짜 | ISO 8601 UTC, 밀리초 포함 (`2026-10-14T20:00:00.418Z`) |
+| 일관성 | 한 응답의 `window`와 통계 숫자는 같은 집계 스냅숏에서 읽는다 (백엔드가 요청마다 `REPEATABLE READ` 읽기 전용 트랜잭션 1개 사용). 05:00 갱신 순간에도 분모와 개수가 섞이지 않는다 |
 
 ---
 
@@ -33,39 +52,52 @@
 
 | 메서드·경로 | 화면 |
 |-------------|------|
-| `GET /api/v1/health` | (운영 확인) |
-| `GET /api/v1/meta` | 공통 (패치 표시, 패치 선택) |
+| `GET /api/v1/health` | (운영 확인, 집계 상태) |
+| `GET /api/v1/meta` | 공통 (통계 기간·패치 구성 표시) |
 | `GET /api/v1/champions` | 챔피언 리스트 (포지션별 티어) |
 | `GET /api/v1/champions/:championId` | 챔피언 상세 (포지션 + 빌드) |
 
-### 2-0. 표시 패치 규칙 (모든 통계 엔드포인트 공통)
+### 2-0. `window` 객체 (모든 통계 응답 공통)
 
-> 요약: `patch`를 안 주면 백엔드가 고른다. 새 패치 초반에 표본이 적으면 직전 패치를 보여주고 `isFallback: true`로 알린다.
+> 요약: 이 응답의 숫자가 어느 14일의 몇 게임에서 나왔는지, 언제 집계했는지, 집계가 멈췄는지, 패치가 어떻게 섞였는지 알려 준다.
 
-1. `patch`를 주면 그 패치를 쓴다 (대체 없음). 없으면 `404 PATCH_NOT_FOUND`.
-2. `patch`를 안 주면:
-   - 최신 패치 = 집계된 패치 중 가장 높은 패치.
-   - 최신 패치의 `games`가 **5,000 미만**이고, 직전 패치가 있고, 직전 패치의 `games`가 더 많으면 → **직전 패치**.
-   - 아니면 최신 패치.
-3. 집계된 패치가 하나도 없으면 `503 STATS_NOT_READY`.
-
-모든 통계 응답에 들어가는 `patch` 객체:
+```json
+{
+  "days": 14,
+  "start": "2026-10-01T20:00:00.418Z",
+  "end": "2026-10-15T20:00:00.418Z",
+  "games": 2481,
+  "aggregatedAt": "2026-10-15T20:00:00.418Z",
+  "isStale": false,
+  "patches": [
+    { "patch": "16.20", "displayName": "26.20", "games": 1489, "share": 60.02 },
+    { "patch": "16.19", "displayName": "26.19", "games": 992, "share": 39.98 }
+  ]
+}
+```
 
 | 필드 | 타입 | null | 의미 |
 |------|------|------|------|
-| `patch.data` | string | 아니오 | 이 응답의 숫자가 나온 패치 |
-| `patch.latest` | string | 아니오 | 집계된 최신 패치 |
-| `patch.requested` | string | 예 | 요청에 준 `patch` (안 줬으면 `null`) |
-| `patch.isFallback` | boolean | 아니오 | 최신 패치 대신 직전 패치를 보여주면 `true` |
-| `patch.games` | int | 아니오 | `patch.data`의 전체 게임 수 (픽률·밴률 분모) |
+| `window.days` | int | 아니오 | 창 길이(일). 지금은 `14` |
+| `window.start` | string | 아니오 | 창 시작 (포함) |
+| `window.end` | string | 아니오 | 창 끝 (제외). 예약 작업 실행 시각 |
+| `window.games` | int | 아니오 | 창 안 완료 게임 수 (픽률·밴률 분모) |
+| `window.aggregatedAt` | string | 아니오 | 이 집계를 만든 시각. 보통 `end`와 같다 |
+| `window.isStale` | boolean | 아니오 | 지금 − `aggregatedAt` > **26시간**이면 `true` (하루 1번 집계가 멈춤). 정확히 26시간은 `false` |
+| `window.patches[]` | array | 아니오 | 창 안 패치 구성, **최신 패치 먼저**. 1개 이상 |
+| `window.patches[].patch` | string | 아니오 | 내부 패치 (`16.20`). Data Dragon 버전 찾기에 쓴다 (5장) |
+| `window.patches[].displayName` | string | 아니오 | 공개 이름 = `${메이저 + 10}.${마이너}` (`16.20` → `26.20`, `16.9` → `26.9`) |
+| `window.patches[].games` | int | 아니오 | 그 패치 게임 수. 합계 = `window.games` |
+| `window.patches[].share` | number | 아니오 | `100 × games / window.games`, 소수 2자리. 반올림 때문에 합이 정확히 `100.00`이 아닐 수 있다 |
 
-- 화면 표시 예: `isFallback`이면 "16.20 패치 표본이 부족해 16.19 패치 통계를 보여줍니다".
+- 화면 표시 예: "최근 14일 · 2,481게임 · 26.20 60% / 26.19 40% · 10월 16일 05:00 집계".
+- `isStale`이면 예: "통계 갱신이 지연되고 있습니다 (마지막 집계 10월 16일 05:00)". 숫자는 마지막 집계 그대로 보여준다.
 
 ---
 
 ### 2-1. `GET /api/v1/health`
 
-> 요약: 서버와 DB가 살아 있는지 확인한다. 화면에서는 쓰지 않는다.
+> 요약: 서버와 DB가 살아 있는지, 집계 상태가 어떤지 확인한다. 화면에서는 쓰지 않는다.
 
 - 파라미터 없음.
 
@@ -74,21 +106,28 @@ GET /api/v1/health
 ```
 
 ```json
-{ "status": "ok", "db": "ok" }
+{
+  "status": "ok",
+  "db": "ok",
+  "stats": { "state": "fresh", "aggregatedAt": "2026-10-15T20:00:00.418Z" }
+}
 ```
 
-| 필드 | 타입 | 의미 |
-|------|------|------|
-| `status` | `"ok"` | 서버 응답 |
-| `db` | `"ok"` | `SELECT 1` 성공. 실패하면 `503 DB_UNAVAILABLE` |
+| 필드 | 타입 | null | 의미 |
+|------|------|------|------|
+| `status` | `"ok"` | 아니오 | 서버 응답 |
+| `db` | `"ok"` | 아니오 | DB 조회 성공. 실패하면 `503 DB_UNAVAILABLE` |
+| `stats.state` | `"fresh"` \| `"stale"` \| `"empty"` | 아니오 | `fresh`: 26시간 안에 집계됨. `stale`: 26시간 넘게 갱신 안 됨. `empty`: 아직 집계 없음 (첫 집계 전) |
+| `stats.aggregatedAt` | string | 예 | 마지막 집계 시각. `empty`면 `null` |
 
+- 집계가 오래돼도(`stale`, `empty`) HTTP는 **200**이다. `/health`는 서버·DB 확인용이고, 집계 상태는 `stats`로만 알린다.
 - 캐시: `no-store`.
 
 ---
 
 ### 2-2. `GET /api/v1/meta`
 
-> 요약: 지금 보여줄 패치, 패치 목록, 마지막 수집 시각, 화면에 적을 규칙 값을 준다.
+> 요약: 지금 통계의 기간·게임 수·패치 구성(`window`), 마지막 수집 시각, 화면에 적을 규칙 값을 준다.
 
 - 파라미터 없음.
 
@@ -98,38 +137,40 @@ GET /api/v1/meta
 
 ```json
 {
-  "latestPatch": "16.20",
-  "defaultPatch": "16.19",
-  "isFallback": true,
-  "patches": [
-    { "patch": "16.20", "games": 812 },
-    { "patch": "16.19", "games": 2712 }
-  ],
-  "lastCollectedAt": "2026-10-14T09:12:33.000Z",
+  "window": {
+    "days": 14,
+    "start": "2026-10-01T20:00:00.418Z",
+    "end": "2026-10-15T20:00:00.418Z",
+    "games": 2481,
+    "aggregatedAt": "2026-10-15T20:00:00.418Z",
+    "isStale": false,
+    "patches": [
+      { "patch": "16.20", "displayName": "26.20", "games": 1489, "share": 60.02 },
+      { "patch": "16.19", "displayName": "26.19", "games": 992, "share": 39.98 }
+    ]
+  },
+  "lastCollectedAt": "2026-10-15T03:41:12.903Z",
   "positions": ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"],
   "rules": {
     "minTierPick": 50,
     "secondaryPositionMinShare": 10,
-    "fallbackMinGames": 5000
+    "windowDays": 14,
+    "staleAfterHours": 26
   }
 }
 ```
 
 | 필드 | 타입 | null | 의미 |
 |------|------|------|------|
-| `latestPatch` | string | 아니오 | 집계된 최신 패치 |
-| `defaultPatch` | string | 아니오 | `patch`를 안 주면 통계 엔드포인트가 쓰는 패치 (2-0) |
-| `isFallback` | boolean | 아니오 | `defaultPatch ≠ latestPatch`이면 `true` |
-| `patches[]` | array | 아니오 | 집계된 모든 패치, 최신 순. 원본을 지운 오래된 패치도 집계는 남아 있어 목록에 있다 |
-| `patches[].patch` | string | 아니오 | 패치 |
-| `patches[].games` | int | 아니오 | 그 패치의 전체 게임 수 |
-| `lastCollectedAt` | string | 예 | 마지막으로 `done`으로 끝난 수집의 끝난 시각. 없으면 `null` |
+| `window` | object | 아니오 | 2-0 |
+| `lastCollectedAt` | string | 예 | 마지막으로 `done`으로 끝난 수집의 끝난 시각. 없으면 `null`. 수집한 게임은 다음 05:00 집계부터 통계에 들어간다 |
 | `positions` | string[] | 아니오 | 포지션 순서 (탭 순서로 사용) |
 | `rules.minTierPick` | int | 아니오 | 이 판 수 미만이면 `tier`가 `null` ("표본 부족") |
 | `rules.secondaryPositionMinShare` | number | 아니오 | 2순위 포지션 최소 비율(%) |
-| `rules.fallbackMinGames` | int | 아니오 | 직전 패치 대체 기준 게임 수 |
+| `rules.windowDays` | int | 아니오 | 통계 창 길이(일). 표시용 (실제 값은 `window.days`) |
+| `rules.staleAfterHours` | int | 아니오 | `isStale` 기준 시간 |
 
-- 집계된 패치가 없으면 `503 STATS_NOT_READY`.
+- 집계가 없으면 `503 STATS_NOT_READY` (3장).
 
 ---
 
@@ -142,7 +183,8 @@ GET /api/v1/meta
 | 이름 | 필수 | 형식 | 검사 | 예 |
 |------|------|------|------|-----|
 | `position` | 예 | `TOP` `JUNGLE` `MIDDLE` `BOTTOM` `UTILITY` | 대문자 정확히 일치. 없거나 다르면 400 | `TOP` |
-| `patch` | 아니오 | `^[0-9]+\.[0-9]+$`, 10자 이하 | 형식이 틀리면 400, 없는 패치면 404 | `16.19` |
+
+- v1의 `patch` 쿼리는 없다. 보내도 무시한다.
 
 ```http
 GET /api/v1/champions?position=TOP
@@ -150,12 +192,17 @@ GET /api/v1/champions?position=TOP
 
 ```json
 {
-  "patch": {
-    "data": "16.19",
-    "latest": "16.20",
-    "requested": null,
-    "isFallback": true,
-    "games": 2712
+  "window": {
+    "days": 14,
+    "start": "2026-10-01T20:00:00.418Z",
+    "end": "2026-10-15T20:00:00.418Z",
+    "games": 2481,
+    "aggregatedAt": "2026-10-15T20:00:00.418Z",
+    "isStale": false,
+    "patches": [
+      { "patch": "16.20", "displayName": "26.20", "games": 1489, "share": 60.02 },
+      { "patch": "16.19", "displayName": "26.19", "games": 992, "share": 39.98 }
+    ]
   },
   "position": "TOP",
   "champions": [
@@ -163,10 +210,10 @@ GET /api/v1/champions?position=TOP
       "rank": 1,
       "championId": 266,
       "tier": 1,
-      "tierScore": 53.355,
+      "tierScore": 53.48,
       "winRate": 52.82,
-      "pickRate": 9.14,
-      "banRate": 14.31,
+      "pickRate": 10.00,
+      "banRate": 15.64,
       "pick": 248,
       "win": 131,
       "ban": 388,
@@ -177,10 +224,10 @@ GET /api/v1/champions?position=TOP
       "rank": 2,
       "championId": 23,
       "tier": 2,
-      "tierScore": 51.793,
+      "tierScore": 51.832,
       "winRate": 53.01,
-      "pickRate": 3.06,
-      "banRate": 4.02,
+      "pickRate": 3.35,
+      "banRate": 4.39,
       "pick": 83,
       "win": 44,
       "ban": 109,
@@ -191,10 +238,10 @@ GET /api/v1/champions?position=TOP
       "rank": 38,
       "championId": 164,
       "tier": null,
-      "tierScore": 51.655,
+      "tierScore": 51.674,
       "winRate": 55.26,
-      "pickRate": 1.40,
-      "banRate": 2.18,
+      "pickRate": 1.53,
+      "banRate": 2.38,
       "pick": 38,
       "win": 21,
       "ban": 59,
@@ -207,7 +254,7 @@ GET /api/v1/champions?position=TOP
 
 | 필드 | 타입 | null | 의미 |
 |------|------|------|------|
-| `patch` | object | 아니오 | 2-0 |
+| `window` | object | 아니오 | 2-0 |
 | `position` | string | 아니오 | 요청한 포지션 |
 | `champions[]` | array | 아니오 | 정렬된 목록. 비어 있을 수 있음 (`[]`) |
 | `rank` | int | 아니오 | 1부터 시작하는 표시 순서 (`tier: null` 포함) |
@@ -215,8 +262,8 @@ GET /api/v1/champions?position=TOP
 | `tier` | int (1~5) | **예** | 티어. `null` = 표본 부족 (pick 50 미만). DB 값 그대로 |
 | `tierScore` | number | 아니오 | 티어 점수 (소수 3자리, 정렬용 표시값) |
 | `winRate` | number | 아니오 | 승률 % |
-| `pickRate` | number | 아니오 | 픽률 % (`pick / games`) |
-| `banRate` | number | 아니오 | 밴률 % (포지션과 무관, 같은 챔피언은 모든 포지션에서 같은 값) |
+| `pickRate` | number | 아니오 | 픽률 % (`pick / window.games`) |
+| `banRate` | number | 아니오 | 밴률 % (`ban / window.games`, 포지션과 무관, 같은 챔피언은 모든 포지션에서 같은 값) |
 | `pick` / `win` / `ban` | int | 아니오 | 이 포지션의 게임 수 / 승리 수 / 밴된 게임 수 |
 | `positionShare` | number | 아니오 | 이 챔피언 전체 pick 중 이 포지션의 비율 % |
 | `mainPositions` | string[] | 아니오 | 그 챔피언의 주 포지션 1~2개, 많은 순 |
@@ -224,7 +271,8 @@ GET /api/v1/champions?position=TOP
 - **목록에 들어가는 챔피언:** 그 포지션이 `mainPositions`에 들어 있는 챔피언만. 주 포지션 = 챔피언별 pick 많은 순 최대 2개, 2순위는 그 챔피언 전체 pick의 10% 이상일 때만.
 - **정렬:** `tier` 오름차순(`null`은 맨 뒤) → `tierScore` 내림차순 → `championId` 오름차순.
 - **`tier`를 `tierScore`로 다시 계산하지 않는다.** 표시 점수는 반올림 값이고 티어는 반올림 전 점수로 정해져, 경계(예: `53.000`)에서 결과가 다를 수 있다 (db_review L4).
-- 테스트 수집(약 2,700게임) 단계에서는 대부분 `tier: null`이 정상이다.
+- 숫자는 창 안의 모든 패치를 합친 값이다. 패치별로 나누지 않는다.
+- 테스트 수집(약 2,200~2,700게임) 단계에서는 대부분 `tier: null`이 정상이다.
 
 ---
 
@@ -238,8 +286,8 @@ GET /api/v1/champions?position=TOP
 |------|------|------|------|------|-----|
 | `championId` | 경로 | 예 | 숫자 (Data Dragon `key`) | `^[1-9][0-9]{0,4}$`. 아니면 400 | `23` |
 | `position` | 쿼리 | 아니오 | 1장의 포지션 | 대문자 정확히 일치. 안 주면 1순위 주 포지션 | `TOP` |
-| `patch` | 쿼리 | 아니오 | 패치 | 2-3과 같음 | `16.19` |
 
+- v1의 `patch` 쿼리는 없다. 보내도 무시한다.
 - 프론트 라우트는 영문 id(`/champions/Tryndamere`)이므로 `champion.json`에서 `key`(`"23"`)를 찾아 부른다.
 - `position`을 주면 주 포지션이 아니어도 그 포지션 통계가 있으면 준다 (`isMainPosition: false`).
 
@@ -249,12 +297,17 @@ GET /api/v1/champions/23?position=TOP
 
 ```json
 {
-  "patch": {
-    "data": "16.19",
-    "latest": "16.20",
-    "requested": null,
-    "isFallback": true,
-    "games": 2712
+  "window": {
+    "days": 14,
+    "start": "2026-10-01T20:00:00.418Z",
+    "end": "2026-10-15T20:00:00.418Z",
+    "games": 2481,
+    "aggregatedAt": "2026-10-15T20:00:00.418Z",
+    "isStale": false,
+    "patches": [
+      { "patch": "16.20", "displayName": "26.20", "games": 1489, "share": 60.02 },
+      { "patch": "16.19", "displayName": "26.19", "games": 992, "share": 39.98 }
+    ]
   },
   "championId": 23,
   "position": "TOP",
@@ -265,26 +318,26 @@ GET /api/v1/champions/23?position=TOP
       "pick": 83,
       "positionShare": 86.46,
       "tier": 2,
-      "tierScore": 51.793,
+      "tierScore": 51.832,
       "winRate": 53.01,
-      "pickRate": 3.06
+      "pickRate": 3.35
     },
     {
       "position": "MIDDLE",
       "pick": 11,
       "positionShare": 11.46,
       "tier": null,
-      "tierScore": 49.711,
+      "tierScore": 49.726,
       "winRate": 45.45,
-      "pickRate": 0.41
+      "pickRate": 0.44
     }
   ],
   "stats": {
     "tier": 2,
-    "tierScore": 51.793,
+    "tierScore": 51.832,
     "winRate": 53.01,
-    "pickRate": 3.06,
-    "banRate": 4.02,
+    "pickRate": 3.35,
+    "banRate": 4.39,
     "pick": 83,
     "win": 44,
     "ban": 109
@@ -332,7 +385,7 @@ GET /api/v1/champions/23?position=TOP
 
 | 필드 | 타입 | null | 의미 |
 |------|------|------|------|
-| `patch` | object | 아니오 | 2-0 |
+| `window` | object | 아니오 | 2-0 |
 | `championId` | int | 아니오 | 요청한 챔피언 |
 | `position` | string | 아니오 | 이 응답의 `stats`·`builds`가 속한 포지션 |
 | `isMainPosition` | boolean | 아니오 | `position`이 `positions[]`에 있으면 `true` |
@@ -362,15 +415,25 @@ GET /api/v1/champions/23?position=TOP
 - `runes`·`spells`·`skills`는 DB에 상위 10개만 있어 `pickRate` 합이 100%가 아니다.
 - **아이템은 프론트가 거른다:** Data Dragon `item.json`에서 `into`가 있는 아이템(하위 재료)과 장신구·소모품을 빼고 상위 2개를 보여준다. 그래서 백엔드는 전체를 준다.
 - `stats.banRate`는 포지션과 무관하다.
+- 두 패치가 섞인 창에서는 한 패치에서 없어진 아이템·룬이 함께 나올 수 있다 (5장 버전 참고).
 
 #### 오류
 
 | 상황 | 응답 |
 |------|------|
-| `championId` 형식 오류, `position` 오류, `patch` 형식 오류 | `400 INVALID_PARAMETER` |
-| 준 `patch`가 없음 | `404 PATCH_NOT_FOUND` |
-| 그 패치에 이 챔피언 통계가 없음 (새 챔피언, 한 번도 안 나옴) | `404 STATS_NOT_FOUND` — 프론트는 Data Dragon 정보만으로 상세를 그리고 "통계 없음" 표시 |
-| `position`을 줬는데 그 포지션 통계가 없음 | `404 STATS_NOT_FOUND` (`details.position` 포함) |
+| `championId` 형식 오류, `position` 오류 | `400 INVALID_PARAMETER` |
+| 창 안에 이 챔피언 통계가 없음 (새 챔피언, 한 번도 안 나옴, 밴만 됨) | `404 STATS_NOT_FOUND` (`details.championId`) — 프론트는 Data Dragon 정보만으로 상세를 그리고 "통계 없음" 표시 |
+| `position`을 줬는데 그 포지션 통계가 없음 | `404 STATS_NOT_FOUND` (`details.championId`, `details.position`) |
+
+```json
+{
+  "error": {
+    "code": "STATS_NOT_FOUND",
+    "message": "최근 14일 통계에 이 챔피언의 해당 포지션 통계가 없습니다.",
+    "details": { "championId": 23, "position": "JUNGLE" }
+  }
+}
+```
 
 ---
 
@@ -396,34 +459,48 @@ GET /api/v1/champions/23?position=TOP
 
 | HTTP | `code` | 의미 |
 |------|--------|------|
-| 400 | `INVALID_PARAMETER` | 파라미터 형식 오류 (`details.param`, `details.value`) |
-| 404 | `PATCH_NOT_FOUND` | 요청한 패치의 집계가 없음 (`details.patch`) |
-| 404 | `STATS_NOT_FOUND` | 그 챔피언(·포지션) 통계가 그 패치에 없음 (`details.championId`, `details.position`, `details.patch`) |
+| 400 | `INVALID_PARAMETER` | 파라미터 형식 오류 (`details.param`, `details.value`). 대상은 `position`, `championId` |
+| 404 | `STATS_NOT_FOUND` | 그 챔피언(·포지션) 통계가 창 안에 없음 (`details.championId`, `details.position`) |
 | 404 | `NOT_FOUND` | 없는 경로 |
-| 503 | `STATS_NOT_READY` | 집계된 패치가 하나도 없음 (첫 수집 전) |
+| 503 | `STATS_NOT_READY` | 집계된 창이 없음 (첫 집계 전). `/meta`, `/champions`, 상세가 준다 |
 | 503 | `DB_UNAVAILABLE` | DB 연결 실패 |
 | 500 | `INTERNAL_ERROR` | 그 밖의 서버 오류. 내부 내용은 응답에 넣지 않음 |
+
+집계 전 응답 예:
+
+```json
+{
+  "error": {
+    "code": "STATS_NOT_READY",
+    "message": "아직 집계된 통계가 없습니다. 매일 05:00(KST)에 집계됩니다."
+  }
+}
+```
+
+- v1의 `PATCH_NOT_FOUND`는 없다.
+- 한 번 집계가 생기면 다시 `STATS_NOT_READY`가 되지 않는다 (집계 함수는 0게임이면 실패하고 이전 집계를 남긴다). 집계가 멈추면 `window.isStale`로 알린다.
 
 ---
 
 ## 4. 캐시
 
-> 요약: 데이터는 수동 수집 때만 바뀐다. 성공 응답은 10분 캐시를 허용하고, 실제 캐시는 Next.js의 `revalidate: 3600`이 맡는다.
+> 요약: 데이터는 하루 1번(05:00 KST) 바뀐다. 성공 응답은 10분 캐시를 허용하고, 실제 캐시는 Next.js의 `revalidate: 3600`이 맡는다.
 
 | 응답 | 헤더 |
 |------|------|
 | 성공 (`meta`, `champions`, 상세) | `Cache-Control: public, max-age=600` |
 | `health`, 모든 오류 | `Cache-Control: no-store` |
 
-- 프론트 권장: `fetch(url, { next: { revalidate: 3600 } })` (Data Dragon 버전 확인 주기와 같음). Next.js는 이 응답 헤더가 아니라 `revalidate` 값으로 캐시한다.
-- 수집·집계 직후 바로 보고 싶으면 프론트에서 재검증(태그·경로 revalidate)으로 처리한다 (프론트 범위).
+- 프론트 권장: `fetch(url, { next: { revalidate: 3600 } })`. 05:00 집계 뒤 최대 약 1시간 안에 새 숫자가 보인다.
+- `window.aggregatedAt`이 바뀌면 스냅숏이 바뀐 것이다. 프론트가 더 빨리 반영하고 싶으면 이 값으로 재검증을 판단할 수 있다 (프론트 범위).
+- `isStale`은 캐시 때문에 최대 캐시 시간만큼 늦게 바뀔 수 있다 (하루 단위 판단이라 문제없음).
 - ETag·304는 이번 버전에 없다.
 
 ---
 
 ## 5. Data Dragon 매핑 (프론트가 붙이는 것)
 
-> 요약: 백엔드는 숫자 ID만 준다. 아래 표대로 Data Dragon에서 이름·이미지를 찾는다.
+> 요약: 백엔드는 숫자 ID만 준다. 아래 표대로 Data Dragon에서 이름·이미지를 찾는다. Data Dragon 버전은 **내부 패치(`patch`)** 로 정하고, 화면 글자는 **`displayName`** 을 쓴다.
 
 | 응답 필드 | Data Dragon 파일 | 찾는 방법 | 비고 |
 |-----------|------------------|-----------|------|
@@ -434,8 +511,10 @@ GET /api/v1/champions/23?position=TOP
 | `builds.runes[].primaryPerks[]`, `subPerks[]` | `runesReforged.json` | `[].slots[].runes[].id` → `name`, `icon` (`/cdn/img/{icon}`) | |
 | `builds.runes[].statPerks.*` | **없음** | Data Dragon에 능력치 파편이 없다. 프론트가 작은 표를 둔다 | 예: `5008` 적응형 능력치, `5005` 공격 속도, `5007` 스킬 가속, `5010` 이동 속도, `5011` 체력, `5013` 강인함, `5001` 체력 증가 |
 | `builds.skills[].skillOrder` | `champion/{id}.json` | 글자 `Q/W/E/R` → `spells[0..3]` (이름·아이콘) | |
+| `window.patches[].patch` | `versions.json` | 내부 패치 `16.20` → Data Dragon 버전 보통 `16.20.1` | `displayName`(`26.20`)으로 Data Dragon을 찾지 않는다 |
 
-- **버전:** 통계 패치 `16.19`의 Data Dragon 버전은 보통 `16.19.1`이다. 이름·이미지는 최신 버전을 써도 되지만, 그 패치에만 있던 아이템을 찾을 수 없으면 `{patch.data}.1` 버전의 `item.json`을 한 번 더 보는 것을 권장한다.
+- **버전:** 이름·이미지는 최신 버전을 써도 된다. 창이 두 패치에 걸쳐 있으면 옛 패치에만 있던 아이템을 최신 `item.json`에서 못 찾을 수 있으므로, 못 찾으면 `window.patches`의 다른 패치(`{patch}.1`) 버전 `item.json`을 한 번 더 보는 것을 권장한다.
+- **패치 표시:** 화면(푸터 포함)에 패치를 적을 때는 `displayName`을 쓴다. Data Dragon 버전 문자열(`16.20.1`)을 그대로 보여주면 공개 이름과 다르다 (프론트 범위에서 정리).
 - 백엔드는 Data Dragon을 부르지 않는다.
 
 ---
@@ -444,4 +523,6 @@ GET /api/v1/champions/23?position=TOP
 
 | 날짜 | 버전 | 내용 |
 |------|------|------|
-| 2026-10-14 | 초안 | 엔드포인트 4개 (`health`, `meta`, `champions`, `champions/:championId`) |
+| 2026-10-14 | v1 (승인) | 엔드포인트 4개 (`health`, `meta`, `champions`, `champions/:championId`), 패치 기준, 직전 패치 대체 |
+| 2026-10-15 | v2 초안 | 최근 14일 창: `patch` 쿼리·대체 규칙·`PATCH_NOT_FOUND` 삭제, `window` 객체(`displayName`, `share`, `aggregatedAt`, `isStale`), `/health` `stats`, 한 응답 한 스냅숏 (back_spec 변경 01) |
+| 2026-10-14 | v2 (구현 반영) | 백엔드 변경 01 Build 구현. 계약 내용 변경 없음, 상태만 갱신 |

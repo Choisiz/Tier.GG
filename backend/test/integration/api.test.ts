@@ -1,19 +1,25 @@
-// API: createApp(트랜잭션 연결) → listen(0) + fetch → ROLLBACK (실제 Supabase)
+// API v2: createApp(롤백 ApiDb) → listen(0) + fetch → ROLLBACK (실제 Supabase)
+// 2021년 가짜 게임 60개(0.8 24개, 0.9 36개) → 과거 p_until로 창 집계 → 고정 시계로 응답 확인 (변경 01-7-3)
 import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, before, describe, it } from 'node:test';
 import type pg from 'pg';
-import { createApp } from '../../src/api/app.js';
-import { aggregateOnConnection } from '../../src/collector/aggregate.js';
+import { createApp, type ApiDb } from '../../src/api/app.js';
+import { aggregateWindow } from '../../src/collector/aggregate.js';
 import { silentLogger } from '../../src/lib/logger.js';
 import { saveMatch } from '../../src/repositories/rawRepository.js';
-import { connect, fakeGames, insertSamplePlayer, TEST_PATCH } from '../helpers/db.js';
+import { connect, FAKE_UNTIL, fakeGames, insertSamplePlayer } from '../helpers/db.js';
 
-const GAMES = 60; // 챔피언 × 포지션 pick 60 ≥ 50 → tier가 null이 아님
+const OLD = 24; // 0.8
+const NEW = 36; // 0.9
+const GAMES = OLD + NEW; // 챔피언 × 포지션 pick 60 ≥ 50 → tier가 null이 아님
 let client: pg.Client;
 let server: Server;
 let base: string;
+let aggregatedAt: Date;
+/** 고정 시계: 집계 시각 + 1시간 (isStale false) */
+let nowMs: number;
 
 async function get(path: string) {
   const r = await fetch(base + path);
@@ -25,9 +31,18 @@ before(async () => {
   await client.connect();
   await client.query('BEGIN');
   await insertSamplePlayer(client);
-  for (const g of fakeGames(GAMES)) await saveMatch(client, g.match, g.players);
-  await aggregateOnConnection(client, [TEST_PATCH], silentLogger);
-  server = createApp(client, silentLogger).listen(0);
+  for (const g of fakeGames(OLD, { patch: '0.8', firstId: 1 })) await saveMatch(client, g.match, g.players);
+  for (const g of fakeGames(NEW, { patch: '0.9', firstId: OLD + 1 })) await saveMatch(client, g.match, g.players);
+  const agg = await aggregateWindow(client, { days: 14, until: FAKE_UNTIL }, silentLogger);
+  assert.equal(agg.ok, true);
+  aggregatedAt = (await client.query(`SELECT aggregated_at FROM stats_window`)).rows[0].aggregated_at;
+  nowMs = aggregatedAt.getTime() + 3_600_000;
+  // 롤백 연결은 이미 트랜잭션 안이라 snapshot은 fn(client) 그대로
+  const db: ApiDb = {
+    query: (text, values) => client.query(text, values),
+    snapshot: (fn) => fn(client),
+  };
+  server = createApp(db, silentLogger, { now: () => nowMs }).listen(0);
   await new Promise<void>((r) => server.once('listening', () => r()));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`;
 });
@@ -41,41 +56,57 @@ after(async () => {
   const c = connect();
   await c.connect();
   try {
-    const r = await c.query(`SELECT (SELECT count(*)::int FROM matches WHERE patch = $1) + (SELECT count(*)::int FROM patch WHERE patch = $1) AS n`, [TEST_PATCH]);
+    const r = await c.query(
+      `SELECT (SELECT count(*)::int FROM matches WHERE match_id LIKE 'KR\\_9000000%')
+            + (SELECT count(*)::int FROM stats_window_patch WHERE patch IN ('0.8', '0.9'))
+            + (SELECT count(*)::int FROM ranked_players WHERE puuid LIKE 'TEST\\_%') AS n`,
+    );
     assert.equal(r.rows[0].n, 0);
   } finally {
     await c.end();
   }
 });
 
-describe('API (ROLLBACK 연결)', () => {
-  it('GET /health', async () => {
+const expectedWindow = (isStale = false) => ({
+  days: 14,
+  start: '2021-01-01T00:00:00.000Z',
+  end: '2021-01-15T00:00:00.000Z',
+  games: GAMES,
+  aggregatedAt: aggregatedAt.toISOString(),
+  isStale,
+  patches: [
+    { patch: '0.9', displayName: '10.9', games: NEW, share: 60 },
+    { patch: '0.8', displayName: '10.8', games: OLD, share: 40 },
+  ],
+});
+
+describe('API v2 (ROLLBACK 연결)', () => {
+  it('GET /health: stats.state fresh', async () => {
     const r = await get('/health');
     assert.equal(r.status, 200);
-    assert.deepEqual(r.body, { status: 'ok', db: 'ok' });
+    assert.deepEqual(r.body, { status: 'ok', db: 'ok', stats: { state: 'fresh', aggregatedAt: aggregatedAt.toISOString() } });
     assert.equal(r.cache, 'no-store');
   });
 
-  it('GET /meta: 형식, 0.9 포함, 캐시 헤더', async () => {
+  it('GET /meta: window 형식, 패치 최신 순·displayName·share, 캐시 헤더', async () => {
     const r = await get('/meta');
     assert.equal(r.status, 200);
     assert.equal(r.cache, 'public, max-age=600');
     assert.equal(r.type, 'application/json; charset=utf-8');
     const b = r.body;
-    assert.deepEqual(Object.keys(b).sort(), ['defaultPatch', 'isFallback', 'lastCollectedAt', 'latestPatch', 'patches', 'positions', 'rules']);
-    assert.ok(b.patches.some((p: { patch: string; games: number }) => p.patch === TEST_PATCH && p.games === GAMES));
-    assert.equal(typeof b.latestPatch, 'string');
-    assert.equal(b.isFallback, b.defaultPatch !== b.latestPatch);
+    assert.deepEqual(Object.keys(b).sort(), ['lastCollectedAt', 'positions', 'rules', 'window']);
+    assert.deepEqual(b.window, expectedWindow());
     assert.deepEqual(b.positions, ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
-    assert.deepEqual(b.rules, { minTierPick: 50, secondaryPositionMinShare: 10, fallbackMinGames: 5000 });
+    assert.deepEqual(b.rules, { minTierPick: 50, secondaryPositionMinShare: 10, windowDays: 14, staleAfterHours: 26 });
     assert.ok(b.lastCollectedAt === null || !Number.isNaN(Date.parse(b.lastCollectedAt)));
   });
 
-  it('GET /champions?position=TOP&patch=0.9: 형식·정렬·주 포지션', async () => {
-    const r = await get(`/champions?position=TOP&patch=${TEST_PATCH}`);
+  it('GET /champions?position=TOP: 형식·정렬·주 포지션', async () => {
+    const r = await get('/champions?position=TOP');
     assert.equal(r.status, 200);
     assert.equal(r.cache, 'public, max-age=600');
-    assert.deepEqual(r.body.patch, { data: TEST_PATCH, latest: r.body.patch.latest, requested: TEST_PATCH, isFallback: false, games: GAMES });
+    assert.deepEqual(Object.keys(r.body).sort(), ['champions', 'position', 'window']);
+    assert.deepEqual(r.body.window, expectedWindow());
     assert.equal(r.body.position, 'TOP');
     const list = r.body.champions as Record<string, unknown>[];
     assert.equal(list.length, 2); // 각 팀 탑 1명씩 (트린다미어 23 + 상대 탑)
@@ -98,11 +129,19 @@ describe('API (ROLLBACK 연결)', () => {
     }
   });
 
-  it('GET /champions/23?patch=0.9: 상세 형식 (위치 생략 → 1순위)', async () => {
-    const r = await get(`/champions/23?patch=${TEST_PATCH}`);
+  it('옛 patch 쿼리는 무시 (같은 응답)', async () => {
+    const a = await get('/champions?position=TOP');
+    const b = await get('/champions?position=TOP&patch=16.19');
+    assert.equal(b.status, 200);
+    assert.deepEqual(b.body, a.body);
+  });
+
+  it('GET /champions/23: 상세 형식 (위치 생략 → 1순위)', async () => {
+    const r = await get('/champions/23');
     assert.equal(r.status, 200);
     const b = r.body;
-    assert.deepEqual(Object.keys(b).sort(), ['builds', 'championId', 'isMainPosition', 'patch', 'position', 'positions', 'stats'].sort());
+    assert.deepEqual(Object.keys(b).sort(), ['builds', 'championId', 'isMainPosition', 'position', 'positions', 'stats', 'window'].sort());
+    assert.deepEqual(b.window, expectedWindow());
     assert.equal(b.championId, 23);
     assert.equal(b.position, 'TOP');
     assert.equal(b.isMainPosition, true);
@@ -132,29 +171,40 @@ describe('API (ROLLBACK 연결)', () => {
     assert.deepEqual(b.builds.skills, [{ skillOrder: 'EQQWQRQEQER', pick: GAMES, win: GAMES / 2, winRate: 50, pickRate: 100 }]);
   });
 
-  it('밴률: 64(1번 참가자 밴)는 모든 게임에서 밴', async () => {
-    // 64는 이 게임에서 밴만 됐고 픽이 없어 champion 줄이 없다 (계약 9-2 한계) → 상세는 404
-    const r = await get(`/champions/64?patch=${TEST_PATCH}`);
-    assert.equal(r.status, 404);
-    assert.equal(r.body.error.code, 'STATS_NOT_FOUND');
-    assert.deepEqual(r.body.error.details, { championId: 64, patch: TEST_PATCH });
-  });
-
-  it('주 포지션이 아닌 포지션 통계가 없으면 404 STATS_NOT_FOUND (details.position)', async () => {
-    const r = await get(`/champions/23?patch=${TEST_PATCH}&position=JUNGLE`);
+  it('밴만 된 챔피언(64) → 404 STATS_NOT_FOUND, details에 patch 없음', async () => {
+    // 64는 이 게임에서 밴만 됐고 픽이 없어 champion 줄이 없다 (계약 9-2 한계)
+    const r = await get('/champions/64');
     assert.equal(r.status, 404);
     assert.equal(r.cache, 'no-store');
+    assert.equal(r.body.error.code, 'STATS_NOT_FOUND');
+    assert.deepEqual(r.body.error.details, { championId: 64 });
+  });
+
+  it('포지션 통계가 없으면 404 STATS_NOT_FOUND (details.championId, position)', async () => {
+    const r = await get('/champions/23?position=JUNGLE');
+    assert.equal(r.status, 404);
     assert.deepEqual(r.body.error, {
       code: 'STATS_NOT_FOUND',
-      message: r.body.error.message,
-      details: { championId: 23, position: 'JUNGLE', patch: TEST_PATCH },
+      message: '최근 14일 통계에 이 챔피언의 해당 포지션 통계가 없습니다.',
+      details: { championId: 23, position: 'JUNGLE' },
     });
   });
 
-  it('없는 패치 → 404 PATCH_NOT_FOUND', async () => {
-    const r = await get('/champions?position=TOP&patch=0.1');
-    assert.equal(r.status, 404);
-    assert.deepEqual(r.body.error.details, { patch: '0.1' });
-    assert.equal(r.body.error.code, 'PATCH_NOT_FOUND');
+  it('오래됨: aggregated_at = now() − 27시간 → window.isStale true, /health stats.state stale', async () => {
+    await client.query('SAVEPOINT stale');
+    try {
+      await client.query(`UPDATE stats_window SET aggregated_at = now() - interval '27 hours'`);
+      const at = (await client.query(`SELECT aggregated_at FROM stats_window`)).rows[0].aggregated_at as Date;
+      const meta = await get('/meta');
+      assert.equal(meta.body.window.isStale, true);
+      assert.equal(meta.body.window.aggregatedAt, at.toISOString());
+      const list = await get('/champions?position=TOP');
+      assert.equal(list.body.window.isStale, true);
+      const h = await get('/health');
+      assert.equal(h.status, 200);
+      assert.deepEqual(h.body.stats, { state: 'stale', aggregatedAt: at.toISOString() });
+    } finally {
+      await client.query('ROLLBACK TO SAVEPOINT stale');
+    }
   });
 });

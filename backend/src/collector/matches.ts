@@ -1,4 +1,5 @@
-// ②~⑤ 게임 ID → 상세 → 타임라인 → 게임 단위 트랜잭션 저장 (back_spec 3-2 ~ 3-5)
+// ②~⑤ 게임 ID(startTime) → 상세(시작 시각·창 상한) → 타임라인 → 게임 단위 트랜잭션 저장 (back_spec 3-2 ~ 3-5, 변경 01-4)
+// 집계는 하지 않는다 (매일 05:00 KST DB 예약 작업)
 import pg from 'pg';
 import { withTransaction } from '../db/tx.js';
 import { isDbConnectionError } from '../db/pool.js';
@@ -10,26 +11,29 @@ import {
   RiotRetryExhaustedError,
 } from '../riot/errors.js';
 import {
+  countMatchesSince,
   existingMatchIds,
   listSamplePuuids,
-  matchCountsByPatch,
   saveMatch,
 } from '../repositories/rawRepository.js';
 import { TooManyFailuresError, UserAbortError, type CollectorContext } from './context.js';
 import {
   emptyWarnings,
-  latestPatches,
   prefilterMatch,
   transformMatch,
   type SkipReason,
   type TransformWarnings,
 } from './transform.js';
 
-export type MatchSkip = SkipReason | 'patch_full' | 'duplicate';
+export type MatchSkip = SkipReason | 'duplicate';
 
 export interface MatchesResult {
   players: number;
   playersFailed: number;
+  /** 창 안 게임이 0개인 플레이어 (② 빈 목록, 정상) */
+  playersNoGames: number;
+  /** 0 준비 단계에서 센 창 안 게임 수 (창 상한 계산용) */
+  inWindowBefore: number;
   idsFound: number;
   idsNew: number;
   processed: number;
@@ -37,8 +41,9 @@ export interface MatchesResult {
   failed: number;
   skipped: Record<MatchSkip, number>;
   warnings: TransformWarnings;
+  /** 요약 로그용 (집계에는 쓰지 않음) */
   savedPatches: Set<string>;
-  stoppedBy: 'done' | 'max_matches';
+  stoppedBy: 'done' | 'max_matches' | 'window_full';
 }
 
 /** 'KR_8408851980' → 8408851980n (숫자 내림차순 정렬용) */
@@ -73,12 +78,14 @@ export function createMatchesResult(): MatchesResult {
   return {
     players: 0,
     playersFailed: 0,
+    playersNoGames: 0,
+    inWindowBefore: 0,
     idsFound: 0,
     idsNew: 0,
     processed: 0,
     saved: 0,
     failed: 0,
-    skipped: { not_solo: 0, too_short: 0, not_10_players: 0, old_patch: 0, bad_format: 0, patch_full: 0, duplicate: 0 },
+    skipped: { not_solo: 0, too_short: 0, not_10_players: 0, out_of_window: 0, bad_format: 0, duplicate: 0 },
     warnings: emptyWarnings(),
     savedPatches: new Set(),
     stoppedBy: 'done',
@@ -87,18 +94,38 @@ export function createMatchesResult(): MatchesResult {
 
 /** out을 넘기면 중간에 오류가 나도 그때까지의 개수(저장 수 등)가 out에 남는다 */
 export async function runMatches(ctx: CollectorContext, out: MatchesResult = createMatchesResult()): Promise<MatchesResult> {
-  const { cfg, riotCfg, logger, riot, pool } = ctx;
+  const { cfg, riotCfg, logger, riot, pool, window } = ctx;
+  const filterOpts = { queue: cfg.queue, minGameDurationSec: cfg.minGameDurationSec, windowStartMs: window.startMs };
 
-  // ② 게임 ID
+  // 0 준비: 창 안에 이미 저장된 게임 수 (창 상한)
+  out.inWindowBefore = await countMatchesSince(pool, new Date(window.startMs));
+  logger.info('창', {
+    windowStart: new Date(window.startMs).toISOString(),
+    startTime: window.startTimeSec,
+    days: cfg.windowDays,
+    inWindow: out.inWindowBefore,
+    maxGamesPerWindow: cfg.maxGamesPerWindow,
+  });
+
+  // ② 게임 ID (startTime = 창 시작, 초)
   const puuids = await listSamplePuuids(pool, cfg.tiers);
   out.players = puuids.length;
-  logger.info('② 게임 ID 시작', { players: puuids.length, count: cfg.gamesPerPlayer, queue: cfg.queue });
+  logger.info('② 게임 ID 시작', {
+    players: puuids.length,
+    path: `/lol/match/v5/matches/by-puuid/…/ids?queue=${cfg.queue}&start=0&count=${cfg.gamesPerPlayer}&startTime=${window.startTimeSec}`,
+  });
   const firstFinder = new Map<string, string>();
   for (const [i, puuid] of puuids.entries()) {
     if (ctx.stop.requested) throw new UserAbortError();
     try {
-      const ids = await riot.getMatchIds(puuid, { queue: cfg.queue, start: 0, count: cfg.gamesPerPlayer });
+      const ids = await riot.getMatchIds(puuid, {
+        queue: cfg.queue,
+        start: 0,
+        count: cfg.gamesPerPlayer,
+        startTime: window.startTimeSec,
+      });
       out.idsFound += ids.length;
+      if (ids.length === 0) out.playersNoGames++;
       for (const id of ids) if (!firstFinder.has(id)) firstFinder.set(id, puuid);
     } catch (err) {
       if (!isPerMatchError(err)) throw err;
@@ -110,11 +137,14 @@ export async function runMatches(ctx: CollectorContext, out: MatchesResult = cre
   const existing = await existingMatchIds(pool, [...firstFinder.keys()]);
   const todo = sortIdsNewestFirst([...firstFinder.keys()].filter((id) => !existing.has(id)));
   out.idsNew = todo.length;
-  logger.info('② 게임 ID 끝', { found: out.idsFound, unique: firstFinder.size, alreadySaved: existing.size, todo: todo.length });
+  logger.info('② 게임 ID 끝', {
+    found: out.idsFound,
+    unique: firstFinder.size,
+    alreadySaved: existing.size,
+    todo: todo.length,
+    playersNoGames: out.playersNoGames,
+  });
 
-  // 보관 패치 창: matches에 있는 패치 ∪ 이번 실행에서 본 패치 중 최신 keepPatches개
-  const perPatch = await matchCountsByPatch(pool);
-  const seenPatches = new Set<string>(perPatch.keys());
   const target = cfg.maxMatchesPerRun === null ? todo.length : Math.min(todo.length, cfg.maxMatchesPerRun);
   const started = Date.now();
   let consecutiveFailures = 0;
@@ -140,31 +170,26 @@ export async function runMatches(ctx: CollectorContext, out: MatchesResult = cre
       out.stoppedBy = 'max_matches';
       break;
     }
+    // 창 상한: 창 안 게임은 모두 같은 창이라 하나씩 건너뛰지 않고 ③ 전에 멈춘다 (결정 D15)
+    if (out.inWindowBefore + out.saved >= cfg.maxGamesPerWindow) {
+      out.stoppedBy = 'window_full';
+      logger.warn('창 상한에 닿아 멈춤', { inWindow: out.inWindowBefore + out.saved, maxGamesPerWindow: cfg.maxGamesPerWindow });
+      break;
+    }
     if (ctx.stop.requested) throw new UserAbortError();
     out.processed++;
     try {
       // ③ 상세
       const match = await riot.getMatch(matchId);
-      const pre = prefilterMatch(match, cfg);
+      const pre = prefilterMatch(match, filterOpts);
       if (!pre.ok) {
         out.skipped[pre.reason]++;
         consecutiveFailures = 0;
         continue;
       }
-      seenPatches.add(pre.patch);
-      if (!latestPatches(seenPatches, cfg.keepPatches).includes(pre.patch)) {
-        out.skipped.old_patch++;
-        consecutiveFailures = 0;
-        continue;
-      }
-      if ((perPatch.get(pre.patch) ?? 0) >= cfg.maxGamesPerPatch) {
-        out.skipped.patch_full++;
-        consecutiveFailures = 0;
-        continue;
-      }
       // ④ 타임라인
       const timeline = await riot.getTimeline(matchId);
-      const t = transformMatch(match, timeline, firstFinder.get(matchId) ?? null, cfg);
+      const t = transformMatch(match, timeline, firstFinder.get(matchId) ?? null, filterOpts);
       if (!t.ok) {
         out.skipped[t.reason]++;
         logger.warn('게임 건너뜀', { matchId, reason: t.reason, detail: t.detail });
@@ -187,7 +212,6 @@ export async function runMatches(ctx: CollectorContext, out: MatchesResult = cre
       }
       out.saved++;
       out.savedPatches.add(t.match.patch);
-      perPatch.set(t.match.patch, (perPatch.get(t.match.patch) ?? 0) + 1);
       out.warnings.banUnmatched += t.warnings.banUnmatched;
       out.warnings.badPosition += t.warnings.badPosition;
       out.warnings.badSkillSlot += t.warnings.badSkillSlot;

@@ -1,4 +1,5 @@
-// 수집 프리셋 (test, main) + CLI 덮어쓰기 (back_spec 7-2, 7-3)
+// 수집 프리셋 (test, main) + CLI 덮어쓰기 (back_spec 7-2, 7-3, 변경 01-5)
+import { WINDOW_DAYS } from './api.js';
 
 export const ALLOWED_TIERS = ['PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'] as const;
 export type Tier = (typeof ALLOWED_TIERS)[number];
@@ -14,8 +15,12 @@ export interface CollectionConfig {
   gamesPerPlayer: number;
   queue: number;
   minGameDurationSec: number;
-  keepPatches: number;
-  maxGamesPerPatch: number;
+  /** 통계 창 길이(일): ② startTime, ③ out_of_window, aggregate의 p_days. 예약 작업(!db)과 함께 바꿔야 해서 CLI 옵션으로 열지 않는다 */
+  windowDays: number;
+  /** 창 안 게임 상한 (계약 1-1). 넘으면 ③ 전에 멈춤 (window_full) */
+  maxGamesPerWindow: number;
+  /** 원본 보관 기간(일): purge_old_games(keepDays) */
+  keepDays: number;
   maxMatchesPerRun: number | null;
 }
 
@@ -49,13 +54,14 @@ const BASE = {
   gamesPerPlayer: 20,
   queue: 420,
   minGameDurationSec: 300,
-  keepPatches: 2,
-  maxGamesPerPatch: 25_000,
+  windowDays: WINDOW_DAYS,
+  maxGamesPerWindow: 25_000,
+  keepDays: 21,
   maxMatchesPerRun: null,
 } as const;
 
 export const PRESETS: Record<string, CollectionConfig> = {
-  test: { preset: 'test', tiers: ['PLATINUM', 'EMERALD', 'DIAMOND'], playersPerTier: 50, ...BASE },
+  test: { preset: 'test', tiers: ['PLATINUM', 'EMERALD', 'DIAMOND'], playersPerTier: 100, ...BASE },
   // 본 수집 (자리만). 4:4:2 비율과 마스터 이상은 테스트 뒤 정한다.
   main: { preset: 'main', tiers: ['EMERALD', 'DIAMOND'], playersPerTier: 200, ...BASE },
 };
@@ -96,7 +102,7 @@ function positiveInt(name: string, v: number, max: number): number {
   return v;
 }
 
-/** 티어당 인원을 디비전 I~IV에 나눔. 50 → 13/13/12/12 (나머지는 앞 디비전부터) */
+/** 티어당 인원을 디비전 I~IV에 나눔. 100 → 25/25/25/25, 50 → 13/13/12/12 (나머지는 앞 디비전부터) */
 export function divisionQuota(playersPerTier: number): Record<Division, number> {
   const base = Math.floor(playersPerTier / DIVISIONS.length);
   let rest = playersPerTier % DIVISIONS.length;
@@ -106,4 +112,12 @@ export function divisionQuota(playersPerTier: number): Record<Division, number> 
     if (rest > 0) rest--;
   }
   return out;
+}
+
+const DAY_MS = 86_400_000;
+
+/** 창 시작 시각 = nowMs − days일. sec는 Riot startTime용 (초, 끝 3자리 버림) */
+export function windowStart(nowMs: number, days: number): { ms: number; sec: number } {
+  const ms = nowMs - days * DAY_MS;
+  return { ms, sec: Math.floor(ms / 1000) };
 }

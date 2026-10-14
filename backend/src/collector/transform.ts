@@ -2,12 +2,14 @@
 import { POSITIONS } from '../config/api.js';
 import type { MatchDto, ParticipantDto, PerkStyleDto, TimelineDto } from '../riot/types.js';
 
-export type SkipReason = 'not_solo' | 'too_short' | 'not_10_players' | 'old_patch' | 'bad_format';
+export type SkipReason = 'not_solo' | 'too_short' | 'not_10_players' | 'out_of_window' | 'bad_format';
 
 export interface MatchRow {
   match_id: string;
   puuid: string | null;
   patch: string;
+  /** info.gameStartTimestamp(ms) → timestamptz */
+  game_start_at: Date;
 }
 
 export interface PlayerRow {
@@ -68,31 +70,24 @@ export function parsePatch(gameVersion: unknown): string | null {
   return `${Number(parts[0])}.${Number(parts[1])}`;
 }
 
-/** 패치 순서 비교 ([major, minor] 숫자 비교, 문자열 비교 금지). a < b면 음수 */
-export function comparePatch(a: string, b: string): number {
-  const [a1 = 0, a2 = 0] = a.split('.').map(Number);
-  const [b1 = 0, b2 = 0] = b.split('.').map(Number);
-  return a1 !== b1 ? a1 - b1 : a2 - b2;
-}
-
-/** 최신 n개 패치 (내림차순) */
-export function latestPatches(patches: Iterable<string>, n: number): string[] {
-  return [...new Set(patches)].sort((a, b) => comparePatch(b, a)).slice(0, n);
-}
-
 export interface PrefilterOptions {
   queue: number;
   minGameDurationSec: number;
+  /** 창 시작 시각 (ms). 실행을 시작할 때 한 번 정한 값 (back_spec 변경 01-4) */
+  windowStartMs: number;
 }
 
+/** DB CHECK matches_game_start_at_check 하한: 2020-01-01T00:00:00Z */
+export const MIN_GAME_START_MS = 1_577_836_800_000;
+
 /**
- * 타임라인을 부르기 전에 거르기 (호출 절약). 통과하면 { patch }.
- * 보관 패치 창(old_patch) 판단은 호출하는 쪽(matches.ts)이 한다.
+ * 타임라인을 부르기 전에 거르기 (호출 절약). 통과하면 { patch, gameStartAt }.
+ * 순서: bad_format(ID) → not_solo → too_short → not_10_players → bad_format(패치) → 시작 시각 (변경 01-4-2)
  */
 export function prefilterMatch(
   match: MatchDto,
   opts: PrefilterOptions,
-): { ok: true; patch: string } | { ok: false; reason: SkipReason; detail: string } {
+): { ok: true; patch: string; gameStartAt: Date } | { ok: false; reason: SkipReason; detail: string } {
   const info = match?.info;
   const id = match?.metadata?.matchId;
   if (!info || typeof id !== 'string' || !MATCH_ID_RE.test(id)) {
@@ -107,7 +102,14 @@ export function prefilterMatch(
   }
   const patch = parsePatch(info.gameVersion);
   if (!patch) return { ok: false, reason: 'bad_format', detail: `gameVersion=${String(info.gameVersion)}` };
-  return { ok: true, patch };
+  const start: unknown = info.gameStartTimestamp;
+  if (typeof start !== 'number' || !Number.isInteger(start) || start < MIN_GAME_START_MS) {
+    return { ok: false, reason: 'bad_format', detail: `gameStartTimestamp=${String(start)}` };
+  }
+  if (start < opts.windowStartMs) {
+    return { ok: false, reason: 'out_of_window', detail: `gameStartTimestamp=${start}` };
+  }
+  return { ok: true, patch, gameStartAt: new Date(start) };
 }
 
 class BadFormat extends Error {}
@@ -247,7 +249,12 @@ export function transformMatch(
       };
     });
 
-    return { ok: true, match: { match_id: matchId, puuid: samplePuuid, patch: pre.patch }, players, warnings };
+    return {
+      ok: true,
+      match: { match_id: matchId, puuid: samplePuuid, patch: pre.patch, game_start_at: pre.gameStartAt },
+      players,
+      warnings,
+    };
   } catch (err) {
     if (err instanceof BadFormat) return { ok: false, reason: 'bad_format', detail: err.message };
     throw err;

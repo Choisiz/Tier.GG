@@ -53,10 +53,17 @@ export class RiotClient {
     return this.get(this.opts.platformUrl, `/lol/league/v4/entries/RANKED_SOLO_5x5/${tier}/${division}?page=${page}`);
   }
 
-  getMatchIds(puuid: string, q: { queue: number; start: number; count: number }): Promise<string[]> {
+  /**
+   * startTime은 **초** (Riot match-v5 규칙). ms(13자리)를 잘못 넣는 실수를 막으려고
+   * 10자리 정수가 아니면 호출 전에 던진다 (코드 오류, 재시도 대상 아님).
+   */
+  getMatchIds(puuid: string, q: { queue: number; start: number; count: number; startTime: number }): Promise<string[]> {
+    if (!Number.isInteger(q.startTime) || q.startTime < 1_000_000_000 || q.startTime > 9_999_999_999) {
+      return Promise.reject(new TypeError(`startTime은 10자리 초 정수여야 합니다: ${q.startTime}`));
+    }
     return this.get(
       this.opts.regionUrl,
-      `/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?queue=${q.queue}&start=${q.start}&count=${q.count}`,
+      `/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?queue=${q.queue}&start=${q.start}&count=${q.count}&startTime=${q.startTime}`,
     );
   }
 
