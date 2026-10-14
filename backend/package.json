@@ -1,0 +1,33 @@
+{
+  "name": "tiergg-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tier.GG 수집 CLI + 읽기 API",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node --env-file=../.env --watch --import tsx src/server.ts",
+    "start": "node --env-file=../.env --import tsx src/server.ts",
+    "collect": "node --env-file=../.env --import tsx src/cli/collect.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "node --import tsx --test \"test/unit/**/*.test.ts\"",
+    "test:integration": "node --env-file=../.env --import tsx --test --test-concurrency=1 \"test/integration/**/*.test.ts\""
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "eslint": "^9.39.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.2"
+  }
+}
