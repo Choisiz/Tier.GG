@@ -1,7 +1,11 @@
-// 저장소·집계 호출·수집 기록 (실제 Supabase, 모두 ROLLBACK)
+// 저장소·창 집계·purge 미리보기·스냅숏·수집 기록 (실제 Supabase, 모두 ROLLBACK)
+// 가짜 게임은 2021년 시작, 집계는 과거 p_until(2021-01-15)로 2021년 창만 센다 (변경 01-7-3).
+// 실제 stats_window는 트랜잭션 안에서만 바뀌고 되돌려진다. 05:00 KST(20:00 UTC)에는 돌리지 않는다.
 import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
-import { aggregateOnConnection, planPurge } from '../../src/collector/aggregate.js';
+import pg from 'pg';
+import { aggregateWindow, planPurgeGames } from '../../src/collector/aggregate.js';
+import { readSnapshot } from '../../src/db/snapshot.js';
 import { silentLogger } from '../../src/lib/logger.js';
 import {
   closeStaleRunning,
@@ -10,15 +14,26 @@ import {
   startRun,
 } from '../../src/repositories/logRepository.js';
 import {
+  countMatchesSince,
   countRankedPlayersByTier,
   existingMatchIds,
   saveMatch,
   upsertRankedPlayers,
 } from '../../src/repositories/rawRepository.js';
-import { connect, fakeGames, inRollback, insertSamplePlayer, TEST_PATCH, TEST_SAMPLE_PUUID } from '../helpers/db.js';
+import {
+  connect,
+  FAKE_START_MS,
+  FAKE_UNTIL,
+  FAKE_WINDOW_START_MS,
+  fakeGames,
+  inRollback,
+  insertSamplePlayer,
+  TEST_PATCH,
+  TEST_SAMPLE_PUUID,
+} from '../helpers/db.js';
 
 describe('rawRepository (ROLLBACK)', () => {
-  it('fixture 게임 저장 → matches 1줄 + match_players 10줄, 다시 저장하면 duplicate(0줄)', async () => {
+  it('게임 저장 → matches(game_start_at) 1줄 + match_players 10줄, 다시 저장하면 duplicate(0줄)', async () => {
     await inRollback(async (c) => {
       await insertSamplePlayer(c);
       const [g] = fakeGames(1);
@@ -26,8 +41,12 @@ describe('rawRepository (ROLLBACK)', () => {
       assert.equal(await saveMatch(c, g.match, g.players), 'saved');
       const n = await c.query(`SELECT count(*)::int AS n FROM match_players WHERE match_id = $1`, [g.match.match_id]);
       assert.equal(n.rows[0].n, 10);
-      const m = await c.query(`SELECT puuid, patch FROM matches WHERE match_id = $1`, [g.match.match_id]);
-      assert.deepEqual(m.rows[0], { puuid: TEST_SAMPLE_PUUID, patch: TEST_PATCH });
+      const m = await c.query(`SELECT puuid, patch, game_start_at FROM matches WHERE match_id = $1`, [g.match.match_id]);
+      assert.deepEqual(m.rows[0], {
+        puuid: TEST_SAMPLE_PUUID,
+        patch: TEST_PATCH,
+        game_start_at: new Date(FAKE_START_MS + 60_000),
+      });
 
       assert.equal(await saveMatch(c, g.match, g.players), 'duplicate');
       const n2 = await c.query(`SELECT count(*)::int AS n FROM match_players WHERE match_id = $1`, [g.match.match_id]);
@@ -58,6 +77,19 @@ describe('rawRepository (ROLLBACK)', () => {
     });
   });
 
+  it('countMatchesSince: 창 시작 이후 게임만 센다', async () => {
+    await inRollback(async (c) => {
+      const since = new Date(FAKE_WINDOW_START_MS);
+      const mid = new Date(FAKE_START_MS + 90_000); // 두 게임 시작(00:01, 00:02) 사이
+      const before = await countMatchesSince(c, since);
+      const beforeMid = await countMatchesSince(c, mid);
+      await insertSamplePlayer(c);
+      for (const g of fakeGames(2)) await saveMatch(c, g.match, g.players);
+      assert.equal(await countMatchesSince(c, since), before + 2);
+      assert.equal(await countMatchesSince(c, mid), beforeMid + 1);
+    });
+  });
+
   it('ranked_players upsert (다시 넣으면 tier·rank 갱신)', async () => {
     await inRollback(async (c) => {
       await upsertRankedPlayers(c, [{ puuid: 'TEST_RP_1', tier: 'PLATINUM', rank: 'IV' }]);
@@ -69,45 +101,77 @@ describe('rawRepository (ROLLBACK)', () => {
   });
 });
 
-describe('집계 호출 (ROLLBACK)', () => {
-  it('같은 연결에서 ANALYZE → refresh_patch_stats(0.9), 반환 jsonb 확인', async () => {
+describe('창 집계 (ROLLBACK)', () => {
+  it('2021년 가짜 게임 3개 → ANALYZE + refresh_window_stats(14, 2021-01-15): games 3, patches [{0.9, 3}]', async () => {
     await inRollback(async (c) => {
+      const st0 = (await c.query('SHOW statement_timeout')).rows[0].statement_timeout;
       await insertSamplePlayer(c);
       for (const g of fakeGames(3)) await saveMatch(c, g.match, g.players);
-      const r = await aggregateOnConnection(c, [TEST_PATCH], silentLogger);
-      assert.ok(r.analyzeMs >= 0);
-      assert.equal(r.patches.length, 1);
-      const p = r.patches[0]!;
-      assert.equal(p.ok, true);
-      assert.equal(p.result?.patch, TEST_PATCH);
-      assert.equal(p.result?.games, 3);
-      assert.equal(p.result?.champion_rows, 10);
-      // 스킬은 11자 이상인 줄만: 10명 중 11레벨 이상 찍은 사람 수와 같아야 함
-      assert.ok(Number(p.result?.skill_rows) >= 1);
-      const t = await c.query(`SELECT games FROM patch WHERE patch = $1`, [TEST_PATCH]);
-      assert.equal(t.rows[0].games, 3);
+      const r = await aggregateWindow(c, { days: 14, until: FAKE_UNTIL }, silentLogger);
+      assert.equal(r.ok, true);
+      assert.ok(r.analyzeMs >= 0 && r.refreshMs >= 0);
+      assert.equal(r.result?.games, 3);
+      assert.equal(r.result?.days, 14);
+      assert.deepEqual(r.result?.patches, [{ patch: TEST_PATCH, games: 3 }]);
+      assert.equal(r.result?.champion_rows, 10);
+      assert.ok(Number(r.result?.skill_rows) >= 1);
+      const w = await c.query(`SELECT days, window_start, window_end, games FROM stats_window`);
+      assert.deepEqual(w.rows, [
+        { days: 14, window_start: new Date('2021-01-01T00:00:00Z'), window_end: new Date(FAKE_UNTIL), games: 3 },
+      ]);
+      const p = await c.query(`SELECT patch, games FROM stats_window_patch`);
+      assert.deepEqual(p.rows, [{ patch: TEST_PATCH, games: 3 }]);
       // statement_timeout은 원래대로
-      const st = await c.query('SHOW statement_timeout');
-      assert.notEqual(st.rows[0].statement_timeout, '5min');
+      assert.equal((await c.query('SHOW statement_timeout')).rows[0].statement_timeout, st0);
     });
   });
 
-  it('완료 게임 0개 패치는 경고만 (P0002), 기존 집계 유지', async () => {
+  it('창 안 완료 게임 0개(P0002) → ok:false, stats_window는 호출 전과 같음', async () => {
     await inRollback(async (c) => {
-      const r = await aggregateOnConnection(c, ['0.99'], silentLogger);
-      assert.equal(r.patches[0]?.ok, false);
+      const before = (await c.query(`SELECT * FROM stats_window`)).rows;
+      await c.query('SAVEPOINT agg');
+      const r = await aggregateWindow(c, { days: 14, until: '2020-06-01T00:00:00Z' }, silentLogger);
+      assert.equal(r.ok, false);
+      assert.ok(r.warning);
+      await c.query('ROLLBACK TO SAVEPOINT agg'); // 오류로 멈춘 트랜잭션을 되살림
+      const after = (await c.query(`SELECT * FROM stats_window`)).rows;
+      assert.deepEqual(after, before);
     });
   });
 
-  it('purge 미리보기는 읽기만 (지울 패치 계산)', async () => {
+  it('purge 미리보기(읽기만): 2021년 게임 1개는 21일보다 오래된 지울 대상으로 셈. purge_old_games는 실행하지 않음', async () => {
     await inRollback(async (c) => {
+      const before = await planPurgeGames(c, 21);
       await insertSamplePlayer(c);
-      for (const g of fakeGames(1, '0.7')) await saveMatch(c, g.match, g.players);
-      const plan = await planPurge(c, 2);
-      // 0.7은 가장 오래된 패치이므로, 실제 패치가 2개 이상이면 지울 대상, 아니면 보관
-      assert.ok(plan.perPatch.some((p) => p.patch === '0.7'));
-      assert.ok(plan.keep.length <= 2);
+      for (const g of fakeGames(1)) await saveMatch(c, g.match, g.players);
+      const after = await planPurgeGames(c, 21);
+      assert.equal(after.total, before.total + 1);
+      assert.equal(after.remove, before.remove + 1);
+      assert.deepEqual(after.oldestStartAt, new Date(FAKE_START_MS + 60_000));
+      assert.ok(after.newestRemoveStartAt instanceof Date);
     });
+  });
+});
+
+describe('스냅숏 (실제 풀)', () => {
+  it('readSnapshot 안: transaction_isolation = repeatable read, transaction_read_only = on, 쓰기는 거부', async () => {
+    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1, application_name: 'tiergg-backend-test' });
+    try {
+      const r = await readSnapshot(pool, async (q) => ({
+        iso: (await q.query<{ transaction_isolation: string }>('SHOW transaction_isolation')).rows[0]?.transaction_isolation,
+        ro: (await q.query<{ transaction_read_only: string }>('SHOW transaction_read_only')).rows[0]?.transaction_read_only,
+      }));
+      assert.deepEqual(r, { iso: 'repeatable read', ro: 'on' });
+      await assert.rejects(
+        readSnapshot(pool, (q) => q.query(`UPDATE collection_logs SET status = status WHERE false`)),
+        (e: { code?: string }) => e.code === '25006',
+      );
+      // 실패 뒤에도 연결이 정상으로 돌아와 다음 스냅숏이 된다 (ROLLBACK 확인)
+      const again = await readSnapshot(pool, async (q) => (await q.query<{ one: number }>('SELECT 1 AS one')).rows[0]?.one);
+      assert.equal(again, 1);
+    } finally {
+      await pool.end();
+    }
   });
 });
 
@@ -140,11 +204,12 @@ after(async () => {
   await c.connect();
   try {
     const r = await c.query(
-      `SELECT (SELECT count(*)::int FROM matches WHERE patch IN ('0.9', '0.7', '0.99')) AS m,
-              (SELECT count(*)::int FROM patch WHERE patch IN ('0.9', '0.7', '0.99')) AS p,
+      `SELECT (SELECT count(*)::int FROM matches WHERE match_id LIKE 'KR\\_9000000%') AS m,
+              (SELECT count(*)::int FROM stats_window_patch WHERE patch IN ('0.8', '0.9')) AS p,
+              (SELECT count(*)::int FROM stats_window WHERE window_end < '2022-01-01') AS w,
               (SELECT count(*)::int FROM ranked_players WHERE puuid LIKE 'TEST\\_%') AS rp`,
     );
-    assert.deepEqual(r.rows[0], { m: 0, p: 0, rp: 0 });
+    assert.deepEqual(r.rows[0], { m: 0, p: 0, w: 0, rp: 0 });
   } finally {
     await c.end();
   }

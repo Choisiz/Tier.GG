@@ -1,18 +1,51 @@
-// 집계 읽기: patch, champion_tier_view, champion_item/rune/spell/skill
+// 집계 읽기: stats_window(+patch), champion_tier_view, champion_item/rune/spell/skill (계약 v7)
 // numeric·bigint는 SQL에서 ::int / ::float8로 바꿔 숫자로 받는다 (pg는 numeric을 문자열로 줌).
 // 비율 반올림도 SQL round(numeric, 2)로 해서 뷰와 같은 방식으로 맞춘다.
 import type { Queryable } from '../db/tx.js';
 
-export interface PatchRow {
+export interface WindowPatchRow {
   patch: string;
   games: number;
 }
 
-export async function listPatches(db: Queryable): Promise<PatchRow[]> {
-  const r = await db.query<PatchRow>(
-    `SELECT patch, games::int AS games FROM patch ORDER BY patch_sort_key(patch) DESC`,
+export interface WindowRow {
+  days: number;
+  windowStart: Date;
+  windowEnd: Date;
+  games: number;
+  aggregatedAt: Date;
+  /** 최신 패치 먼저 (patch_sort_key DESC) */
+  patches: WindowPatchRow[];
+}
+
+/**
+ * stats_window 1줄 + stats_window_patch를 **한 문장**으로 (스냅숏의 첫 문장). 집계 전(0줄)이면 null.
+ * json_agg 안의 games는 json 숫자로 오므로 ::int로 맞춰 둔다.
+ */
+export async function readWindow(db: Queryable): Promise<WindowRow | null> {
+  const r = await db.query<WindowRow>(
+    `SELECT w.days::int        AS "days",
+            w.window_start     AS "windowStart",
+            w.window_end       AS "windowEnd",
+            w.games::int       AS "games",
+            w.aggregated_at    AS "aggregatedAt",
+            coalesce(
+              (SELECT json_agg(json_build_object('patch', p.patch, 'games', p.games::int)
+                               ORDER BY patch_sort_key(p.patch) DESC)
+                 FROM stats_window_patch p),
+              '[]'::json)      AS "patches"
+       FROM stats_window w
+      WHERE w.id = 1`,
   );
-  return r.rows;
+  return r.rows[0] ?? null;
+}
+
+/** /health: DB 확인과 집계 시각을 한 문장으로 (SELECT 1 대신). 집계 전이면 null */
+export async function readAggregatedAt(db: Queryable): Promise<Date | null> {
+  const r = await db.query<{ aggregated_at: Date | null }>(
+    `SELECT (SELECT aggregated_at FROM stats_window WHERE id = 1) AS aggregated_at`,
+  );
+  return r.rows[0]?.aggregated_at ?? null;
 }
 
 export interface TierRow {
@@ -44,30 +77,27 @@ const TIER_SELECT = `
          round(100.0 * v.pick / sum(v.pick) OVER (PARTITION BY v.champion_id), 2)::float8 AS "positionShare"
     FROM champion_tier_view v`;
 
-/** 패치의 모든 챔피언 × 포지션. 티어리스트 정렬 순서 (tier NULLS LAST, tier_score DESC, champion_id) */
-export async function tierRowsForPatch(db: Queryable, patch: string): Promise<TierRow[]> {
+/** 창의 모든 챔피언 × 포지션. 티어리스트 정렬 순서 (tier NULLS LAST, tier_score DESC, champion_id) */
+export async function tierRows(db: Queryable): Promise<TierRow[]> {
   const r = await db.query<TierRow>(
     `${TIER_SELECT}
-     WHERE v.patch = $1
      ORDER BY v.tier NULLS LAST, v.tier_score DESC, v.champion_id ASC, v.position ASC`,
-    [patch],
   );
   return r.rows;
 }
 
 /** 한 챔피언의 모든 포지션 (pick 내림차순) */
-export async function tierRowsForChampion(db: Queryable, patch: string, championId: number): Promise<TierRow[]> {
+export async function tierRowsForChampion(db: Queryable, championId: number): Promise<TierRow[]> {
   const r = await db.query<TierRow>(
     `${TIER_SELECT}
-     WHERE v.patch = $1 AND v.champion_id = $2
+     WHERE v.champion_id = $1
      ORDER BY v.pick DESC, v.position ASC`,
-    [patch, championId],
+    [championId],
   );
   return r.rows;
 }
 
 interface Key {
-  patch: string;
   championId: number;
   position: string;
 }
@@ -120,8 +150,8 @@ const RATES = `
   round(100.0 * t.win / t.pick, 2)::float8 AS "winRate",
   round(100.0 * t.pick / c.pick, 2)::float8 AS "pickRate"`;
 const JOIN_CHAMPION = `
-  JOIN champion c ON c.patch = t.patch AND c.champion_id = t.champion_id AND c.position = t.position
- WHERE t.patch = $1 AND t.champion_id = $2 AND t.position = $3`;
+  JOIN champion c ON c.champion_id = t.champion_id AND c.position = t.position
+ WHERE t.champion_id = $1 AND t.position = $2`;
 
 /** 모든 아이템, pick 내림차순 (결정 D4) */
 export async function itemsFor(db: Queryable, k: Key): Promise<ItemRow[]> {
@@ -129,7 +159,7 @@ export async function itemsFor(db: Queryable, k: Key): Promise<ItemRow[]> {
     `SELECT t.item_id::int AS "itemId", t.pick::int AS "pick", t.win::int AS "win", ${RATES}
        FROM champion_item t ${JOIN_CHAMPION}
       ORDER BY t.pick DESC, t.win DESC, t.item_id ASC`,
-    [k.patch, k.championId, k.position],
+    [k.championId, k.position],
   );
   return r.rows;
 }
@@ -146,8 +176,8 @@ export async function runesFor(db: Queryable, k: Key, limit: number): Promise<Ru
       ORDER BY t.pick DESC, t.win DESC,
                t.primary_style, t.primary_perk1, t.primary_perk2, t.primary_perk3, t.primary_perk4,
                t.sub_style, t.sub_perk1, t.sub_perk2, t.stat_offense, t.stat_flex, t.stat_defense
-      LIMIT $4`,
-    [k.patch, k.championId, k.position, limit],
+      LIMIT $3`,
+    [k.championId, k.position, limit],
   );
   return r.rows;
 }
@@ -158,8 +188,8 @@ export async function spellsFor(db: Queryable, k: Key, limit: number): Promise<S
             t.pick::int AS "pick", t.win::int AS "win", ${RATES}
        FROM champion_spell t ${JOIN_CHAMPION}
       ORDER BY t.pick DESC, t.win DESC, t.spell1_id, t.spell2_id
-      LIMIT $4`,
-    [k.patch, k.championId, k.position, limit],
+      LIMIT $3`,
+    [k.championId, k.position, limit],
   );
   return r.rows;
 }
@@ -169,12 +199,8 @@ export async function skillsFor(db: Queryable, k: Key, limit: number): Promise<S
     `SELECT t.skill_order AS "skillOrder", t.pick::int AS "pick", t.win::int AS "win", ${RATES}
        FROM champion_skill t ${JOIN_CHAMPION}
       ORDER BY t.pick DESC, t.win DESC, t.skill_order
-      LIMIT $4`,
-    [k.patch, k.championId, k.position, limit],
+      LIMIT $3`,
+    [k.championId, k.position, limit],
   );
   return r.rows;
-}
-
-export async function ping(db: Queryable): Promise<void> {
-  await db.query('SELECT 1');
 }

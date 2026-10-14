@@ -1,4 +1,4 @@
-// API 오류 형식과 오류 미들웨어 (api_contract 3장)
+// API 오류 형식과 오류 미들웨어 (api_contract v2 3장)
 import type { ErrorRequestHandler, RequestHandler, Response } from 'express';
 import { isDbConnectionError } from '../db/pool.js';
 import { formatError, redact, type Logger } from '../lib/logger.js';
@@ -6,7 +6,6 @@ import type { Parsed } from './validate.js';
 
 export type ErrorCode =
   | 'INVALID_PARAMETER'
-  | 'PATCH_NOT_FOUND'
   | 'STATS_NOT_FOUND'
   | 'NOT_FOUND'
   | 'STATS_NOT_READY'

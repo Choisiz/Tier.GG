@@ -2,21 +2,25 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   buildSkillOrder,
-  comparePatch,
   emptyWarnings,
-  latestPatches,
   parsePatch,
   prefilterMatch,
   transformMatch,
 } from '../../src/collector/transform.js';
-import { clone, loadMatch, loadTimeline, OPTS } from '../helpers/fixture.js';
+import { clone, FIXTURE_START_MS, loadMatch, loadTimeline, OPTS } from '../helpers/fixture.js';
 
 describe('transform: 실제 게임 KR_8408851980', () => {
   const r = transformMatch(loadMatch(), loadTimeline(), 'TEST_PUUID_01', OPTS);
 
-  it('matches 1줄 + match_players 10줄, patch 16.19', () => {
+  it('matches 1줄(game_start_at 포함) + match_players 10줄, patch 16.19', () => {
     assert.ok(r.ok);
-    assert.deepEqual(r.match, { match_id: 'KR_8408851980', puuid: 'TEST_PUUID_01', patch: '16.19' });
+    assert.deepEqual(r.match, {
+      match_id: 'KR_8408851980',
+      puuid: 'TEST_PUUID_01',
+      patch: '16.19',
+      game_start_at: new Date('2026-10-06T05:19:50.514Z'),
+    });
+    assert.equal(r.match.game_start_at.getTime(), 1791263990514);
     assert.equal(r.players.length, 10);
     assert.equal(new Set(r.players.map((p) => p.puuid)).size, 10);
   });
@@ -185,11 +189,47 @@ describe('패치', () => {
     assert.equal(parsePatch('a.b.c'), null);
     assert.equal(parsePatch(undefined), null);
   });
+});
 
-  it('숫자 비교: 16.9 < 16.19 < 17.1', () => {
-    assert.ok(comparePatch('16.9', '16.19') < 0);
-    assert.ok(comparePatch('17.1', '16.19') > 0);
-    assert.equal(comparePatch('16.19', '16.19'), 0);
-    assert.deepEqual(latestPatches(['16.9', '16.19', '16.10', '16.19'], 2), ['16.19', '16.10']);
+describe('시작 시각 검사 (변경 01-4-2)', () => {
+  const withStart = (v: unknown) => {
+    const m = clone(loadMatch());
+    (m.info as { gameStartTimestamp: unknown }).gameStartTimestamp = v;
+    return m;
+  };
+  const reason = (m: ReturnType<typeof loadMatch>, opts = OPTS) => {
+    const r = prefilterMatch(m, opts);
+    return r.ok ? 'ok' : r.reason;
+  };
+
+  it('없음·문자열·소수·2020-01-01 이전 → bad_format', () => {
+    const m = clone(loadMatch());
+    delete (m.info as { gameStartTimestamp?: number }).gameStartTimestamp;
+    assert.equal(reason(m), 'bad_format');
+    assert.equal(reason(withStart('1791263990514')), 'bad_format');
+    assert.equal(reason(withStart(1791263990514.5)), 'bad_format');
+    const early = { ...OPTS, windowStartMs: 0 };
+    assert.equal(reason(withStart(1_577_836_799_999), early), 'bad_format');
+    assert.equal(reason(withStart(1_577_836_800_000), early), 'ok');
+  });
+
+  it('창 시작 − 1ms → out_of_window, 정확히 창 시작 → 통과', () => {
+    const opts = { ...OPTS, windowStartMs: FIXTURE_START_MS };
+    assert.equal(reason(withStart(FIXTURE_START_MS - 1), opts), 'out_of_window');
+    const r = prefilterMatch(withStart(FIXTURE_START_MS), opts);
+    assert.ok(r.ok);
+    assert.equal(r.gameStartAt.getTime(), FIXTURE_START_MS);
+  });
+
+  it('패치 형식 오류가 시작 시각 검사보다 먼저', () => {
+    const m = withStart(1);
+    m.info.gameVersion = 'x';
+    const r = prefilterMatch(m, OPTS);
+    assert.deepEqual(r.ok ? null : r.detail, 'gameVersion=x');
+  });
+
+  it('transformMatch도 창 밖이면 out_of_window', () => {
+    const r = transformMatch(loadMatch(), loadTimeline(), null, { ...OPTS, windowStartMs: FIXTURE_START_MS + 1 });
+    assert.equal(r.ok ? null : r.reason, 'out_of_window');
   });
 });

@@ -42,12 +42,26 @@ const json = (status: number, body: unknown, headers: Record<string, string> = {
 describe('riot client (가짜 fetch)', () => {
   it('키는 X-Riot-Token 헤더에만, URL에는 없음', async () => {
     const { client, calls } = setup([json(200, ['KR_1'])]);
-    assert.deepEqual(await client.getMatchIds('PUUID_X', { queue: 420, start: 0, count: 20 }), ['KR_1']);
+    assert.deepEqual(
+      await client.getMatchIds('PUUID_X', { queue: 420, start: 0, count: 20, startTime: 1790816400 }),
+      ['KR_1'],
+    );
     assert.equal(calls.length, 1);
     const c = calls[0]!;
-    assert.equal(c.url, 'https://asia.example/lol/match/v5/matches/by-puuid/PUUID_X/ids?queue=420&start=0&count=20');
+    assert.equal(
+      c.url,
+      'https://asia.example/lol/match/v5/matches/by-puuid/PUUID_X/ids?queue=420&start=0&count=20&startTime=1790816400',
+    );
     assert.ok(!c.url.includes(KEY));
     assert.equal((c.init.headers as Record<string, string>)['X-Riot-Token'], KEY);
+  });
+
+  it('startTime에 ms(13자리)·소수·9자리를 넣으면 호출 전에 던짐', async () => {
+    const { client, calls } = setup([]);
+    for (const bad of [1790816400000, 1790816400.5, 179081640]) {
+      await assert.rejects(client.getMatchIds('PUUID_X', { queue: 420, start: 0, count: 20, startTime: bad }), TypeError);
+    }
+    assert.equal(calls.length, 0);
   });
 
   for (const status of [401, 403]) {
@@ -113,7 +127,7 @@ describe('riot client (가짜 fetch)', () => {
   it('오류 path에 puuid 전체가 남지 않는다', async () => {
     const { client } = setup([json(404, {})]);
     const puuid = 'A'.repeat(78);
-    await assert.rejects(client.getMatchIds(puuid, { queue: 420, start: 0, count: 20 }), (err: RiotNotFoundError) => {
+    await assert.rejects(client.getMatchIds(puuid, { queue: 420, start: 0, count: 20, startTime: 1790816400 }), (err: RiotNotFoundError) => {
       assert.ok(!err.path.includes(puuid));
       return true;
     });

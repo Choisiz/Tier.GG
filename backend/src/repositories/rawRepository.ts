@@ -44,19 +44,43 @@ export async function existingMatchIds(db: Queryable, ids: string[]): Promise<Se
   return new Set(r.rows.map((x) => x.match_id));
 }
 
-/** matches에 있는 패치별 게임 수 */
-export async function matchCountsByPatch(db: Queryable): Promise<Map<string, number>> {
-  const r = await db.query<{ patch: string; n: number }>(
-    `SELECT patch, count(*)::int AS n FROM matches GROUP BY patch ORDER BY patch_sort_key(patch)`,
+/** game_start_at >= since 인 게임 수 (창 상한 확인용, 변경 01-4-3) */
+export async function countMatchesSince(db: Queryable, since: Date): Promise<number> {
+  const r = await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM matches WHERE game_start_at >= $1::timestamptz`, [
+    since,
+  ]);
+  return r.rows[0]?.n ?? 0;
+}
+
+export interface PurgePreview {
+  total: number;
+  remove: number;
+  oldestStartAt: Date | null;
+  newestStartAt: Date | null;
+  /** 지울 게임 중 가장 최근 시작 시각 */
+  newestRemoveStartAt: Date | null;
+}
+
+/** purge 미리보기 (읽기만): purge_old_games(keepDays)와 같은 조건 game_start_at < now() − keepDays일 */
+export async function purgePreview(db: Queryable, keepDays: number): Promise<PurgePreview> {
+  const r = await db.query<PurgePreview>(
+    `SELECT count(*)::int AS "total",
+            (count(*) FILTER (WHERE game_start_at < now() - $1::int * interval '24 hours'))::int AS "remove",
+            min(game_start_at) AS "oldestStartAt",
+            max(game_start_at) AS "newestStartAt",
+            max(game_start_at) FILTER (WHERE game_start_at < now() - $1::int * interval '24 hours') AS "newestRemoveStartAt"
+       FROM matches`,
+    [keepDays],
   );
-  return new Map(r.rows.map((x) => [x.patch, x.n]));
+  return r.rows[0] as PurgePreview;
 }
 
 /** matches 1줄. 이미 있으면 0 (ON CONFLICT DO NOTHING) */
 export async function insertMatch(db: Queryable, m: MatchRow): Promise<number> {
   const r = await db.query(
-    `INSERT INTO matches (match_id, puuid, patch) VALUES ($1, $2, $3) ON CONFLICT (match_id) DO NOTHING`,
-    [m.match_id, m.puuid, m.patch],
+    `INSERT INTO matches (match_id, puuid, patch, game_start_at) VALUES ($1, $2, $3, $4::timestamptz)
+     ON CONFLICT (match_id) DO NOTHING`,
+    [m.match_id, m.puuid, m.patch, m.game_start_at],
   );
   return r.rowCount ?? 0;
 }
@@ -95,11 +119,4 @@ export async function saveMatch(db: Queryable, m: MatchRow, players: PlayerRow[]
   if (n === 0) return 'duplicate';
   await insertMatchPlayers(db, players);
   return 'saved';
-}
-
-export async function distinctMatchPatches(db: Queryable): Promise<string[]> {
-  const r = await db.query<{ patch: string }>(
-    `SELECT DISTINCT patch FROM matches ORDER BY patch_sort_key(patch)`,
-  );
-  return r.rows.map((x) => x.patch);
 }

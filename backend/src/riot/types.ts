@@ -53,6 +53,8 @@ export interface MatchDto {
   info: {
     gameVersion: string;
     gameDuration: number;
+    /** 게임 시작 시각 (ms). matches.game_start_at */
+    gameStartTimestamp: number;
     queueId: number;
     participants: ParticipantDto[];
     teams: TeamDto[];
