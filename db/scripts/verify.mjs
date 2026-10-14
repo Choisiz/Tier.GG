@@ -17,7 +17,7 @@ const fresh = process.argv.includes('--fresh');
 
 const TABLES = [
   'ranked_players', 'matches', 'match_players', 'collection_logs',
-  'patch', 'champion', 'champion_item', 'champion_rune', 'champion_spell', 'champion_skill',
+  'stats_window', 'stats_window_patch', 'champion', 'champion_item', 'champion_rune', 'champion_spell', 'champion_skill',
 ];
 
 async function countRows(client) {

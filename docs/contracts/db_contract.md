@@ -2,11 +2,21 @@
 
 > 이 문서는 `!db`가 작성하고 `!백엔드`가 읽는 계약 문서다. 테이블 구조, 수집 범위, 집계 함수, 저장 규칙을 정한다. (CLAUDE.md 9장)
 
-- 상태: **v6 승인됨 (2026-10-14, 변경 02)**
-- 기준: `docs/contracts/db_contract.dbml` (v6, 2026-10-14 변경 02). 이 문서와 dbml이 다르면 dbml이 우선이다.
+- 상태: **v7 승인됨 (2026-10-14, 변경 03)**
+- 기준: `docs/contracts/db_contract.dbml` (v7, 2026-10-14 변경 03). 이 문서와 dbml이 다르면 dbml이 우선이다.
 - DB: Supabase 무료 플랜 (PostgreSQL 17, 500MB)
-- 범위: 챔피언 티어리스트(포지션별 1~5티어) + 챔피언 상세 추천(아이템, 룬, 스펠, 스킬)
+- 범위: 챔피언 티어리스트(포지션별 1~5티어) + 챔피언 상세 추천(아이템, 룬, 스펠, 스킬) 통계는 최근 14일 게임 기준.
 - 전적 검색과 AI 피드백용 테이블은 이번 범위에 포함하지 않는다.
+
+### v6 → v7 변경 (변경 03, 2026-10-14)
+
+| 변경 | 이유 |
+|------|------|
+| 통계 기준을 패치 → **최근 14일에 시작한 게임**으로. 집계는 현재 창 스냅숏 1개 (`patch` 테이블 → `stats_window`, 집계 5개에서 `patch` 컬럼 삭제) | 사용자 결정. 새 패치 직후 표본 급감과 직전 패치 대체 규칙을 없앰. 14일은 패치 주기(약 2주)와 비슷 |
+| `matches.game_start_at` 추가 (`info.gameStartTimestamp`) | 창에 넣을지 판단하는 기준 |
+| `stats_window_patch` 추가 (창 안 패치별 게임 수) | 두 패치가 섞이는 시기를 화면에 투명하게 보여줌 |
+| `refresh_patch_stats` → `refresh_window_stats(p_days, p_until)`, `purge_old_patches` → `purge_old_games(p_keep_days)` (원본 21일 보관) | 패치 대신 시각 기준 |
+| 테스트 수집 인원 티어당 50명 → 100명 | 14일 창 안 게임만 받으므로 플레이어당 게임 수가 줄어듦 |
 
 ### v5 → v6 변경 (변경 02, 2026-10-14)
 
@@ -37,7 +47,7 @@
 
 ## 1. 수집 범위
 
-> 요약: KR 서버 **솔로랭크**, **최근 2개 패치**의 게임만 모은다. 첫 실제 수집(**테스트**)은 **플래티넘·에메랄드·다이아 각 50명**, **본 수집**은 **에메랄드 이상**이다. 패치당 최대 **2만 5천 게임**이다.
+> 요약: KR 서버 **솔로랭크**, **최근 14일에 시작한** 게임만 모은다. 원본은 **21일** 보관한다. 첫 실제 수집(**테스트**)은 **플래티넘·에메랄드·다이아 각 100명**, **본 수집**은 **에메랄드 이상**이다. 14일 창에 최대 **2만 5천 게임**이다.
 
 ### 1-1. 수집 기준
 
@@ -45,27 +55,28 @@
 |------|------|------|
 | 서버 | KR | 한국 서비스 |
 | 큐 | 솔로랭크. 게임 ID 목록을 `queue=420`으로 요청 | 일반·자유랭크는 실력·조합 편차가 큼. DB에는 큐 컬럼이 없으므로 요청 단계에서 거른다 |
-| 티어 | 테스트: 플래티넘·에메랄드·다이아 각 50명 (1-3). 본 수집: 에메랄드 이상 (에메랄드 : 다이아 : 마스터 이상 = 4 : 4 : 2, 테스트 뒤 다시 정함) | 표본 품질. 한 티어에 몰리지 않게 비율 고정 |
-| 원본 보관 | **최근 2개 패치**만 | 무료 용량. 오래된 원본은 `purge_old_patches`로 삭제 |
-| 패치당 게임 수 | 최대 25,000게임 | 아래 용량 계산 기준 |
+| 티어 | 테스트: 플래티넘·에메랄드·다이아 각 100명 (1-3). 본 수집: 에메랄드 이상 (에메랄드 : 다이아 : 마스터 이상 = 4 : 4 : 2, 테스트 뒤 다시 정함) | 표본 품질. 한 티어에 몰리지 않게 비율 고정 |
+| 원본 보관 | **시작 시각 기준 최근 21일** (통계 창 14일 + 여유 7일) | 무료 용량. 오래된 원본은 `purge_old_games`로 삭제 |
+| 창당 게임 수 | 최근 14일 최대 25,000게임 | 아래 용량 계산 기준 |
+| 수집 기간 | 게임 ID 목록을 `startTime = 지금 − 14일`(초)로 요청 | 창 밖 게임은 처음부터 받지 않는다 |
 | 플레이어당 게임 수 | 최대 20게임 (권장) | 원챔 장인 한 명이 통계를 좌우하지 않게 |
 | 제외 게임 | `gameDuration < 300`(5분 미만, 다시하기) | 정상 게임이 아님. **저장하지 않는다** |
 | 저장 필드 | 참가자 1명당 26개 컬럼 | 티어와 추천에 필요한 값만 (6장) |
 | 타임라인 원본 | 저장하지 않음 | 한 판 약 570KB. 스킬 순서만 뽑아 `skill_order`에 저장 |
-| 집계 결과 | 모든 패치 계속 보관 | 패치당 약 4MB |
+| 집계 결과 | **현재 창 1개만** (집계할 때마다 통째로 다시 만듦) | 약 4~10MB로 고정 |
 
 - `ranked_players.tier` 허용 값: `PLATINUM`, `EMERALD`, `DIAMOND`, `MASTER`, `GRANDMASTER`, `CHALLENGER` (CHECK `ranked_players_tier_check`). `IRON`~`GOLD`는 저장할 수 없다.
 
-### 1-2. 용량 계산 (패치당 25,000게임 × 2개 패치)
+### 1-2. 용량 계산 (14일 창 25,000게임, 원본 21일 보관)
 
-| 테이블 | 줄 수 | 1줄 크기 (인덱스 포함, 대략) | 용량 |
-|--------|-------|------------------------------|------|
-| `match_players` | 50만 | 약 400B (본문 약 250B + PK 인덱스 약 120B + 챔피언 인덱스 약 30B) | 약 200MB |
-| `matches` | 5만 | 약 180B (`puuid` 78자 포함 + PK) | 약 9MB |
+| 테이블 | 줄 수 | 1줄 크기 | 용량 |
+|--------|-------|----------|------|
+| `match_players` | 21일 = 약 37,500게임 × 10 = 37.5만 | 약 400B | 약 150MB |
+| `matches` | 약 3만 7,500 | 약 190B | 약 7MB |
 | `ranked_players` | 약 5천 | 약 150B | 약 1MB |
-| 집계 테이블 6개 | 패치당 약 3만 줄 | - | 패치당 약 4MB |
-| **합계 (시작)** | | | **약 220MB / 500MB** |
-| 합계 (1년, 집계 약 25패치 누적) | | | 약 310MB / 500MB |
+| 집계 7개 | 창 1개, 약 3만 줄 | 약 120B | 약 4~10MB (db_review M2: 아이템 줄 수에 따라) |
+| 집계 다시 만들 때 죽은 줄 | 이전 스냅숏 | - | 일시적으로 +4~10MB (autovacuum이 재사용) |
+| **합계** | | | **약 165~180MB / 500MB, 계속 같음** |
 
 - v3(약 315MB)보다 원본 1줄이 작아져(약 560B → 약 400B) 시작 용량이 약 100MB 줄었다.
 - `match_players`에서 가장 큰 것은 `puuid`(78자)다. 본문과 PK 인덱스에 두 번 들어간다.
@@ -76,9 +87,9 @@
 ### 1-3. 개발 단계 운영 (테스트 수집)
 
 - 첫 실제 수집은 **테스트 수집**으로 수집 → 저장 → 집계 → 화면 흐름을 검증한다.
-- 표본: **플래티넘·에메랄드·다이아 각 50명, 모두 150명.** 각 티어에서 디비전 I~IV에 12~13명씩 고르게 고른다. `league-v4` `/lol/league/v4/entries/RANKED_SOLO_5x5/{tier}/{division}`만 쓴다.
+- 표본: **플래티넘·에메랄드·다이아 각 100명, 모두 300명.** 각 티어에서 디비전 I~IV에 25명씩 고르게 고른다. `league-v4` `/lol/league/v4/entries/RANKED_SOLO_5x5/{tier}/{division}`만 쓴다.
 - 마스터·그랜드마스터·챌린저는 디비전이 없어 같은 방식으로 고르게 뽑을 수 없으므로 테스트에서 뺀다. 본 수집 때 별도 리그 API로 다시 정한다.
-- 예상 규모: 약 2,700게임 (150명 × 최대 20게임, 겹침 제외), 개발 키로 약 2시간, 약 12MB. 챔피언 × 포지션당 평균 약 30판이라 티어는 대부분 NULL("표본 부족")이다.
+- 예상 규모: 약 2,200~2,700게임 (300명 × 14일 안 게임 평균 약 8~10게임(상한 20), 겹침 약 10% 제외, 상한 약 5,400), Riot 호출 약 5,700회·개발 키로 약 2시간, 약 13MB (상한이면 약 25MB). 챔피언 × 포지션당 평균 약 30판이라 티어는 대부분 NULL("표본 부족")이다.
 - 티어·디비전별 인원, 디비전 안에서 고르는 방법, 플레이어당 게임 수는 **백엔드 수집기 설정**이다. DB는 허용 값(1-1)만 확인한다.
 - 개발 키(24시간 만료)를 사용자가 매일 직접 발급해 `.env`에 넣고, 수집은 명령어로 직접 실행한다.
 - 키가 만료되면(401/403) 수집을 멈추고 `collection_logs.status = 'key_expired'`로 기록한다.
@@ -92,15 +103,16 @@
 
 ## 2. 테이블 목록
 
-> 요약: 테이블 10개를 세 묶음으로 나눈다. **원본**(Riot 값 그대로), **집계**(원본을 센 개수, 화면이 읽음), **운영**(수집 기록)이다.
+> 요약: 테이블 11개를 세 묶음으로 나눈다. **원본**(Riot 값 그대로), **집계**(원본을 센 개수, 화면이 읽음), **운영**(수집 기록)이다.
 
 | 묶음 | 테이블 | 한 줄의 의미 | 설명 |
 |------|--------|--------------|------|
 | 원본 | `ranked_players` | 플레이어 1명 | 수집 대상 표본(테스트: 플래티넘~다이아, 본 수집: 에메랄드 이상). 이 사람들의 게임 ID를 찾는다 |
-| 원본 | `matches` | 게임 1개 | 게임 ID, 찾을 때 쓴 표본 플레이어, 패치 |
+| 원본 | `matches` | 게임 1개 | 게임 ID, 찾을 때 쓴 표본 플레이어, 패치, 시작 시각 |
 | 원본 | `match_players` | 게임 속 플레이어 1명 | **핵심.** 게임당 10줄. 챔피언, 포지션, 승패, 밴, 스펠, 룬, 최종 아이템, 스킬 순서 |
-| 집계 | `patch` | 패치 1개 | 그 패치의 전체 게임 수 (픽률·밴률 분모) |
-| 집계 | `champion` | 패치 × 챔피언 × 포지션 | pick, win, ban 개수. **티어리스트 화면** |
+| 집계 | `stats_window` | 현재 창 1개 (0~1줄) | 창 시작·끝, 전체 게임 수(픽률·밴률 분모), 집계 시각 |
+| 집계 | `stats_window_patch` | 창 안 패치 1개 | 패치별 게임 수 (패치 구성 표시) |
+| 집계 | `champion` | 챔피언 × 포지션 | pick, win, ban 개수. **티어리스트 화면** |
 | 집계 | `champion_item` | 아이템 1개 | 그 아이템을 가지고 끝난 게임 수. **상세 화면** |
 | 집계 | `champion_rune` | 룬 페이지 조합 1개 | 트리 2개 + 룬 6개 + 파편 3개가 같은 조합. **상세 화면** |
 | 집계 | `champion_spell` | 소환사 주문 조합 1개 | 작은 번호 + 큰 번호. **상세 화면** |
@@ -114,34 +126,32 @@
 
 ## 3. 테이블 관계
 
-> 요약: 원본은 수집 순서대로 `ranked_players` → `matches` → `match_players`, 집계는 `patch` → `champion` → 상세 4개로 이어진다. 원본과 집계는 FK로 잇지 않고, 집계 SQL 함수가 원본을 읽어 집계를 다시 만든다.
+> 요약: 원본은 수집 순서대로 `ranked_players` → `matches` → `match_players`, 집계는 `champion` → 상세 4개로 이어지고, `stats_window`·`stats_window_patch`는 따로 선다. 원본과 집계는 FK로 잇지 않고, 집계 SQL 함수가 원본을 읽어 집계를 다시 만든다.
 
 | 관계 | 종류 | 삭제 동작 | 설명 |
 |------|------|-----------|------|
 | `ranked_players` 1 : N `matches` | FK `matches.puuid` | ON DELETE SET NULL | 이 게임 ID를 어느 표본 플레이어 목록에서 처음 찾았는지 |
 | `matches` 1 : N `match_players` | FK `match_players.match_id` | ON DELETE CASCADE | 게임 1개에 10줄. 게임을 지우면 함께 삭제 |
-| `patch` 1 : N `champion` | FK `champion.patch` | ON DELETE CASCADE | 패치 1개에 챔피언 × 포지션 여러 줄 |
-| `champion` 1 : N `champion_item` / `champion_rune` / `champion_spell` / `champion_skill` | FK `(patch, champion_id, position)` | ON DELETE CASCADE | 챔피언 × 포지션 1개에 추천 조합 여러 개 |
+| `champion` 1 : N `champion_item` / `champion_rune` / `champion_spell` / `champion_skill` | FK `(champion_id, position)` | ON DELETE CASCADE | 챔피언 × 포지션 1개에 추천 조합 여러 개 |
 | `collection_logs` | 관계 없음 | - | 실행 기록일 뿐 통계와 무관 |
 
 - `match_players.puuid`는 참가자 10명의 puuid다. 표본 플레이어가 아닌 사람도 있으므로 `ranked_players`와 잇지 않는다.
-- `patch` 1줄을 지우면 그 패치의 집계 5개 테이블이 모두 CASCADE로 지워진다. 집계 함수는 이 성질을 이용해 다시 만든다.
+- 집계 함수는 `champion`을 지워(상세 4개 CASCADE) 다시 만든다.
 
 ---
 
 ## 4. ERD
 
-> 요약: dbml v6을 Mermaid로 옮긴 그림이다. 각 테이블 이름 옆에 설명을 붙였다.
+> 요약: dbml v7을 Mermaid로 옮긴 그림이다. 각 테이블 이름 옆에 설명을 붙였다.
 
 ```mermaid
 erDiagram
     ranked_players |o--o{ matches : "puuid (SET NULL)"
     matches ||--|{ match_players : "match_id (CASCADE)"
-    patch ||--o{ champion : "patch (CASCADE)"
-    champion ||--o{ champion_item : "patch+champion_id+position"
-    champion ||--o{ champion_rune : "patch+champion_id+position"
-    champion ||--o{ champion_spell : "patch+champion_id+position"
-    champion ||--o{ champion_skill : "patch+champion_id+position"
+    champion ||--o{ champion_item : "champion_id+position"
+    champion ||--o{ champion_rune : "champion_id+position"
+    champion ||--o{ champion_spell : "champion_id+position"
+    champion ||--o{ champion_skill : "champion_id+position"
 
     ranked_players["ranked_players · 수집 대상 플레이어"] {
         text puuid PK "플레이어 고유 ID"
@@ -153,6 +163,7 @@ erDiagram
         text match_id PK "KR_8408851980"
         text puuid FK "처음 찾은 표본 플레이어 (null 가능)"
         text patch "16.19"
+        timestamptz game_start_at "info.gameStartTimestamp"
     }
 
     match_players["match_players · 게임 속 플레이어 (게임당 10줄)"] {
@@ -184,13 +195,21 @@ erDiagram
         text skill_order "EQQWQRQEQEREEW"
     }
 
-    patch["patch · 패치별 전체 게임 수"] {
-        text patch PK "16.19"
+    stats_window["stats_window · 현재 집계 창 (0~1줄, 관계 없음)"] {
+        smallint id PK "항상 1"
+        int days "14"
+        timestamptz window_start "포함"
+        timestamptz window_end "제외"
         int games "픽률 밴률 분모"
+        timestamptz aggregated_at
     }
 
-    champion["champion · 패치 x 챔피언 x 포지션 (티어리스트)"] {
-        text patch PK,FK
+    stats_window_patch["stats_window_patch · 창 안 패치 구성 (관계 없음)"] {
+        text patch PK "16.20"
+        int games "합계 = stats_window.games"
+    }
+
+    champion["champion · 챔피언 x 포지션 (티어리스트)"] {
         int champion_id PK
         text position PK
         int pick
@@ -199,7 +218,6 @@ erDiagram
     }
 
     champion_item["champion_item · 아이템별 개수"] {
-        text patch PK,FK
         int champion_id PK,FK
         text position PK,FK
         int item_id PK
@@ -209,7 +227,6 @@ erDiagram
 
     champion_rune["champion_rune · 룬 페이지 조합 (상위 10개)"] {
         bigint id PK
-        text patch FK
         int champion_id FK
         text position FK
         int primary_style UK
@@ -228,7 +245,6 @@ erDiagram
     }
 
     champion_spell["champion_spell · 소환사 주문 조합"] {
-        text patch PK,FK
         int champion_id PK,FK
         text position PK,FK
         int spell1_id PK "작은 번호"
@@ -238,7 +254,6 @@ erDiagram
     }
 
     champion_skill["champion_skill · 스킬 앞 11레벨 순서"] {
-        text patch PK,FK
         int champion_id PK,FK
         text position PK,FK
         text skill_order PK "^[QWER]{11}$, EQQWQRQEQER"
@@ -257,7 +272,7 @@ erDiagram
     }
 ```
 
-- `champion_rune`의 `UK`는 `(patch, champion_id, position, 룬 11개)` 전체에 걸린 유니크 키 1개다.
+- `champion_rune`의 `UK`는 `(champion_id, position, 룬 11개)` 전체에 걸린 유니크 키 1개다.
 
 ---
 
@@ -268,17 +283,17 @@ erDiagram
 | 단계 | Riot API / SQL | 하는 일 | 채우는 곳 |
 |------|----------------|---------|-----------|
 | ① | `league-v4` `/lol/league/v4/entries/RANKED_SOLO_5x5/{tier}/{division}` (테스트: 플래티넘·에메랄드·다이아, 본 수집: 에메랄드·다이아), 마스터 이상은 `league-v4` `masterleagues`·`grandmasterleagues`·`challengerleagues` `/by-queue/RANKED_SOLO_5x5` | 티어·디비전별 인원은 백엔드 수집기 설정 (1-1, 1-3) | `ranked_players` (upsert) |
-| ② | `match-v5` `/lol/match/v5/matches/by-puuid/{puuid}/ids?queue=420` | 솔로랭크 게임 ID 목록. 이미 `matches`에 있는 ID는 건너뜀 | (메모리, 아직 저장 안 함) |
-| ③ | `match-v5` `/lol/match/v5/matches/{matchId}` | 패치, 참가자 10명, 밴 | (메모리) |
+| ② | `match-v5` `/lol/match/v5/matches/by-puuid/{puuid}/ids?queue=420&startTime={지금 − 14일, 초}` | 솔로랭크 게임 ID 목록. 이미 `matches`에 있는 ID는 건너뜀 | (메모리, 아직 저장 안 함) |
+| ③ | `match-v5` `/lol/match/v5/matches/{matchId}` | 패치, 시작 시각, 참가자 10명, 밴 | (메모리) |
 | ④ | `match-v5` `/lol/match/v5/matches/{matchId}/timeline` | `SKILL_LEVEL_UP` 이벤트로 스킬 순서 | (메모리) |
 | ⑤ | DB 트랜잭션 1개 | ③④가 모두 성공하고 5분 이상 게임이면 `matches` 1줄 + `match_players` 10줄을 **한 번에** 저장 | `matches`, `match_players` |
-| ⑥ | `ANALYZE matches, match_players` → `SELECT refresh_patch_stats('16.19')` | 원본 통계를 새로 고친 뒤 패치 전체를 처음부터 다시 셈 (9-4) | 집계 6개 |
-| ⑦ | `SELECT purge_old_patches(2)` | 최신 2개 패치보다 오래된 원본 삭제 | `matches`(+`match_players` CASCADE) |
+| ⑥ | 매일 05:00 KST pg_cron 작업 `tiergg_daily_refresh`: `ANALYZE matches, match_players` → `SELECT refresh_window_stats(14)` | 최근 14일 완료 게임 전체를 처음부터 다시 셈. 수집과 따로 돈다 (9-4) | 집계 7개 |
+| ⑦ | `SELECT purge_old_games(21)` | 시작 시각이 21일보다 오래된 원본 삭제 (수동, 사용자 확인 뒤) | `matches`(+`match_players` CASCADE) |
 
 - 수집 실행 1회마다 `collection_logs`에 1줄을 남긴다 (`running`으로 시작 → `done`/`key_expired`/`failed`로 끝냄).
 - **게임 완료 기준:** `match_players`가 10줄인 게임만 완료로 본다. 집계 함수는 10줄이 아닌 게임을 세지 않는다. 그래서 ⑤를 한 트랜잭션으로 하면 중간에 멈춰도 반쪽 게임이 남지 않는다.
 - ③에서 나온 참가자를 ①의 수집 대상으로 다시 넣지 않는다 (데이터가 눈덩이처럼 불어남).
-- ⑥은 ⑦보다 먼저 한다. 원본을 지운 패치는 다시 집계할 수 없다.
+- ⑥은 ⑦보다 먼저 한다.
 
 ---
 
@@ -301,6 +316,7 @@ erDiagram
 | `match_id` | `metadata.matchId` | `KR_8408851980` | |
 | `puuid` | (②에서 조회한 표본 플레이어) | (78자 문자열) | 이미 다른 플레이어로 저장된 게임이면 그대로 둠 |
 | `patch` | `info.gameVersion` 앞 두 부분 | `16.19.823.722` → `16.19` | 파생 |
+| `game_start_at` | `info.gameStartTimestamp` | `1791263990514` (ms) → `2026-10-06 05:19:50.514+00` | ms → timestamptz (`new Date(ms)`). 값이 없으면 저장하지 않음 |
 
 ### 6-3. `match_players` (getMatch `info.participants[]` + timeline)
 
@@ -338,7 +354,8 @@ erDiagram
 | 큐 | 게임 ID 목록을 `queue=420`으로만 요청. DB는 큐를 다시 확인하지 않는다 |
 | 5분 미만 | `info.gameDuration < 300`이면 `matches`·`match_players` 모두 저장하지 않는다 |
 | 패치 | `info.gameVersion`을 `.`으로 나눈 앞 두 부분 (`16.19.823.722` → `16.19`). 형식 `^[0-9]+\.[0-9]+$` |
-| 보관 패치 밖 게임 | 최신 2개 패치보다 오래된 패치의 게임은 저장하지 않는다 (권장) |
+| 창 밖 게임 | `startTime`으로 요청하므로 보통 없다. `gameStartTimestamp`가 지금 − 14일보다 이르면 저장하지 않는다 (권장) |
+| 시작 시각 | `info.gameStartTimestamp`(ms, UTC)를 그대로 timestamptz로. 2020-01-01 이전이면 CHECK 거부 |
 | 한 게임 저장 | `getMatch`와 `timeline`이 모두 성공한 뒤 `matches` 1줄 + `match_players` 10줄을 트랜잭션 1개로 저장. 하나라도 실패하면 저장하지 않고 다음 실행에서 다시 시도 |
 | 중복 게임 | `match_id`가 이미 있으면 건너뜀 (`ON CONFLICT DO NOTHING`) |
 | `team_position` | Riot 빈 문자열 `""`은 NULL |
@@ -349,7 +366,7 @@ erDiagram
 | `skill_order` | timeline `SKILL_LEVEL_UP` 중 그 참가자의 `levelUpType = 'NORMAL'` 이벤트만(카이사 등의 `EVOLVE` 제외), `timestamp` 순, `skillSlot` 1→`Q` 2→`W` 3→`E` 4→`R`로 이어 붙임. 허용 형식 `^[QWER]*$` |
 | `ranked_players` | `rank`는 Riot 값 그대로. 표본 갱신은 upsert |
 | 키 만료 | 401/403이면 즉시 멈추고 `collection_logs.status = 'key_expired'`, `finished_at` 기록 |
-| 집계 호출 | `refresh_patch_stats` 직전에 같은 연결에서 `ANALYZE matches, match_players`를 실행한다 (9-4) |
+| 집계 호출 | `refresh_window_stats` 직전에 같은 연결에서 `ANALYZE matches, match_players`를 실행한다 (9-4) |
 
 - **알려진 한계:** 밴 ↔ 참가자 연결(`pickTurn` 1~5 = `participantId` 1~5, 6~10 = 6~10)은 실제 응답에서 관찰한 규칙이며 Riot 문서에 명시되어 있지 않다. 밴률 합계(챔피언이 밴된 게임 수)는 누가 밴했는지와 무관하다.
 
@@ -363,34 +380,37 @@ erDiagram
 |--------|--------|------|------|
 | `match_players` | `(match_id, puuid)` | PK | 게임별 참가자 조회, 게임 완료(10줄) 확인 |
 | `match_players` | `(champion_id, team_position)` | 일반 | 챔피언 × 포지션 조회 |
-| `champion` 등 집계 5개 | `(patch, champion_id, position, …)` | PK | 패치별 티어리스트, 챔피언 상세 조회 |
-| `champion_rune` | `(patch, champion_id, position, 룬 11개)` | 유니크 | 같은 룬 페이지는 1줄 |
+| `champion` 등 집계 5개 | `(champion_id, position, …)` | PK | 티어리스트, 챔피언 상세 조회 |
+| `champion_rune` | `(champion_id, position, 룬 11개)` | 유니크 | 같은 룬 페이지는 1줄 |
+| `stats_window` | `(id)` | PK | 항상 1줄 (`id = 1`) |
+| `stats_window_patch` | `(patch)` | PK | 창 안 패치 1개 = 1줄 |
 
-- 만들지 않는 인덱스: `matches.patch`, `matches.puuid`, `match_players.puuid`. `matches`는 최대 5만 줄이라 순차 스캔이 빠르고, 나머지는 이번 범위에 조회가 없다. 전적 검색을 만들 때 추가한다.
+- 만들지 않는 인덱스: `matches.patch`, `matches.game_start_at`, `matches.puuid`, `match_players.puuid`. `matches`는 최대 약 3만 7천 줄이라 순차 스캔이 빠르고 (D21), 나머지는 이번 범위에 조회가 없다. 전적 검색을 만들 때 추가한다.
 
 ---
 
 ## 9. 집계 SQL 함수
 
-> 요약: 백엔드는 `SELECT refresh_patch_stats('16.19')`로 그 패치의 집계를 다시 만들기 전에 `ANALYZE matches, match_players`를 먼저 실행하고, `SELECT purge_old_patches(2)`로 오래된 원본을 지운다. 비율과 티어는 저장하지 않고 조회할 때 계산한다.
+> 요약: 매일 DB 예약 작업(pg_cron, 9-4)이 `ANALYZE matches, match_players` 뒤에 `SELECT refresh_window_stats(14)`로 최근 14일 집계를 통째로 다시 만든다 (백엔드 `aggregate`는 시험용으로 같은 순서). 백엔드는 사용자 확인 뒤 `SELECT purge_old_games(21)`로 오래된 원본을 지운다. 비율과 티어는 저장하지 않고 조회할 때 계산한다.
 
 ### 9-1. 함수 목록
 
 | 함수 | 반환 | 하는 일 |
 |------|------|---------|
-| `refresh_patch_stats(p_patch text)` | jsonb `{patch, games, champion_rows, item_rows, rune_rows, spell_rows, skill_rows}` | 그 패치의 집계 6개를 한 트랜잭션 안에서 지우고 다시 센다. 완료된 원본 게임이 0개면 **오류**(기존 집계 보존) |
-| `purge_old_patches(p_keep int DEFAULT 2)` | int (삭제한 게임 수) | 최신 `p_keep`개 패치보다 오래된 `matches` 삭제(`match_players` CASCADE). 집계는 남김 |
-| `patch_sort_key(p_patch text)` | int[] | `'16.9'` → `{16,9}`. 패치 순서는 항상 이 값으로 비교 (문자열 정렬이면 `16.9 > 16.19`가 됨) |
+| `refresh_window_stats(p_days int DEFAULT 14, p_until timestamptz DEFAULT now())` | jsonb `{window_start, window_end, days, games, patches: [{patch, games}], champion_rows, item_rows, rune_rows, spell_rows, skill_rows}` | `[p_until − p_days일, p_until)`에 시작한 완료 게임(10줄)으로 집계 7개를 한 트랜잭션 안에서 지우고 다시 센다. 완료 게임이 0개면 **오류**(기존 집계 보존). 백엔드는 인자 없이 `refresh_window_stats(14)`만 쓴다 (`p_until`은 테스트·재현용) |
+| `purge_old_games(p_keep_days int DEFAULT 21)` | int (삭제한 게임 수) | `game_start_at < now() − p_keep_days일`인 `matches` 삭제(`match_players` CASCADE). 집계는 남김. `p_keep_days`가 14 미만이거나 현재 창의 `days`보다 작으면 오류 |
+| `patch_sort_key(p_patch text)` | int[] | `'16.9'` → `{16,9}`. 패치 구성 정렬에 쓴다 |
 | `tier_from_score(p_score numeric)` | smallint | 점수로 1~5티어 (9-3) |
 
 - 모든 함수와 뷰는 DB 주인 계정(백엔드)만 실행·조회할 수 있다 (11장).
 
-### 9-2. `refresh_patch_stats` 계산 규칙
+### 9-2. `refresh_window_stats` 계산 규칙
 
 | 값 | 정의 |
 |----|------|
-| 대상 게임 | `matches.patch = p_patch`이고 `match_players`가 정확히 10줄인 게임 |
-| `patch.games` | 대상 게임 수 |
+| 대상 게임 | `matches.game_start_at >= p_until − p_days × 24시간` 이고 `< p_until` (시작 포함, 끝 제외)이며 `match_players`가 정확히 10줄인 게임. `p_until`보다 늦은(미래) 게임은 빠진다 |
+| `stats_window` | 1줄: `days = p_days`, `window_start`, `window_end = p_until`, `games` = 대상 게임 수, `aggregated_at = now()` |
+| `stats_window_patch` | 대상 게임을 `matches.patch`로 묶은 게임 수. 합계 = `stats_window.games` |
 | `champion.pick` / `win` | 대상 게임의 `match_players` 중 `team_position IS NOT NULL`, 챔피언 × 포지션별 줄 수 / 그중 `win = true` |
 | `champion.ban` | 대상 게임 중 `ban_champion_id = 그 챔피언`인 **게임 수** (`count(DISTINCT match_id)`, 양 팀이 같은 챔피언을 밴해도 1번). 포지션과 무관하게 같은 값 |
 | `champion_item` | 각 줄의 `item0`~`item5` 중 `0`(빈 칸)과 NULL을 빼고, **한 줄 안의 중복은 1번만** 센다 (예시의 `1036` 2개 → 1). 하위 재료도 포함. **모든 아이템 저장** |
@@ -399,7 +419,7 @@ erDiagram
 | `champion_skill` | `skill_order`가 11자 이상인 줄만(NULL·빈 문자열·10자 이하 제외), `left(skill_order, 11)`로 묶는다 (예: `EQQWQRQEQEREEW` → `EQQWQRQEQER`). **상위 10개** (v5, 변경 01. v4의 "`skill_priority`가 NULL이 아닌 줄만, 모두 저장"(D3)을 대체). 저장 형식은 CHECK `champion_skill_skill_order_check`: `skill_order ~ '^[QWER]{11}$'` (Q·W·E·R 정확히 11자). |
 
 - 상위 N개 정렬: `pick` 내림차순 → `win` 내림차순 → 조합 키 오름차순 (결과가 매번 같게).
-- 포지션이 NULL인 줄은 픽·상세 집계에서 빠지지만 `patch.games`와 `ban`에는 포함된다.
+- 포지션이 NULL인 줄은 픽·상세 집계에서 빠지지만 `stats_window.games`와 `ban`에는 포함된다.
 - 밴만 되고 픽이 한 번도 없는 챔피언은 `champion` 줄이 없어서 밴률이 표시되지 않는다 (한계).
 
 ### 9-3. 비율과 티어 (조회할 때 계산)
@@ -407,8 +427,8 @@ erDiagram
 | 값 | 공식 |
 |----|------|
 | 승률 | `100 × win / pick` |
-| 픽률 | `100 × pick / patch.games` |
-| 밴률 | `100 × ban / patch.games` |
+| 픽률 | `100 × pick / stats_window.games` |
+| 밴률 | `100 × ban / stats_window.games` |
 | 보정 승률 | `100 × (win + 50) / (pick + 100)` (승률 50% 가상 게임 100판을 더한 베이지안 보정) |
 | 티어 점수 | `보정 승률 + 0.10 × least(픽률, 20) + 0.03 × least(밴률, 30)` |
 | 티어 | `pick < 50`이면 NULL("표본 부족"). 아니면 1: ≥ 53.0, 2: ≥ 51.5, 3: ≥ 50.0, 4: ≥ 48.5, 5: 그 미만 |
@@ -417,8 +437,8 @@ erDiagram
 
 | 뷰 컬럼 | 타입 | 정의 |
 |---------|------|------|
-| `patch`, `champion_id`, `position`, `pick`, `win`, `ban` | `champion`과 같음 | `champion` 그대로 |
-| `games` | int | `patch.games` |
+| `champion_id`, `position`, `pick`, `win`, `ban` | `champion`과 같음 | `champion` 그대로 |
+| `games` | int | `stats_window.games` |
 | `win_rate` | numeric | `round(100.0 × win / pick, 2)` |
 | `pick_rate` | numeric | `round(100.0 × pick / games, 2)` |
 | `ban_rate` | numeric | `round(100.0 × ban / games, 2)` |
@@ -426,21 +446,27 @@ erDiagram
 | `tier_score` | numeric | `round(티어 점수, 3)`. 점수는 반올림 전 비율로 계산 |
 | `tier` | smallint | `pick < 50`이면 NULL, 아니면 `tier_from_score(반올림 전 점수)` 1~5 |
 
-- 사용 예: `SELECT * FROM champion_tier_view WHERE patch = $1 AND position = $2 ORDER BY tier NULLS LAST, tier_score DESC`.
+- 사용 예: `SELECT * FROM champion_tier_view WHERE position = $1 ORDER BY tier NULLS LAST, tier_score DESC`.
 - 기준값(50판, 100판, 0.10, 0.03, 경계값)은 뷰와 `tier_from_score`에만 있다. 바꿀 때는 `!db`가 새 마이그레이션으로 바꾼다.
 - 상세 테이블의 비율(조합 승률 = `win / pick`, 조합 사용률 = `pick / champion.pick`)은 단순 나눗셈이라 백엔드가 계산한다.
 - 주 포지션: 챔피언별 pick이 많은 순서로 최대 2개. 2순위는 그 챔피언 전체 pick의 10% 이상일 때만 표시. **백엔드 API가 적용한다.**
-- 화면 패치 선택(새 패치 초반에 직전 패치 대체)도 백엔드가 정한다. 패치 순서는 `ORDER BY patch_sort_key(patch) DESC`.
+- 패치 구성: `SELECT patch, games FROM stats_window_patch ORDER BY patch_sort_key(patch) DESC`. 비율은 백엔드가 `100 × games / stats_window.games`로 계산
 
 ### 9-4. 백엔드 호출 규칙
 
-> 요약: 집계 직전에 원본 두 테이블의 통계를 새로 고친다. 통계가 틀리면 같은 집계가 5초에서 5분 이상으로 늘어난다.
+> 요약: 집계는 DB의 매일 예약 작업(pg_cron)이 한다. 통계 갱신 → 집계 순서는 예약 작업과 백엔드 시험 명령 모두 같다.
+
+- **집계는 DB 예약 작업이 한다.** Supabase Cron(`pg_cron`) 작업 `tiergg_daily_refresh`가 **매일 05:00 KST(20:00 UTC)** 에 아래 명령을 실행한다 (마이그레이션 `015_schedule_daily_refresh.sql`).
+  `SET statement_timeout = '5min'; ANALYZE matches, match_players; SELECT refresh_window_stats(14);`
+- 창은 `[실행 시각 − 14일, 실행 시각)`. 백엔드 수집은 끝난 뒤 집계를 부르지 않는다. 백엔드 `aggregate` 명령은 시험용으로 같은 순서를 쓴다.
+- 실패(창 안 게임 0개, 시간 초과)하면 기존 집계를 그대로 두고 `cron.job_run_details`에 `failed`로 남는다. 집계가 멈췄는지는 `stats_window.aggregated_at`으로 안다.
+- 작업 시각·명령을 바꿀 때는 `!db`가 새 마이그레이션으로 같은 이름을 지우고 다시 등록한다.
 
 | 순서 | SQL | 이유 |
 |------|-----|------|
 | 1 | `ANALYZE matches, match_players` | 대량 수집·삭제 직후 통계가 "페이지는 있는데 줄은 0개"로 남으면 플래너가 원본을 1줄로 보고 느린 Nested Loop를 고른다. 2만 5천 게임에서 집계가 3~5분을 넘겼고, `ANALYZE` 후 5~7초였다 (db_review M2). `ANALYZE` 자체는 0.35~3.3초 |
-| 2 | `SELECT refresh_patch_stats($1)` | 패치마다 1번. 여러 패치면 1번의 `ANALYZE` 뒤에 차례로 |
-| 3 | `SELECT purge_old_patches(2)` | 집계를 마친 뒤 (5장 ⑦) |
+| 2 | `SELECT refresh_window_stats(14)` | 하루 1번 예약 작업이 실행. 백엔드 aggregate 명령(시험용)도 같은 순서 |
+| 3 | `SELECT purge_old_games(21)` | 집계를 마친 뒤, 사용자 확인(`--yes`) 뒤에만 |
 
 - 1과 2는 같은 연결에서 실행한다. 트랜잭션 안이어도 된다 (`ANALYZE`는 `VACUUM`과 달리 트랜잭션 안에서 실행 가능).
 - `ANALYZE`는 테이블 주인(또는 `MAINTAIN` 권한) 역할만 실행할 수 있다. 백엔드는 테이블 주인 계정으로 접속하므로 그대로 쓴다 (11장).
@@ -456,17 +482,19 @@ erDiagram
 | # | 항목 | 결정 |
 |---|------|------|
 | 1 | Supabase 프로젝트 | 생성 완료 (무료 플랜, 500MB) |
-| 2 | 수집 티어 | 테스트: 플래티넘·에메랄드·다이아 각 50명, 디비전 I~IV 고르게 (변경 02). 본 수집: 에메랄드 이상 4 : 4 : 2 (테스트 뒤 다시 정함) |
+| 2 | 수집 티어 | 테스트: 플래티넘·에메랄드·다이아 각 100명, 디비전 I~IV 고르게 (변경 02). 본 수집: 에메랄드 이상 4 : 4 : 2 (테스트 뒤 다시 정함) |
 | 3 | 티어 표시 최소 표본 | 챔피언 × 포지션 **50판** 미만이면 티어 NULL ("표본 부족") |
-| 4 | 새 패치 초반 표시 | 현재 패치 표본이 기준 미만이면 직전 패치 통계를 보여주고 기준 패치를 표시 (백엔드) |
+| 4 | 통계 기준 | 최근 14일에 시작한 게임 (변경 03). 패치 대체 규칙 없음. 패치 구성을 함께 표시 |
 | 5 | 추천 개수 | 화면에는 카테고리별 상위 2개 (프론트 작업 때 조정 가능) |
-| 6 | 원본 보관 | 최근 2개 패치 |
-| 7 | 스키마 | dbml v6 (원본 3, 집계 6, 운영 1. 테이블 구성은 v4·v5와 같음). 집계는 개수만, 비율·티어는 조회할 때 계산 |
+| 6 | 원본 보관 | 시작 시각 기준 21일 (변경 03) |
+| 7 | 스키마 | dbml v7 (원본 3, 집계 7, 운영 1). 집계는 개수만, 비율·티어는 조회할 때 계산 |
 | 8 | 아이템 | `item0~5` 모든 아이템을 센다. 하위 재료는 프론트가 Data Dragon으로 거른다. 아이템 테이블 없음 |
 | 9 | 주 포지션 | 최대 2개, 2순위는 10% 이상일 때만 (백엔드) |
 | 10 | 운영 | 개발 키 24시간마다 수동 재발급, 수집은 수동 실행 |
 | 11 | 스킬 집계 | 원본 스킬 순서 앞 11레벨, 11자 미만 제외, 챔피언 × 포지션당 상위 10개 (변경 01) |
-| 12 | 집계 전 통계 | 백엔드가 `refresh_patch_stats` 직전에 `ANALYZE matches, match_players` (변경 02, M2) |
+| 12 | 집계 전 통계 | `refresh_window_stats` 직전에 `ANALYZE matches, match_players` (변경 02, M2) |
+| 13 | 집계 보관 | 현재 14일 창 스냅숏 1개만 (D13) |
+| 14 | 집계 시점 | 매일 05:00 KST(20:00 UTC) pg_cron 작업 `tiergg_daily_refresh` (D23). 수집 뒤 자동 집계 없음 |
 
 ---
 
@@ -479,3 +507,4 @@ erDiagram
 - 함수 실행 권한을 `PUBLIC`, `anon`, `authenticated`에서 회수한다 (Supabase는 public 함수를 RPC로 노출하므로).
 - 뷰를 만들면 `security_invoker = true`로 만들어 RLS를 우회하지 않게 한다.
 - Riot API 키와 DB 접속 정보는 루트 `.env`에만 둔다. 값은 문서·로그·커밋에 출력하지 않는다.
+- Supabase 기본 권한(`pg_default_acl`)이 새 객체에 `anon`·`authenticated` 권한을 주므로, 새 테이블·시퀀스·뷰·함수는 만들 때마다 이름을 적어 `REVOKE`한다. 보안 테스트는 스키마의 모든 객체를 자동으로 검사한다 (db_review L2).

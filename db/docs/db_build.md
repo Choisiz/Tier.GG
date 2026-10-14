@@ -372,3 +372,150 @@
 | 2 | 계약 9-4 `ANALYZE` 규칙은 DB가 강제하지 않는다 (D10 = (a)). `!백엔드` Plan·Review에서 지켜지는지 확인해야 하고, 안 지켜지면 새 마이그레이션으로 (b')를 넣는다 (spec D10) |
 | 3 | "나쁜 통계 → `ANALYZE` → 집계" 5,000게임 재현(완료 기준 권장 항목)은 Build에서 하지 않음. Review가 1~2회만 측정 (죽은 줄 용량 주의). **Review에서 반영 (2026-10-14):** 9-4대로 1.64초, `ANALYZE` 없이 120초 시간 초과 (db_review 변경 02 검토 R4) |
 | 4 | D12: 본 수집 전환 때 플래티넘 테스트 게임을 어떻게 할지 다시 결정. 지울 경우 삭제 SQL이라 사용자 승인 대상 |
+
+---
+
+## 변경 03 (2026-10-14): 패치 기준 → 최근 14일 기준
+
+- 작성: Build 서브에이전트 (2026-10-14)
+- 기준: `db/docs/db_spec.md` 변경 03 (승인됨, D13~D23 추천안). 계약 v6 → v7
+- 사용자 승인 (2026-10-14, 메인 에이전트 전달): 03-10의 되돌릴 수 없는 작업 1~4·6·7
+  1. 011 테스트 26게임 삭제 (`matches` 26줄, `match_players` 260줄, 안전장치 포함)
+  2. 012 `DROP VIEW champion_tier_view`
+  3. 012 `DROP FUNCTION refresh_patch_stats(text)`, `purge_old_patches(integer)`
+  4. 012 `DROP TABLE champion_skill, champion_spell, champion_rune, champion_item, champion, patch` (안전장치 포함)
+  6. 015 `CREATE EXTENSION pg_cron`
+  7. 015 예약 작업 `tiergg_daily_refresh` (`'0 20 * * *'`) 등록
+  - 5번(실제 DB에서 `purge_old_games` 실행)은 이번 Build 범위가 아니다. **실행하지 않았다.**
+- 대상 DB: 위와 같은 Supabase (Session pooler, PostgreSQL 17.11, 접속 계정 `postgres`, superuser 아님)
+
+### 03-1. 적용 전 상태 (안전장치 가정 확인)
+
+> 요약: 실제 DB가 계획의 가정(테스트 26게임, 패치 16.19·16.20, 집계 합계 26)과 같아서 진행했다.
+
+| 항목 | 값 | 계획 가정 | 판정 |
+|------|----|-----------|------|
+| `matches` | 26줄 (16.19: 20, 16.20: 6) | 26줄 이하, 16.19·16.20만 | ✅ |
+| `match_players` | 260줄, 10줄이 아닌 게임 0개 | 260줄 | ✅ |
+| `patch` | 2줄 (16.19 games 20, 16.20 games 6), `sum(games)` = 26 | 26 이하 | ✅ |
+| 집계 상세 | `champion` 164, `champion_item` 1,129, `champion_rune` 234, `champion_spell` 183, `champion_skill` 189 | 26게임에서 나온 파생값 | ✅ |
+| `ranked_players` / `collection_logs` | 3줄 / 3줄 | 지우지 않음 | - |
+| `pg_cron` | 사용 가능 (`pg_available_extensions` 1.6.4, 미설치), `shared_preload_libraries`에 `pg_cron` 있음, `cron.database_name = postgres` | 켤 수 있어야 함 | ✅ |
+| `schema_migrations` | 001~010 적용됨 | - | - |
+| public 객체 | 테이블 10 + `schema_migrations`, 뷰 1, 시퀀스 2, 함수 4 (`patch_sort_key`, `tier_from_score`, `refresh_patch_stats`, `purge_old_patches`) | - | - |
+
+### 03-2. 기능별 결과
+
+> 요약: 마이그레이션 011~015를 실제 DB에 적용했다. 원본에 `game_start_at`이 생겼고, 집계는 `stats_window` 1줄 스냅숏 구조로 바뀌었고, 매일 20:00 UTC 예약 작업이 등록됐다. 테스트 10개 파일이 실제·임시 스키마에서 모두 통과했다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 011 `game_start_at` | 안전장치(`matches` 26줄 초과, 16.19·16.20 밖 패치, `match_players` 260줄 초과면 `RAISE`) → `DELETE FROM matches WHERE true` (CASCADE) → `ADD COLUMN game_start_at timestamptz NOT NULL` + `matches_game_start_at_check (>= 2020-01-01 00:00:00+00)` → 테이블·컬럼 주석 (`info.gameStartTimestamp`) | ✅ |
+| 012 집계 구조 교체 | 안전장치(`sum(patch.games) > 26`이면 멈춤) → 뷰 DROP → 옛 함수 2개 DROP → 옛 집계 테이블 6개 DROP → `stats_window`, `stats_window_patch`, `patch` 없는 집계 5개 CREATE (제약 이름은 002 형식, `champion_skill`은 009의 `skill_order` CHECK) → 7개 RLS 켜기 → 7개 테이블 + `champion_rune_id_seq` `REVOKE ALL FROM anon, authenticated` | ✅ |
+| 013 함수 | `refresh_window_stats(int DEFAULT 14, timestamptz DEFAULT now())`: 인자 검사(22023) → advisory lock 1개 → 창 `[p_until − p_days × 24시간, p_until)` 10줄 게임 → 0개면 P0002 → `DELETE … WHERE true` 3개 → `stats_window`·`stats_window_patch`·집계 5개 INSERT (본문은 009와 같고 `patch`만 뺌) → jsonb 반환(`patches`는 `patch_sort_key` 내림차순). `purge_old_games(int DEFAULT 21)`: 14 미만·NULL·현재 창보다 짧으면 22023, `game_start_at < now() − p_keep_days × 24시간` 삭제. 둘 다 `SECURITY INVOKER`, `SET search_path FROM CURRENT`(→ `public, pg_catalog`), `REVOKE EXECUTE FROM PUBLIC, anon, authenticated` | ✅ |
+| 014 뷰 | `champion CROSS JOIN stats_window`, `patch` 컬럼 없음, 공식은 008과 같음, `security_invoker = true`, 주석(`games` = `stats_window.games`), `REVOKE ALL` | ✅ |
+| 015 예약 작업 | `CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog` → 같은 이름 작업 `unschedule` → `cron.schedule('tiergg_daily_refresh', '0 20 * * *', 03-11 명령)`. 접속 계정으로 확장 켜기 성공 (대시보드 조작 불필요) | ✅ |
+| 테스트 001 | 모든 `matches` INSERT에 `game_start_at`. fixture 값 `1791263990514` ms → `2026-10-06 05:19:50.514+00` 확인. 새 거부: `game_start_at` NULL(23502), 1970-01-21(23514), `stats_window` id 2·days 0·start = end·games 0, `stats_window_patch` `16.19.1`·games 0 → 거부 7건 → 15건. `stats_window` 기본값(id 1, `aggregated_at = now()`) 확인 | ✅ |
+| 테스트 003 | `003_refresh_patch_stats.sql` 삭제 → `003_refresh_window_stats.sql`. 샘플 20게임 2021-01-10, `KR_9000000022`는 2020-12-01(창 밖). 기존 기대값 그대로(반환 jsonb, 챔피언·아이템·룬·스펠·스킬), 멱등(스냅숏 `stats_window`·`stats_window_patch` 포함 2번 같음), 게임 없는 창 P0002, 원본 삭제 뒤 P0002에 기존 스냅숏 유지, 인자 오류 5건(22023) | ✅ |
+| 테스트 004 | `stats_window`(games 1000) + `champion` 6줄 직접 넣고 같은 손 계산값. `stats_window` 0줄 → 뷰 0줄, 뷰 컬럼에 `patch` 없음 | ✅ |
+| 테스트 005 → 010 | `005_purge_old_patches.sql` 삭제, `010_purge_old_games.sql` 새로. P1(30일)·P2(21일 + 1초) 삭제, P3(정확히 21일)·P4·P5 남음, 반환값 = 호출 전 같은 트랜잭션에서 센 21일 초과 수, CASCADE, 집계 유지, 인자 오류 3건(13, NULL, 현재 창 30일), 두 번째 0 | ✅ |
+| 테스트 006 (D19, L2) | 손 목록 → `current_schema()` 자동 검사: 확장 소속 제외한 모든 테이블(RLS·FORCE 아님·정책 0·주인)·뷰(`security_invoker`)·시퀀스·함수의 `anon`·`authenticated` 권한, 함수 `PUBLIC` EXECUTE. 개수 기대값 확인 | ✅ |
+| 테스트 007·008 | 007: `game_start_at` 2021-01-10, `refresh_window_stats(14, '2021-01-15+00')`, 구조 기대값에서 `patch` 뺌(컬럼 5개, PK 3개). 008: `matches` INSERT에 `game_start_at`만 추가 | ✅ |
+| 테스트 009 (새) | 창 경계 A~H (spec 03-6 표 그대로), 패치 구성·반환 `patches` 순서, 비율 기준값 NOTICE(75.0 / 25.0), 뷰 분모 4, `p_days = 1` 재집계 | ✅ |
+| 테스트 011 (새) | 확장, 작업 1개, 일정·`active`, 명령 문자열, 실행 계정·DB, `anon`·`authenticated`의 `cron` 스키마 USAGE. 함수 EXECUTE는 아래 03-6 편차 1 | ⚠️ |
+| `verify.mjs` `TABLES` (D20) | `'patch'` → `'stats_window', 'stats_window_patch'` 한 줄만 | ✅ |
+| 계약 v7 | 03-5 참고 | ✅ |
+
+### 03-3. 검증 결과
+
+| 순서 | 명령 | 결과 |
+|------|------|------|
+| 1 | 적용 전 조회 | 03-1 표 |
+| 2 | `npm run migrate:fresh-check` | 001~015 15개 파일 통과 (015의 `CREATE EXTENSION`·작업 등록 포함, 모두 롤백). 임시 스키마 결과 테이블 11, 뷰 1, 함수 4. `migration_check` 남지 않음 |
+| 3 | `npm run verify:fresh` (적용 전) | 10개 파일 모두 통과 (첫 실행에서 006 문법 오류·011 권한 검사 실패 → 고친 뒤 통과). 줄 수 전·후 같음 |
+| 4 | `npm run migrate` | 011~015 5개 적용 (2026-10-14 11:24 UTC) |
+| 5 | `npm run migrate:status` | 001~015 모두 적용됨, 체크섬 불일치 없음. `git diff db/migrations/` 001~010 변경 없음 |
+| 6 | `npm run verify` (실제 스키마) | 10개 파일 모두 통과. 006: 테이블 12(`schema_migrations` 포함), 뷰 1, 시퀀스 2, 함수 4. 줄 수 전·후 같음, 샘플 남지 않음 |
+| 7 | `npm run verify:fresh` (적용 후) | 10개 파일 모두 통과, 샘플 남지 않음 |
+| 8 | 적용 후 구조 조회 | 아래 |
+
+적용 후 줄 수:
+
+| 테이블 | 적용 전 | 적용 후 |
+|--------|---------|---------|
+| `ranked_players` | 3 | 3 |
+| `matches` | 26 | **0** |
+| `match_players` | 260 | **0** |
+| `collection_logs` | 3 | 3 |
+| `patch` | 2 | (삭제됨) |
+| `champion` / `champion_item` / `champion_rune` / `champion_spell` / `champion_skill` | 164 / 1,129 / 234 / 183 / 189 | 0 / 0 / 0 / 0 / 0 (새 테이블) |
+| `stats_window` / `stats_window_patch` | (없음) | 0 / 0 (새 테이블) |
+
+적용 후 구조 (`information_schema`, `pg_constraint`, `pg_proc`로 확인, 계약 v7·spec 03-3-1과 같음):
+
+- `matches.game_start_at` = `timestamp with time zone NOT NULL`, `matches_game_start_at_check` = `CHECK ((game_start_at >= '2020-01-01 00:00:00+00'::timestamp with time zone))`, 주석에 `info.gameStartTimestamp`.
+- `patch` 테이블, `refresh_patch_stats(text)`, `purge_old_patches(integer)` 없음 (`to_regclass`·`to_regprocedure` NULL).
+- `stats_window`: `id smallint DEFAULT 1`, `days`, `window_start`, `window_end`, `games`, `aggregated_at DEFAULT now()`, 모두 NOT NULL. PK `(id)`, CHECK `id = 1`, `days 1~60`, `window_start < window_end`, `games > 0`.
+- `stats_window_patch`: PK `(patch)`, CHECK 형식 `^[0-9]+\.[0-9]+$`, `games > 0`.
+- 집계 5개에 `patch` 컬럼 없음. PK `champion (champion_id, position)`, `champion_item (…, item_id)`, `champion_spell (…, spell1_id, spell2_id)`, `champion_skill (…, skill_order)`, `champion_rune (id)` + 유니크 `(champion_id, position, 룬 11개)`. 상세 4개 FK `(champion_id, position) → champion ON DELETE CASCADE`. CHECK는 002·009와 같음.
+- 함수 4개: `patch_sort_key(text)`, `tier_from_score(numeric)`, `refresh_window_stats(p_days integer DEFAULT 14, p_until timestamptz DEFAULT now())`, `purge_old_games(p_keep_days integer DEFAULT 21)`. 모두 `prosecdef = false`, `search_path=public, pg_catalog`.
+- 뷰 `champion_tier_view` `reloptions = {security_invoker=true}`, 컬럼 12개(`patch` 없음).
+- public 테이블 12개 모두 RLS 켜짐, FORCE 아님, 정책 0개.
+
+### 03-4. 예약 작업 상태
+
+| 항목 | 값 |
+|------|----|
+| 확장 | `pg_cron` 1.6.4, 스키마 `pg_catalog` (작업 테이블은 `cron` 스키마) |
+| `cron.job` | 1줄: `jobid 1`, `jobname tiergg_daily_refresh`, `schedule '0 20 * * *'`, `active true`, `username postgres`, `database postgres` |
+| `command` | `SET statement_timeout = '5min'; ANALYZE matches, match_players; SELECT refresh_window_stats(14);` (015 문구와 같음) |
+| `cron.job_run_details` | 0줄 (아직 실행 전). 첫 실행은 2026-10-14 20:00 UTC (2026-10-15 05:00 KST) |
+| `anon`·`authenticated` | `cron` 스키마 USAGE 없음 (`cron` 스키마 ACL = `supabase_admin=UC`, `postgres=U*`만). 함수 EXECUTE는 03-6 편차 1 |
+| 롤백 시험 1회 | 같은 연결(기본 `search_path` = `"$user", public, extensions`)에서 `BEGIN` → `cron.job.command` 그대로 실행 → `ROLLBACK`. 결과: **예상대로 P0002** `refresh_window_stats: 2026-09-30 11:24:48 ~ 2026-10-14 11:24:48 에 완료된 게임(10줄)이 없습니다. 기존 집계를 그대로 둡니다.` 함수 이름이 스키마 없이 찾아지고, `ANALYZE`가 같은 명령 안에서 돈다는 것을 확인. 실행 뒤 `stats_window` 0줄 |
+
+- 원본이 0게임이므로 **첫 05:00 실행은 `failed`(P0002)로 남는 것이 정상**이다. 백엔드가 새 수집기로 14일 안 게임을 저장한 다음 날부터 성공한다.
+
+### 03-5. 계약 반영 (v7)
+
+| 위치 | 반영 |
+|------|------|
+| `db_contract.md` 머리말 | 상태 `v7 승인됨 (2026-10-14, 변경 03)`, 기준 `(v7, 2026-10-14 변경 03)`, 범위 끝에 "통계는 최근 14일 게임 기준.", "v5 → v6 변경" 위에 "v6 → v7 변경" 표 |
+| 1장 | 요약 교체, 1-1 "원본 보관"·"창당 게임 수"·"집계 결과" 줄 교체, "수집 기간" 줄 추가, 1-2 제목·표를 03-5 본 수집 표로, 1-3 인원(각 100명, 모두 300명, 디비전마다 25명)·예상 규모(03-5 테스트 값) |
+| 2장 | `matches` 설명에 시작 시각, `patch` 줄 → `stats_window`·`stats_window_patch` 줄, `champion` "챔피언 × 포지션", 테이블 11개 |
+| 3장 | 요약, `patch 1 : N champion` 줄 삭제, 상세 FK `(champion_id, position)`, 끝 문단 |
+| 4장 ERD | "dbml v7", `patch` 엔터티·관계 삭제, `stats_window`·`stats_window_patch` 엔터티(관계 없음), `matches.game_start_at`, 집계 5개에서 `patch` 컬럼 삭제, 관계 라벨 `champion_id+position`, 룬 UK 설명 |
+| 5장 | ② `&startTime={지금 − 14일, 초}`, ③ 시작 시각, ⑥ pg_cron 작업, ⑦ `purge_old_games(21)`, 끝 문단 |
+| 6-2 | `game_start_at` 줄 (fixture 실제 값 `1791263990514` → `2026-10-06 05:19:50.514+00`) |
+| 7장 | "창 밖 게임" 줄 교체, "시작 시각" 줄 추가, "집계 호출" `refresh_window_stats` |
+| 8장 | 집계 PK·룬 유니크에서 `patch` 삭제, `stats_window`·`stats_window_patch` PK 줄, 만들지 않는 인덱스에 `matches.game_start_at` (약 3만 7천 줄, D21) |
+| 9장 | 요약, 9-1 새 표, 9-2 제목과 대상 게임·`stats_window`·`stats_window_patch` 줄, `stats_window.games`와 `ban`, 9-3 공식 분모·뷰 표·사용 예·패치 구성 줄, 9-4 요약·예약 작업 문구·표 2·3번 |
+| 10장 | 2·4·6·7번 교체, 13·14번 추가 |
+| 11장 | `pg_default_acl` / 자동 검사 문장 추가 |
+| `db_contract.dbml` | 머리 주석 v7, `원본`·`집계` TableGroup 메모와 목록, `ranked_players` 메모 각 100명, `matches` 출처 메모(`&startTime=지금-14일`)·`game_start_at` 컬럼, `patch` 블록 → `stats_window`·`stats_window_patch`, 집계 5개에서 `patch` 컬럼·인덱스 첫 키 삭제, `champion` 메모 분모, 뷰 메모, 집계 호출 규칙 메모(pg_cron 줄 포함), 관계 4줄 교체(`champion.patch > patch.patch` 삭제) |
+
+- `@dbml/core` 3.14.1 `dbmlv2` 파서(`/private/tmp/claude-501/dbmlcheck`에 설치)로 파싱 성공: 테이블 11개, Ref 6개, TableGroup 원본 3·집계 7·운영 1. `stats_window`·`stats_window_patch`·`champion`·`matches` 컬럼이 실제 DB와 같다.
+
+### 03-6. 계획과 다른 점
+
+| # | 내용 | 이유 |
+|---|------|------|
+| 1 | **테스트 011의 함수 권한 검사를 완화함.** spec 03-11 표는 "`cron.schedule(text,text,text)` EXECUTE 없음"이지만, 실제로는 `PUBLIC`에 EXECUTE가 있다 (`cron.schedule`·`cron.unschedule`·`cron.job_cache_invalidate`의 `proacl`에 `=X/supabase_admin`, `cron.job`·`cron.job_run_details`에도 `PUBLIC` 읽기). 그래서 `has_function_privilege('anon', …)`가 true다. 테스트는 (a) `cron` 스키마 USAGE가 있으면 실패, (b) `anon`·`authenticated`에 **직접** 준 EXECUTE가 있으면 실패, (c) `PUBLIC`으로 온 EXECUTE는 `[주의]` NOTICE만 남기도록 바꿨다 | pg_cron 확장이 만든 기본값이고 확장 소속 객체라 spec 03-11 보안 절대로 마이그레이션에서 고치지 않았다(다른 객체 권한 변경은 승인 대상). `cron` 스키마 USAGE가 `supabase_admin`·`postgres`에만 있어 `anon`·`authenticated`는 실제로 함수를 부를 수 없고, `cron`은 PostgREST 노출 스키마도 아니다. **메인 에이전트 보고 대상** |
+| 2 | 011 안전장치에 `match_players` 260줄 초과 조건을 하나 더 넣음 | spec은 `matches` 26줄·패치 조건만. 더 엄격한 쪽이라 삭제 범위는 같다 |
+| 3 | 011에서 `matches` 테이블 주석도 다시 적음 (출처에 `&startTime={지금-14일}`) | 계약 dbml `matches` 메모 변경과 맞춤. 동작 영향 없음 |
+| 4 | 계약 1-1 "티어" 줄과 10장 12번 줄도 고침 (각 50명 → 각 100명, `refresh_patch_stats` → `refresh_window_stats`) | 03-3-2 표에 직접 적혀 있지 않지만, 그대로 두면 같은 문서 안에서 1-3·10장 2번과 어긋나거나 없는 함수를 가리킨다 |
+| 5 | 1-2는 제목·표만 바꾸고 표 아래 메모(v3 비교, `puuid` 크기, autovacuum, 속도)는 그대로 둠 | spec은 "제목·표 교체"만 지시 |
+| 6 | cron 명령 롤백 시험 1회를 Build에서 함 | spec은 Review 권장 항목이지만 지금 0게임이라 P0002로 바로 끝나 죽은 줄이 생기지 않는다. Review가 다시 해도 된다 |
+| 7 | 006 첫 실행 문법 오류(`IF` 조건 안의 `CASE … END`) → 변수로 바꿔 해결. 011 첫 실행 실패 → 편차 1 | Build 중 수정 |
+
+### 03-7. 남은 문제
+
+| # | 내용 |
+|---|------|
+| 1 | **지금 백엔드는 `!백엔드` 변경 전까지 동작하지 않는다.** 수집기는 `matches`에 `game_start_at` 없이 INSERT하므로 NOT NULL로 실패한다(나쁜 데이터는 저장되지 않음). API·`aggregate`·`purge`는 없어진 `patch` 테이블·`refresh_patch_stats`·`purge_old_patches`를 불러 오류가 난다. `!백엔드` 변경(spec 03-7) 전에는 수집·API·aggregate·purge를 실행하지 않는다 |
+| 2 | 예약 작업 첫 실행(2026-10-14 20:00 UTC)은 원본 0게임이라 `failed`(P0002)로 남는다. 정상이며 기존 집계(0줄)도 그대로다. Review는 `cron.job_run_details`의 `status`·`return_message`를 확인한다 (spec 03-8). **Review (2026-10-14 11:36 UTC): 아직 실행 기록 0줄(⚠️). 같은 명령 롤백 1회 실행은 P0002로 기대대로. 20:00 UTC 뒤 다시 확인** |
+| 3 | 편차 1(`PUBLIC`의 `cron.schedule`/`unschedule` EXECUTE)을 그대로 둘지 사용자 결정이 필요하다. 고치려면 `REVOKE EXECUTE ON FUNCTION cron.… FROM PUBLIC` 같은 확장 객체 권한 변경이고, 확장 주인(`supabase_admin`)이 준 권한이라 `postgres`로 회수가 안 될 수도 있다 (시험하지 않음). **Review: `SET ROLE anon/authenticated`로 `cron.schedule`·`unschedule`·`cron.job` 조회가 모두 42501(스키마 USAGE 없음)임을 확인. 기본값 유지 권고 (db_review 03R-5, L8)** |
+| 4 | DB의 `ranked_players` 테이블 주석은 아직 "각 50명"(010)이다. 계약은 100명으로 바꿨지만 03-4에 주석 변경이 없어 마이그레이션에 넣지 않았다. 필요하면 다음 번호 파일로 |
+| 5 | (권장, Review) 롤백 안에서 5,000게임 `ANALYZE` → `refresh_window_stats(14, 과거 시각)` 시간 측정, 동시 호출 잠금(두 연결) 확인은 하지 않았다 (spec 03-8). **Review에서 반영: 5,000게임 `ANALYZE` 0.35초 → 집계 1.14초(아이템 줄 1.1만), 과장 분포 4.17초. 두 연결에서 두 번째가 advisory lock을 기다림 확인 (db_review 03R-3 R7, 03R-4)** |
+| 6 | Supabase 무료 플랜 7일 일시정지 중에는 예약 작업도 돌지 않는다. 예약 작업이 일시정지를 막는다고 가정하지 않는다 (spec 03-11) |
+
+- Review 수정 (2026-10-14): 계약 `db_contract.md` 9장 요약 문구 1줄 (예약 작업이 집계함을 명시, 규칙·값 변경 없음). 상세는 db_review 03R-7. 마이그레이션·테스트 변경 없음.

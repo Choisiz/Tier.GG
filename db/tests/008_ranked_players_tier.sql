@@ -47,7 +47,8 @@ BEGIN
   RAISE NOTICE '[통과] 구조: CHECK 2개(%), tier_check convalidated = true', v_got;
 
   -- FK
-  INSERT INTO matches (match_id, puuid, patch) VALUES ('KR_9000000001', 'test-008-platinum', '0.4');
+  INSERT INTO matches (match_id, puuid, patch, game_start_at)
+  VALUES ('KR_9000000001', 'test-008-platinum', '0.4', '2021-01-10 00:00:00+00');
   SELECT count(*) INTO v_n FROM matches m JOIN ranked_players r ON r.puuid = m.puuid
   WHERE m.match_id = 'KR_9000000001' AND r.tier = 'PLATINUM';
   IF v_n <> 1 THEN RAISE EXCEPTION 'PLATINUM 표본을 참조하는 matches 줄 불일치: %', v_n; END IF;

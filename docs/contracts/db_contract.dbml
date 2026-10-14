@@ -1,5 +1,5 @@
 // Tier.GG DB 계약 (DB ↔ 백엔드) - dbdiagram.io용 DBML
-// v6 (2026-10-14) - 변경 02: 테스트 수집 범위(플래티넘~다이아), 집계 전 ANALYZE, skill_order CHECK 명시
+// v7 (2026-10-14) - 변경 03: 패치 기준 → 최근 14일 창. game_start_at, stats_window, stats_window_patch
 // 원칙
 //  1. 원본 컬럼은 Riot 응답 필드 이름을 snake_case로 그대로 쓴다.
 //  2. 집계 테이블은 개수(pick, win, ban)만 저장한다. 승률, 픽률, 밴률, 티어는 조회할 때 계산한다.
@@ -14,14 +14,15 @@ Project TierGG {
   '''
 }
 
-TableGroup "원본" [color: #0F6E56, note: 'Riot API에서 받은 값 그대로. 최근 2개 패치만 보관'] {
+TableGroup "원본" [color: #0F6E56, note: 'Riot API에서 받은 값 그대로. 시작 시각 기준 최근 21일만 보관'] {
   ranked_players
   matches
   match_players
 }
 
-TableGroup "집계" [color: #534AB7, note: '원본을 패치 x 챔피언 x 포지션으로 묶어 센 결과. 화면(API)이 읽는 곳. 모든 패치 보관'] {
-  patch
+TableGroup "집계" [color: #534AB7, note: '최근 14일 원본을 챔피언 x 포지션으로 묶어 센 결과. 현재 창 1개만 보관 (집계할 때마다 통째로 다시 만듦)'] {
+  stats_window
+  stats_window_patch
   champion
   champion_item
   champion_rune
@@ -39,7 +40,7 @@ TableGroup "운영" [color: #5F5E5A, note: '수집이 언제 돌았고 결과가
 Table ranked_players [headercolor: #0F6E56, note: '''
 ① 수집 대상 플레이어 (표본)
 - 출처: league-v4 /lol/league/v4/entries/{queue}/{tier}/{division}
-- 테스트 수집: 플래티넘 · 에메랄드 · 다이아 각 50명, 디비전 I~IV 고르게 (티어별 인원은 백엔드 수집기 설정)
+- 테스트 수집: 플래티넘 · 에메랄드 · 다이아 각 100명, 디비전 I~IV 고르게 (티어별 인원은 백엔드 수집기 설정)
 - 본 수집: 에메랄드 이상, 에메랄드 : 다이아 : 마스터 이상 = 4 : 4 : 2 (테스트 뒤 다시 정함)
 - 이 사람들의 puuid로 게임 ID를 찾는다
 '''] {
@@ -50,14 +51,15 @@ Table ranked_players [headercolor: #0F6E56, note: '''
 
 Table matches [headercolor: #0F6E56, note: '''
 ② 게임 1개 = 1줄
-- 출처: match-v5 /lol/match/v5/matches/by-puuid/{puuid}/ids?queue=420 (게임 ID 목록)
-        + /lol/match/v5/matches/{matchId} 의 info (패치)
+- 출처: match-v5 /lol/match/v5/matches/by-puuid/{puuid}/ids?queue=420 (게임 ID 목록은 &startTime=지금-14일)
+        + /lol/match/v5/matches/{matchId} 의 info (패치, 시작 시각)
 - 솔로랭크(queue=420)만 요청하고, 5분 미만 게임은 저장하지 않는다
 - 같은 게임 ID가 여러 플레이어 목록에 나와도 1줄만 저장 (match_id가 PK)
 '''] {
   match_id text [pk, note: '게임 ID. 목록 응답의 각 항목 (예: KR_8408851980)']
   puuid text [note: '이 게임 ID를 찾을 때 조회한 표본 플레이어. 여러 명이면 처음 찾은 1명']
   patch text [not null, note: '패치. info.gameVersion 앞 두 자리 (16.19.823.722 → 16.19)']
+  game_start_at timestamptz [not null, note: '게임 시작 시각. info.gameStartTimestamp (ms → timestamptz). CHECK >= 2020-01-01']
 }
 
 Table match_players [headercolor: #0F6E56, note: '''
@@ -107,23 +109,35 @@ Table match_players [headercolor: #0F6E56, note: '''
 
 // ───────────── 집계 ─────────────
 
-Table patch [headercolor: #534AB7, note: '''
-패치 1개 = 1줄
-- 픽률, 밴률의 분모(그 패치의 전체 게임 수)를 보관한다
-- 원본(matches)은 2개 패치만 남기므로, 오래된 패치의 게임 수는 여기에만 남는다
+Table stats_window [headercolor: #534AB7, note: '''
+현재 집계 창 1개 = 1줄 (집계 전에는 0줄)
+- 픽률, 밴률의 분모(창 안의 전체 게임 수)를 보관한다
+- 대상: window_start <= game_start_at < window_end 이고 match_players 10줄인 게임
 '''] {
-  patch text [pk, note: '패치 (예: 16.19)']
-  games int [not null, note: '이 패치에서 수집한 전체 게임 수']
+  id smallint [pk, default: 1, note: '항상 1. CHECK id = 1']
+  days int [not null, note: '창 길이(일). 기본 14. CHECK 1~60']
+  window_start timestamptz [not null, note: '창 시작 (포함) = window_end - days x 24시간']
+  window_end timestamptz [not null, note: '창 끝 (제외). 보통 집계한 시각']
+  games int [not null, note: '창 안의 완료 게임 수 (픽률·밴률 분모)']
+  aggregated_at timestamptz [not null, default: `now()`, note: '집계한 시각']
+}
+
+Table stats_window_patch [headercolor: #534AB7, note: '''
+창 안의 패치 1개 = 1줄. 화면의 패치 구성 (예: 16.19 40% / 16.20 60%)
+- 비율은 저장하지 않는다. 백엔드가 games / stats_window.games 로 계산
+- games 합계 = stats_window.games
+'''] {
+  patch text [pk, note: '패치 (예: 16.20). matches.patch 값']
+  games int [not null, note: '창 안에서 이 패치의 완료 게임 수']
 }
 
 Table champion [headercolor: #534AB7, note: '''
-패치 x 챔피언 x 포지션 = 1줄. 챔피언 티어리스트 화면
-- 승률 = win / pick, 픽률 = pick / patch.games, 밴률 = ban / patch.games
+챔피언 x 포지션 = 1줄. 챔피언 티어리스트 화면
+- 승률 = win / pick, 픽률 = pick / stats_window.games, 밴률 = ban / stats_window.games
 - 티어(1~5)는 위 값으로 조회할 때 계산한다. pick 50 미만은 "표본 부족"
 - 챔피언의 주 포지션은 최대 2개: pick이 많은 순서로 1순위, 2순위.
   2순위는 그 챔피언 전체 pick 중 10% 이상일 때만 표시 (규칙 적용은 백엔드 API)
 '''] {
-  patch text [not null]
   champion_id int [not null, note: '챔피언 (Data Dragon key, 예: 266 아트록스)']
   position text [not null, note: 'TOP | JUNGLE | MIDDLE | BOTTOM | UTILITY']
   pick int [not null, note: '이 포지션으로 고른 게임 수']
@@ -131,7 +145,7 @@ Table champion [headercolor: #534AB7, note: '''
   ban int [not null, note: '이 챔피언이 밴된 게임 수. 포지션과 무관해서 같은 챔피언은 모든 포지션에 같은 값']
 
   indexes {
-    (patch, champion_id, position) [pk]
+    (champion_id, position) [pk]
   }
 }
 
@@ -140,7 +154,6 @@ Table champion_item [headercolor: #534AB7, note: '''
 - match_players.item0~item5 를 아이템 1개씩 센다 (빈 칸 0 제외)
 - 하위 재료(롱소드 등)도 함께 세어진다. 완성 아이템만 보여주는 것은 프론트가 Data Dragon으로 거른다
 '''] {
-  patch text [not null]
   champion_id int [not null]
   position text [not null]
   item_id int [not null, note: '아이템 (Data Dragon item.json의 키)']
@@ -148,7 +161,7 @@ Table champion_item [headercolor: #534AB7, note: '''
   win int [not null, note: '그중 이긴 게임 수']
 
   indexes {
-    (patch, champion_id, position, item_id) [pk]
+    (champion_id, position, item_id) [pk]
   }
 }
 
@@ -159,7 +172,6 @@ Table champion_rune [headercolor: #534AB7, note: '''
 - 조합이 많아서 챔피언 x 포지션마다 상위 10개만 저장
 '''] {
   id bigint [pk, increment]
-  patch text [not null]
   champion_id int [not null]
   position text [not null]
   primary_style int [not null]
@@ -177,7 +189,7 @@ Table champion_rune [headercolor: #534AB7, note: '''
   win int [not null, note: '그중 이긴 게임 수']
 
   indexes {
-    (patch, champion_id, position, primary_style, primary_perk1, primary_perk2, primary_perk3, primary_perk4, sub_style, sub_perk1, sub_perk2, stat_offense, stat_flex, stat_defense) [unique, note: '같은 조합은 1줄']
+    (champion_id, position, primary_style, primary_perk1, primary_perk2, primary_perk3, primary_perk4, sub_style, sub_perk1, sub_perk2, stat_offense, stat_flex, stat_defense) [unique, note: '같은 조합은 1줄']
   }
 }
 
@@ -186,7 +198,6 @@ Table champion_spell [headercolor: #534AB7, note: '''
 - D/F 위치만 다른 조합(점멸+점화, 점화+점멸)은 같은 조합으로 센다
 - 그래서 spell1_id 에는 작은 번호, spell2_id 에는 큰 번호를 넣는다
 '''] {
-  patch text [not null]
   champion_id int [not null]
   position text [not null]
   spell1_id int [not null, note: '두 주문 중 작은 번호 (예: 4 점멸)']
@@ -195,7 +206,7 @@ Table champion_spell [headercolor: #534AB7, note: '''
   win int [not null, note: '그중 이긴 게임 수']
 
   indexes {
-    (patch, champion_id, position, spell1_id, spell2_id) [pk]
+    (champion_id, position, spell1_id, spell2_id) [pk]
   }
 }
 
@@ -205,7 +216,6 @@ Table champion_skill [headercolor: #534AB7, note: '''
 - 예: EQQWQRQEQEREEW → EQQWQRQEQER
 - 챔피언 x 포지션마다 상위 10개
 '''] {
-  patch text [not null]
   champion_id int [not null]
   position text [not null]
   skill_order text [not null, note: '스킬 찍은 순서 앞 11레벨 (예: EQQWQRQEQER). CHECK skill_order ~ \'^[QWER]{11}$\'']
@@ -213,22 +223,25 @@ Table champion_skill [headercolor: #534AB7, note: '''
   win int [not null, note: '그중 이긴 게임 수']
 
   indexes {
-    (patch, champion_id, position, skill_order) [pk]
+    (champion_id, position, skill_order) [pk]
   }
 }
 
 
 // ───────────── 뷰 (DBML은 뷰를 표현하지 않으므로 메모로 남김) ─────────────
-// champion_tier_view (db_spec D1 = (a), 2026-10-13 승인, 마이그레이션 008)
-//   champion JOIN patch. 컬럼: patch, champion_id, position, pick, win, ban, games,
+// champion_tier_view (변경 03, 마이그레이션 014)
+//   champion CROSS JOIN stats_window. 컬럼: champion_id, position, pick, win, ban, games,
 //   win_rate, pick_rate, ban_rate, adjusted_win_rate, tier_score, tier
+//   (공식·경계값은 v6과 같음, 분모만 stats_window.games)
 //   보정 승률 = 100 x (win + 50) / (pick + 100)
 //   tier_score = 보정 승률 + 0.10 x least(픽률, 20) + 0.03 x least(밴률, 30)
 //   tier = pick < 50 이면 null, 아니면 tier_from_score(score) 1~5 (경계 53.0 / 51.5 / 50.0 / 48.5)
 //   security_invoker = true. 자세한 정의는 db_contract.md 9-3
 
 // ───────────── 집계 호출 규칙 (db_contract.md 9-4) ─────────────
-// 백엔드는 refresh_patch_stats 직전에 같은 연결에서 ANALYZE matches, match_players 를 실행한다 (변경 02, M2)
+// 집계: pg_cron 작업 tiergg_daily_refresh, 매일 20:00 UTC(05:00 KST): ANALYZE matches, match_players; SELECT refresh_window_stats(14)
+// 백엔드는 refresh_window_stats(14) 직전에 같은 연결에서 ANALYZE matches, match_players 를 실행한다 (9-4)
+// purge_old_games(21)은 집계 뒤, 사용자 확인(--yes) 뒤에만 실행한다
 
 
 // ───────────── 운영 ─────────────
@@ -255,9 +268,8 @@ Table collection_logs [headercolor: #5F5E5A, note: '''
 Ref: matches.puuid > ranked_players.puuid [delete: set null]
 Ref: match_players.match_id > matches.match_id [delete: cascade]
 
-// 집계: 패치 → 챔피언 → 상세 추천
-Ref: champion.patch > patch.patch [delete: cascade]
-Ref: champion_item.(patch, champion_id, position) > champion.(patch, champion_id, position) [delete: cascade]
-Ref: champion_rune.(patch, champion_id, position) > champion.(patch, champion_id, position) [delete: cascade]
-Ref: champion_spell.(patch, champion_id, position) > champion.(patch, champion_id, position) [delete: cascade]
-Ref: champion_skill.(patch, champion_id, position) > champion.(patch, champion_id, position) [delete: cascade]
+// 집계: 챔피언 → 상세 추천 (stats_window, stats_window_patch는 관계 없음)
+Ref: champion_item.(champion_id, position) > champion.(champion_id, position) [delete: cascade]
+Ref: champion_rune.(champion_id, position) > champion.(champion_id, position) [delete: cascade]
+Ref: champion_spell.(champion_id, position) > champion.(champion_id, position) [delete: cascade]
+Ref: champion_skill.(champion_id, position) > champion.(champion_id, position) [delete: cascade]

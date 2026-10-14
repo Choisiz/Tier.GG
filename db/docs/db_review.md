@@ -465,3 +465,140 @@
 ### R7. Build 기록 반영
 
 - 함수·테스트·마이그레이션은 고친 것이 없다. `db_build.md` 변경 02의 02-5 남은 문제 1(계약 문구 v5)과 3(5,000게임 재현)에 "Review에서 반영"을 적었다.
+
+## 변경 03 검토 (2026-10-14): 패치 기준 → 최근 14일 기준
+
+- 작성: Review 서브에이전트 (2026-10-14). Build 보고를 믿지 않고 실제 DB를 직접 조회·실행해 확인했다.
+- 기준: `db/docs/db_spec.md` 변경 03 (승인됨, D13~D23, 되돌릴 수 없는 작업 1~4·6·7), `db/docs/db_build.md` 변경 03 (편차 1 포함), 계약 v7 (`db_contract.md`, `db_contract.dbml`)
+- 대상: Supabase PostgreSQL 17.11, Session pooler, 접속 계정 `postgres`(superuser 아님)
+- **모든 샘플은 ROLLBACK 되는 트랜잭션 안에서만 실행했다.** 검토 전·후 줄 수 `matches` 0, `match_players` 0, `ranked_players` 3, `collection_logs` 3, 집계 7개 0. `cron.job` 1줄(jobid 1) 그대로.
+- 검토용 스크립트는 scratchpad에만 두었다 (저장소에 넣지 않음).
+
+### 03R-1. 종합 판정
+
+> 요약: **PASS.** 실제 DB 구조·함수·뷰·권한·예약 작업이 계약 v7·마이그레이션 파일과 같고, 직접 만든 롤백 시험 6개와 두 연결 잠금 시험이 모두 기대대로 나왔다. 정확성 결함이 없어 016은 만들지 않았다. 편차 1(pg_cron 기본 `PUBLIC` 권한)은 `anon`·`authenticated`가 실제로 호출·조회할 수 없음을 `SET ROLE`로 확인했고, **기본값 유지**를 권한다.
+
+| 구분 | 결과 |
+|------|------|
+| 판정 | **PASS** |
+| Critical / High / Medium | 0 / 0 / 0 |
+| Low | 6 (03R-6) |
+| Review에서 고친 것 | 계약 `.md` 9장 요약 문구 1줄 (03R-7). 마이그레이션 016 만들지 않음 |
+| 예약 작업 첫 실행 | ⚠️ 아직 없음 (검토 시각 2026-10-14 11:36 UTC). 다음 확인: 2026-10-14 20:00 UTC 뒤 `cron.job_run_details` (P0002 `failed`가 정상) |
+
+### 03R-2. 체크리스트
+
+> 요약: spec 03-8 완료 기준을 하나씩 직접 확인했다. 숫자는 모두 이번 검토에서 조회·실행한 값이다.
+
+| 항목 | 결과 | 근거 |
+|------|------|------|
+| 사용자 승인 기록 | ✅ | `db_build.md` 변경 03 머리말에 1~4·6·7 승인, 5번(purge 실행) 하지 않음 |
+| `migrate:status` | ✅ | 001~015 "적용됨" (011~015 2026-10-14 11:24 UTC), 체크섬 불일치 없음. `git diff db/migrations/` 출력 없음 (001~010 안 바뀜) |
+| `migrate:fresh-check` | ✅ | 15개 파일 통과, 임시 스키마 테이블 11·뷰 1·함수 4, `migration_check` 남지 않음 |
+| `verify` / `verify:fresh` | ✅ | 둘 다 10개 파일 통과 (001~004, 006~011). 검증 전·후 11개 테이블 줄 수 같음, 샘플 남지 않음 |
+| 줄 수 | ✅ | `matches` 0, `match_players` 0, `ranked_players` 3, `collection_logs` 3, `stats_window`·`stats_window_patch`·집계 5개 0 |
+| `matches.game_start_at` | ✅ | `timestamp with time zone`, NOT NULL, 기본값 없음. `matches_game_start_at_check` = `CHECK ((game_start_at >= '2020-01-01 00:00:00+00'::timestamp with time zone))`. 주석에 `info.gameStartTimestamp` |
+| 옛 객체 없음 | ✅ | `to_regclass('public.patch')`, `to_regprocedure('refresh_patch_stats(text)')`, `to_regprocedure('purge_old_patches(integer)')` 모두 NULL. public 함수는 4개뿐 |
+| `stats_window` | ✅ | `id smallint DEFAULT 1`, `days int`, `window_start`·`window_end timestamptz`, `games int`, `aggregated_at timestamptz DEFAULT now()`, 모두 NOT NULL. PK `(id)`, CHECK `id = 1`, `days 1~60`, `window_start < window_end`, `games > 0` (이름 03-3-1과 같음) |
+| `stats_window_patch` | ✅ | `patch text`, `games int` NOT NULL, PK `(patch)`, CHECK `^[0-9]+\.[0-9]+$`, `games > 0` |
+| 집계 5개 | ✅ | `patch` 컬럼 없음. PK `champion (champion_id, position)`, `champion_item (…, item_id)`, `champion_spell (…, spell1_id, spell2_id)`, `champion_skill (…, skill_order)`, `champion_rune (id)` identity ALWAYS + `champion_rune_page_key` UNIQUE 13개 컬럼. 상세 4개 FK `(champion_id, position) → champion ON DELETE CASCADE`. CHECK 21개가 002·009와 같음 |
+| 인덱스 | ✅ | PK·UNIQUE 인덱스 + `match_players_champion_id_team_position_idx`만. `matches.game_start_at` 인덱스 없음 (D21, 계약 8장과 같음) |
+| 함수 본문 md5 | ✅ | 롤백 트랜잭션 안 임시 스키마에 001~014를 적용해 비교. `refresh_window_stats` `baec482d…`, `purge_old_games` `6e63b2ad…`, `patch_sort_key` `b98dc8d6…`, `tier_from_score` `b6079ba3…` 4개 모두 실제 DB와 같음 |
+| 함수 시그니처 | ✅ | `refresh_window_stats(p_days integer DEFAULT 14, p_until timestamp with time zone DEFAULT now()) → jsonb`, `purge_old_games(p_keep_days integer DEFAULT 21) → integer`. 모두 `prosecdef = false`, `search_path=public, pg_catalog`, VOLATILE |
+| 뷰 | ✅ | `pg_get_viewdef` md5가 014 적용 결과와 같음 (`f1920fa1…`), `reloptions = {security_invoker=true}`, 컬럼 12개(`patch` 없음). 분모는 R1·R4에서 확인 |
+| RLS | ✅ | public 테이블 12개(`schema_migrations` 포함) RLS 켜짐, FORCE 아님, `pg_policies` public 0개 |
+| 권한 | ✅ | 테이블·뷰 `relacl` = `{postgres=…, service_role=…}`, 시퀀스 2개 같음, 함수 4개 `proacl` = `{postgres=X, service_role=X}` (`PUBLIC`·`anon`·`authenticated` 없음). `SET ROLE anon/authenticated`로 `stats_window`·뷰 SELECT, 함수 3개 호출 모두 42501 |
+| 006 자동 검사 | ✅ | NOTICE "테이블 12, 뷰 1, 시퀀스 2, 함수 4" = spec 기대값. 손 목록이 아닌 `current_schema()` 전체 순회 |
+| 직접 시험 (03R-3) | ✅ | R1~R6 모두 통과 |
+| 두 연결 잠금 | ✅ | 03R-3 R7 |
+| 5,000게임 측정 | ✅ | 03R-4 |
+| 예약 작업 | ✅ / ⚠️ | 03R-5. 첫 실행 기록은 아직 없음 |
+| 계약 v7 | ✅ | `.dbml`이 `dbmlv2`로 파싱됨: 테이블 11, Ref 6(상세 4개는 `(champion_id, position)` cascade), TableGroup 원본 3·집계 7·운영 1. 컬럼·타입·NOT NULL·기본값·PK·UNIQUE가 실제 DB와 같음. `.md`에 `refresh_patch_stats`·`purge_old_patches`·"각 50명"이 v6→v7 변경표 밖에 남지 않음. 9장 요약 문구 1줄만 고침 (03R-7) |
+
+### 03R-3. 직접 만든 롤백 시나리오
+
+> 요약: Build 테스트와 다른 시각·값으로 창 경계, 패치 구성, 상위 N, 밴, 0게임, 재집계, purge를 다시 확인했다. 모두 기대대로다.
+
+- 방법: 시나리오마다 `BEGIN` → 임시 함수 `pg_temp.add_game`(게임 1개 + 참가자 N줄) → 확인 → `ROLLBACK`. 샘플 시각은 2021년(R6만 `now()` 기준), ID는 `KR_97…`.
+
+| # | 시나리오 | 결과 |
+|---|----------|------|
+| R1 | `p_until = 2021-03-01 12:00+00`, 14일 → 창 `[2021-02-15 12:00, 2021-03-01 12:00)`. 시작 정확히 / 시작 − 1µs / 끝 − 1µs / 끝 정확히 / 미래 / 9줄 | ✅ 시작 정확히·끝 − 1µs만 포함, games 2. `p_days` 0·61·NULL, `p_until` NULL·`now() + 1µs` → 22023. `p_days = 60` 허용(games 3). `p_until = now()` 허용(실데이터 0게임 → P0002). 인자 오류 뒤 기존 스냅숏 그대로 |
+| R2 | 패치 `16.10` 5게임, `16.9` 3, `15.24` 2 + 창 밖 `16.11`, 8줄 `16.12` | ✅ 구성 `16.10:5, 16.9:3, 15.24:2`, 합계 10 = `stats_window.games`. 반환 `patches`가 숫자 순(`16.10` > `16.9`) |
+| R3 | 챔피언 900 TOP 30게임, 변형 12개(1~6은 3판, 7~12는 2판, 짝수 게임 승) | ✅ 룬·스펠·스킬 각 10개. 2판 동률은 승 많은 8·10·12 → 그다음 조합 키 오름차순(룬·스펠은 7, 스킬은 문자열이 가장 작은 `…EE`). 스킬은 14자 → 앞 11자. 아이템 13줄(전부), 한 줄 안 2번 나온 3100은 pick 30·win 15 (1번만 셈) |
+| R4 | 챔피언 41: 게임 1에서 두 명이 밴, 게임 2에서 한 명, 창 밖 게임에서 10명, 9줄 게임에서 1명 | ✅ `ban = 2`. 픽 없이 밴만 된 999는 `champion` 줄 없음(계약 9-2 한계와 같음). 뷰 `ban_rate` 66.67 = 2/3 |
+| R5 | 스냅숏(11.1·11.2) 만든 뒤 0게임 창 / 다른 창(11.3)으로 다시 집계 | ✅ 0게임 → P0002, `stats_window` 행 전체·구성·`champion`이 그대로. 재집계 뒤 7개 테이블 모두 교체(11.3만, 이전 챔피언 상세 0줄) |
+| R6 | `now() − 21일` 정확히 / `− 21일 − 1µs` / `− 14일` / 2021년 | ✅ `purge_old_games(21)` = 2 (= 호출 전 같은 트랜잭션에서 센 수), 정확히 21일은 남음, CASCADE, 집계·`ranked_players`·`collection_logs` 그대로, 두 번째 0. 13·NULL → 22023, `stats_window.days = 20`일 때 19 → 22023. `purge_old_games(14)`도 허용되고 정확히 14일 게임은 남음 |
+| R7 | 두 연결: A가 `refresh_window_stats`를 마치고 커밋 전 / B가 같은 함수 호출 | ✅ 1.5초 뒤 B는 `wait_event = advisory`, `pg_locks` advisory `ExclusiveLock granted = false`. A `ROLLBACK` 직후 B가 진행해 P0002(A의 샘플이 롤백돼 0게임). 차례 실행 확인 |
+
+- 참고: 롤백해도 `champion_rune_id_seq`는 되돌아가지 않는다 (검토 뒤 `last_value` 5067). bigint라 문제없다.
+
+### 03R-4. 성능: 5,000게임 (ROLLBACK 2회)
+
+> 요약: 9-4 순서(`ANALYZE` → 집계)로 5,000게임 집계가 **1.14초**(아이템 줄 1만 1천)였다. 변경 02 R4의 1.64초, 변경 01의 1.84초와 같은 범위이고, 창 거르기 추가로 느려지지 않았다. 아이템 종류를 일부러 크게 늘린 시험(아이템 줄 10만)은 4.2초였다.
+
+- 데이터: 창 안 5,000게임(2021-01-01부터 241초 간격, 패치 0.8 40% / 0.9 60%) + 창 밖 500게임, 참가자 5만 5천 줄, 챔피언 160 × 포지션 5. 실행 계획: `tmp_games`는 Hash Join + HashAggregate (`rows=49510`), Nested Loop 아님.
+
+| # | 아이템 분포 | `ANALYZE` | `refresh_window_stats(14, '2021-01-15+00')` | 결과 줄 수 |
+|---|-------------|-----------|---------------------------------------------|-----------|
+| 1 | 칸마다 150종 무작위 (과장) | 0.43초 | **4.17초**, 같은 트랜잭션 재집계 4.49초 | champion 800, item 106,329, rune 1,600, spell 800, skill 1,600 |
+| 2 | 챔피언마다 약 12종 (현실적, 변경 02 R4의 25,440줄보다 적음) | 0.35초 | **1.14초** | champion 800, item 11,200, rune 1,600, spell 800, skill 1,600 |
+
+- 두 실행 모두 `stats_window_patch` 합계 = games 5,000, 구성 `0.9:3000, 0.8:2000`, 챔피언 × 포지션당 룬 줄 최대 2 (변형 수만큼).
+- 시간은 아이템 줄 수에 가장 크게 좌우된다 (db_review M2와 같은 관찰). 25,000게임에서도 5분 시간 제한까지 여유가 크다.
+- 죽은 줄과 용량: 측정 전 70MB → 트랜잭션 안 최대 116MB → 1회 ROLLBACK 뒤 98MB(죽은 줄 `match_players` 5.5만, `champion_item` 21만, `matches` 5,500 등), 2회 뒤 108MB → 약 2분 뒤 autovacuum 정리로 **77MB**. 무료 플랜 500MB에 영향 없음. 큰 측정은 2회로 끝냈다 (C7).
+
+### 03R-5. 예약 작업과 권한 (편차 1 판단)
+
+> 요약: 작업 행은 spec 그대로다. `anon`·`authenticated`는 `cron` 스키마 USAGE가 없어 `cron.schedule`·`unschedule` 호출과 `cron.job` 조회가 모두 42501로 막힌다. `PUBLIC` EXECUTE는 실제로 쓸 수 없는 권한이고, `postgres`가 회수할 수도 없어 **기본값 유지**를 권한다.
+
+작업 상태:
+
+| 항목 | 값 |
+|------|----|
+| `cron.job` | 1줄: jobid 1, `tiergg_daily_refresh`, `0 20 * * *`, `active = true`, `username postgres`, `database postgres`, `nodename localhost` |
+| `command` | `SET statement_timeout = '5min'; ANALYZE matches, match_players; SELECT refresh_window_stats(14);` (015와 같음) |
+| 설정 | `cron.timezone = GMT`, `cron.use_background_workers = off`(localhost 접속), `cron.log_run = on`, `pg_cron launcher` 프로세스 실행 중 |
+| 롤백 1회 실행 | 같은 명령을 `BEGIN` 안에서 실행 → **P0002** (`2026-09-30 11:35:57 ~ 2026-10-14 11:35:57 에 완료된 게임(10줄)이 없습니다`). `ROLLBACK` 뒤 `stats_window` 0줄, `statement_timeout`도 원래 값(2min)으로 돌아옴 |
+| `cron.job_run_details` | 0줄 (첫 실행 2026-10-14 20:00 UTC 전) |
+
+실패가 보이는 곳:
+
+- `cron.job_run_details`: 실행마다 1줄, `status`(`succeeded`/`failed`)와 `return_message`(오류 문장). 확인 SQL은 spec 03-11 "실패 확인". Supabase 대시보드 Integrations → Cron에서도 같은 기록을 본다.
+- `stats_window.aggregated_at`: 성공한 마지막 집계 시각. 하루를 크게 넘으면 멈춘 것이다 (백엔드가 `window.aggregatedAt`으로 내보낼 예정, spec 03-7).
+- **알림은 없다.** 누군가 위 두 곳을 봐야 안다 (L7).
+- 실패하면 명령 전체가 한 트랜잭션으로 롤백되어 기존 스냅숏이 남는다 (R5와 롤백 실행으로 확인).
+
+편차 1 독립 판단:
+
+| 확인 | 결과 |
+|------|------|
+| 카탈로그 | `cron.schedule(text,text)`, `schedule(text,text,text)`, `unschedule(bigint)`, `unschedule(text)`, `job_cache_invalidate()`의 `proacl`에 `=X/supabase_admin`(PUBLIC). `alter_job`, `schedule_in_database`는 PUBLIC 없음. `cron.job` `=r`, `cron.job_run_details` `=rd`(PUBLIC 읽기·삭제). 시퀀스 2개 `=r` |
+| 스키마 | `cron` ACL = `{supabase_admin=UC, postgres=U*}`. `has_schema_privilege('anon'/'authenticated'/'authenticator'/'service_role', 'cron', 'USAGE')` 모두 false |
+| `SET ROLE anon` / `authenticated` (각각 롤백) | `cron.schedule` 2종, `cron.unschedule` 2종, `SELECT FROM cron.job`, `SELECT FROM cron.job_run_details` 6개 모두 **42501 permission denied for schema cron**. 검토 뒤 `cron.job` 1줄 그대로 |
+| 2중 방어 | `cron.job`·`cron.job_run_details`에 RLS가 켜져 있고 정책이 `username = CURRENT_USER`. USAGE가 생겨도 남의 작업은 보이지 않는다 |
+| PostgREST | DB 안에서 노출 스키마 설정은 조회되지 않는다 (`pgrst.db_schemas` 설정 없음, `authenticator` 역할 설정에도 없음). `.env`에 anon 키가 없어 HTTP로도 시험하지 않았다. 확인할 수 있는 것: 노출에 필요한 `cron` USAGE가 `anon`·`authenticated`에 없으므로, 대시보드에서 `cron`을 노출해도 42501로 막힌다 |
+| 회수 가능 여부 (실행하지 않음) | `PUBLIC` 권한의 grantor는 `supabase_admin`(확장 주인)이다. PostgreSQL에서 주인이 아닌 역할의 `REVOKE`는 자기가 준 권한만 회수하므로 `postgres`의 `REVOKE … FROM PUBLIC`은 경고만 내고 아무것도 바꾸지 않을 것으로 본다 |
+
+- **권고: 기본값 유지, 016 REVOKE 마이그레이션은 만들지 않는다.** (1) 실제 호출·조회 경로가 스키마 USAGE에서 막히는 것을 직접 확인했다. (2) 회수가 효과 없을 가능성이 크고, 효과가 있더라도 Supabase 관리 확장 객체를 건드리는 지속 변경이다. (3) 진짜 위험은 누군가 `cron` 스키마 USAGE를 `anon`·`authenticated`에 주는 것인데, 테스트 011이 그 경우 실패한다. 테스트 011의 완화(직접 부여·USAGE면 실패, PUBLIC은 `[주의]`)는 적절하다.
+
+### 03R-6. 발견한 문제 (심각도 순)
+
+| # | 심각도 | 내용 | 권고 |
+|---|--------|------|------|
+| L7 | Low | 예약 작업 실패에 알림이 없다. `cron.job_run_details`나 `stats_window.aggregated_at`을 누가 봐야 안다. 백엔드 변경 전까지는 매일 P0002로 실패하는 것이 정상이라 더 놓치기 쉽다 | `!백엔드` 변경에서 `/health` 또는 `/meta`에 `window.aggregatedAt`을 꼭 넣는다 (spec 03-7 "선택" → 권장) |
+| L8 | Low | 편차 1: `cron.schedule`·`unschedule`에 pg_cron 기본 `PUBLIC` EXECUTE, `cron.job` PUBLIC 읽기. 스키마 USAGE가 없어 실제로는 쓸 수 없다 (03R-5) | 기본값 유지. 사용자 결정으로 확정 |
+| L9 | Low | 테스트 011의 직접 부여 검사는 `schedule(text,text,text)`·`unschedule(bigint)` 2개만 본다. `schedule(text,text)`, `unschedule(text)`, `alter_job`, `schedule_in_database`는 빠진다. 스키마 USAGE 검사가 모두를 막으므로 지금 위험은 없다 | 다음 테스트 수정 때 `cron` 스키마 함수 전체로 넓힌다 |
+| L10 | Low | DB의 `ranked_players` 테이블 주석이 아직 "각 50명"(010)이다 (Build 남은 문제 4). 계약은 100명 | 동작 영향 없음. 다음 `!db` 변경 마이그레이션에서 주석만 바꾼다. 이번에는 016을 정확성 결함에만 쓰므로 만들지 않음 |
+| L11 | Low | 05:00 집계 커밋 순간에 백엔드가 `stats_window`와 집계 테이블을 **다른 문장**으로 읽으면(READ COMMITTED) 이전·새 스냅숏이 섞일 수 있다 | `!백엔드` Plan 메모: 한 요청의 읽기를 한 문장(JOIN)이나 `REPEATABLE READ` 트랜잭션으로 묶는다 |
+| L12 | Low | 계약 11장 보안에 `cron` 스키마 권한(USAGE 없음, PUBLIC 기본값 유지 판단)이 없다 | 다음 계약 수정 때 한 줄 추가 (문구 추가라 이번 수정 범위 밖) |
+| 참고 | - | 집계 시간은 아이템 줄 수에 비례해 커진다 (03R-4: 1.1만 줄 1.14초, 10.6만 줄 4.2초) | 본 수집 뒤 `item_rows`와 실행 시간을 `cron.job_run_details`(`end_time − start_time`)로 확인 |
+
+### 03R-7. Review에서 고친 것
+
+| 파일 | 내용 | 이유 |
+|------|------|------|
+| `docs/contracts/db_contract.md` 9장 요약 (문구만) | "백엔드는 `ANALYZE` 뒤에 `refresh_window_stats(14)`로 … 다시 만들고" → "매일 DB 예약 작업(pg_cron, 9-4)이 `ANALYZE` 뒤에 `refresh_window_stats(14)`로 … 다시 만든다 (백엔드 `aggregate`는 시험용으로 같은 순서). 백엔드는 사용자 확인 뒤 `purge_old_games(21)`…" | spec 03-3-2 문구를 그대로 옮긴 것이지만, 같은 장 9-4·10장 14번("수집 뒤 자동 집계 없음")과 어긋나 백엔드 Plan이 수집 뒤 집계를 다시 넣을 수 있다. 규칙·값은 바꾸지 않았다 |
+
+- 마이그레이션·함수·테스트는 고치지 않았다. 016 없음.
+- `db_build.md` 변경 03 03-7 남은 문제 2·3·5에 Review 결과를 적었다.
