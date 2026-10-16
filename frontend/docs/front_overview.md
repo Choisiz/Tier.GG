@@ -1,7 +1,7 @@
 # 프론트엔드 현재 상태 — Tier.GG
 
 > 이 문서는 프론트엔드의 **지금 모습**만 적는다. 현재 계획은 `front_spec.md`, 구현 상태는 `front_build.md`, 최근 검토는 `front_review.md`에 있다. 그 이전 과정 기록은 git 커밋 `87cfc78`에 있다.
-> 기준: 변경 02 Review 반영 후 코드 (2026-10-17 확인). 이후 Review 에이전트가 이 문서를 최신 상태로 덮어쓰고 변경 이력에 1줄을 더한다.
+> 기준: 변경 03 Review 반영 후 코드 (2026-10-17 확인). 이후 Review 에이전트가 이 문서를 최신 상태로 덮어쓰고 변경 이력에 1줄을 더한다.
 
 ## 목차
 
@@ -25,7 +25,7 @@
 요약: 포지션별 챔피언 티어 표와 챔피언 상세(추천 빌드 + 스킬·스킨·스토리)를 보여주는 Next.js 사이트다.
 
 - **티어 표**: 탑·정글·미드·원딜·서폿 5개 탭. 티어, 승률, 픽률, 밴률, 게임 수를 보여준다.
-- **챔피언 상세**: 주 포지션 1~2개 탭. 탭마다 추천 룬, 소환사 주문, 스킬 순서, 핵심 아이템을 보여준다. 아래에 스킬 설명, 스킨, 스토리가 있다.
+- **챔피언 상세**: 주 포지션 1~2개 탭. 탭마다 추천 룬(사용률·승률 포함), 소환사 주문, 스킬 순서, 핵심 아이템을 보여준다. 모든 아이콘에 호버·포커스·탭 툴팁이 있다. 스킨은 Hero 스플래시에서 화살표로 전환(순환)하고, 아래에 스킬 설명, 스토리가 있다.
 - **통계 기준**: 최근 14일 게임. 백엔드가 매일 05:00(KST)에 다시 집계한다.
 - 로그인, 전적 검색, AI 피드백은 아직 없다.
 
@@ -36,7 +36,7 @@
 | 테마 | 다크 고정, 한국어(`lang="ko"`, Data Dragon `ko_KR`) |
 | 빌드 페이지 수 | 183개 (상세 173개 + 리스트 5개 + `/`·404 등) |
 | 챔피언 수 | 173명 (Data Dragon `16.20.1` 기준) |
-| 클라이언트 컴포넌트 | `TierTable`, `PositionTabs`, `RunePage`, `SkinGallery`, `NavLink`, `error.tsx` 2개 |
+| 클라이언트 컴포넌트 | `TierTable`, `PositionTabs`, `RunePage`, `ChampionHero`, `HeroSkinSwitcher`, `Tooltip`(공용), `NavLink`, `error.tsx` 2개 |
 
 ---
 
@@ -76,15 +76,15 @@
 | 영역 | 내용 |
 |------|------|
 | "← 목록" | 1순위 포지션의 티어 표로 간다 (예: "← 정글 티어 목록"). 통계가 없으면 탑 |
-| Hero | 스플래시(LCP 이미지, `fetchPriority="high"`), 이름(`h1`), 칭호, 역할군, 난이도 |
+| Hero | 스플래시가 곧 스킨 미리보기(`HeroSkinSwitcher`, LCP 이미지, `fetchPriority="high"`). 좌우 화살표(‹ ›)로 스킨 전환(크로마 제외, 양 끝에서 순환), 이름(`h1`), 칭호, 스킨 이름·순서(`aria-live="polite"`, 고정 배경 정보 영역), 역할군, 난이도 |
 | 포지션 탭 | 주 포지션이 2개면 탭 2개 ("정글 · 2티어 · 86%"). ←/→, Home/End로 이동. 1개면 탭 줄 없이 "탑" 글자만 |
 | 요약 줄 | 티어 배지, 승률, 픽률, 밴률, 게임 수 |
-| 룬 | 1순위 룬 페이지 전체 (핵심 트리 4줄 / 보조 트리 3줄 / 파편 3줄). 고른 룬만 밝게. 2개면 [1순위]/[2순위] 버튼 |
-| 소환사 주문 | 상위 2조합 ("점멸 + 점화"), 사용률·승률·게임 |
-| 스킬 순서 | 1순위는 Q/W/E/R × 11레벨 격자, 2순위는 "Q E W Q Q R …" 한 줄 |
-| 아이템 | 핵심 3개 + 신발 1개. "게임이 끝날 때 가지고 있던 아이템 기준 · 구매 순서 아님" |
-| 레이아웃 | `lg`(1024px) 이상 2열 (왼쪽 룬 / 오른쪽 주문·스킬·아이템) |
-| 아래 영역 | 스킬 설명(P/Q/W/E/R), 스킨(크로마 제외, 누르면 위 미리보기 교체), 스토리 |
+| 룬 | 1순위 룬 페이지 전체를 세로로: 핵심 트리(4줄, 크게) → "사용 …% · 승률 …% · …게임" → 보조 트리(3줄) → 능력치 파편(3줄). 고른 룬만 밝게. 2개면 [1순위]/[2순위] 버튼. 모든 룬 아이콘에 설명 툴팁 |
+| 소환사 주문 | 상위 2조합 ("점멸 + 점화"), 사용률·승률·게임, 아이콘에 설명 툴팁 |
+| 스킬 순서 | 1순위는 레벨(11행) × Q/W/E/R(4열) 격자(머리글 아이콘에 설명 툴팁), 2순위는 "Q E W Q Q R …" 한 줄 |
+| 아이템 | 핵심 3개 + 신발 1개, 아이콘에 설명 툴팁. "게임이 끝날 때 가지고 있던 아이템 기준 · 구매 순서 아님" |
+| 레이아웃 | `lg`(1024px) 이상 2열 (왼쪽 룬 전체 / 오른쪽 주문(위)+스킬(아래)), "많이 완성한 아이템"은 그 아래 전체 폭으로 따로. `lg` 미만은 룬→주문→스킬→아이템 1열 |
+| 아래 영역 | 스킬 설명(P/Q/W/E/R), 스토리. 스킨은 별도 섹션 없음(Hero로 통합) |
 
 ---
 
@@ -123,6 +123,7 @@
 | `skillOrder` "QEWQ…" | `champion/{id}.json` | `spells[0..3]` → Q/W/E/R 이름·아이콘 | 글자만 표시 |
 
 - Data Dragon 가공 결과(아이템·주문·룬 표)는 버전마다 한 번만 만든다. 실패하면 지우고 다음에 다시 시도한다.
+- 아이템·소환사 주문·룬(`shortDesc`)·스킬 설명은 공용 `Tooltip`(`components/common/Tooltip.tsx`)의 내용으로도 쓰인다. 전부 기존 `stripHtml`로 HTML 태그만 지운 글자이고, 설명이 없으면 툴팁 자체를 달지 않는다 (추가 의존성 없음).
 
 ---
 
@@ -233,7 +234,8 @@ frontend/
    ├─ components/
    │  ├─ layout/           헤더·푸터·메뉴
    │  ├─ champions/        티어 표·상세 화면 조각
-   │  └─ stats/            통계 공통 조각 (기간 줄, 배지, 안내)
+   │  ├─ stats/            통계 공통 조각 (기간 줄, 배지, 안내)
+   │  └─ common/           공용 조각 (Tooltip)
    └─ lib/
       ├─ api/              백엔드 호출 (server-only)
       ├─ ddragon/          Data Dragon 호출과 가공
@@ -262,16 +264,17 @@ frontend/
 | `champions/TierListPage.tsx` | 티어 표 페이지 한 개 (데이터 호출 + 상태 분기) |
 | `champions/PositionNav.tsx` | 포지션 탭 링크 5개 |
 | `champions/TierTable.tsx` | 검색 + 티어 표 (client) |
-| `champions/ChampionHero.tsx` | 상세 상단 스플래시와 기본 정보 |
+| `champions/ChampionHero.tsx` | 상세 상단 스플래시(스킨 전환)와 기본 정보 (client, `HeroSkinSwitcher`의 선택 상태를 받아 캡션 표시) |
+| `champions/HeroSkinSwitcher.tsx` | Hero 스플래시 자리의 스킨 전환 화살표 (client, 순환, `onChange` 콜백) |
 | `champions/PositionTabs.tsx` | 상세 포지션 탭 (client, WAI-ARIA tabs) |
-| `champions/PositionStatsPanel.tsx` | 탭 한 개 내용 (요약 줄 + 빌드 카드) |
-| `champions/RunePage.tsx` | 룬 페이지와 1/2순위 전환 (client) |
-| `champions/SummonerSpells.tsx` | 소환사 주문 조합 |
-| `champions/SkillOrder.tsx` | 스킬 11레벨 격자 |
-| `champions/CoreItems.tsx` | 핵심 아이템 3개 + 신발 |
+| `champions/PositionStatsPanel.tsx` | 탭 한 개 내용 (요약 줄 + 빌드 카드, 룬 카드 1행 + 아이템 카드 별도 행) |
+| `champions/RunePage.tsx` | 룬 페이지 세로 배치(핵심→사용률·승률→보조→파편)와 1/2순위 전환 (client) |
+| `champions/SummonerSpells.tsx` | 소환사 주문 조합 (아이콘에 `Tooltip`) |
+| `champions/SkillOrder.tsx` | 스킬 레벨×Q/W/E/R 격자 (머리글에 `Tooltip`) |
+| `champions/CoreItems.tsx` | 핵심 아이템 3개 + 신발 (아이콘에 `Tooltip`) |
 | `champions/ChampionAbilities.tsx` | 패시브·스킬 설명 |
-| `champions/SkinGallery.tsx` | 스킨 미리보기와 목록 (client) |
 | `champions/ChampionLore.tsx` | 스토리 |
+| `common/Tooltip.tsx` | 호버·포커스·탭 공용 설명 툴팁 (client, `role="tooltip"` + `aria-describedby`) |
 | `stats/WindowInfo.tsx` | 기간 줄 + 지연 안내 |
 | `stats/TierBadge.tsx` | 1~5티어 / 표본 부족 배지 |
 | `stats/StatsNotice.tsx` | 집계 전·통계 없음·연결 실패·빈 목록 안내 |
@@ -306,7 +309,7 @@ frontend/
 
 | 항목 | 상태 |
 |------|------|
-| 키보드 | 본문 건너뛰기, 검색, 포지션 탭(←/→/Home/End), 룬 전환, 스킨 선택 모두 키보드로 가능. 금색 2px `focus-visible` 링 |
+| 키보드 | 본문 건너뛰기, 검색, 포지션 탭(←/→/Home/End), 룬 전환, 스킨 전환 화살표, 룬·스킬·주문·아이템 툴팁(Tab 포커스로 열림) 모두 키보드로 가능. 금색 2px `focus-visible` 링(전역 비-레이어 CSS가 Tailwind `focus-visible:outline-none` 유틸보다 우선 적용됨) |
 | 표 | `caption`(sr-only), `th scope` |
 | 이미지 | `alt` 누락 0. 고르지 않은 룬과 장식 이미지는 `alt=""` |
 | 티어 | 색만이 아니라 글자("1티어")가 항상 함께 보인다 |
@@ -327,10 +330,10 @@ frontend/
 
 | 페이지 | 성능 | LCP | CLS | 전송량 | 접근성 | LCP 요소 |
 |--------|------|-----|-----|--------|--------|----------|
-| `/champions` | 96 | 2.77s | 0 | 473KB (이미지 106 / JS 155) | 100 | 검색창 안내 글자 |
-| `/champions/Aatrox` | 95 | 2.98s | 0 | 407KB (이미지 199 / JS 155) | 100 | Hero 스플래시 |
+| `/champions` | 96 | 2.78s | 0 | 505KB | 100 | 검색창 안내 글자 |
+| `/champions/Aatrox` | 94 | 3.15s | 0 | 321KB (이미지 113 / JS 156) | 100 | Hero 스플래시 (`fetchpriority="high"`, discoverable) |
 
-- 권장사항·SEO도 100이다. LCP는 둘 다 "좋음" 기준(2.5s)을 조금 넘는다 (12장 2번).
+- 권장사항·SEO도 100이다. LCP는 둘 다 "좋음" 기준(2.5s)을 조금 넘는다 (12장 2번). `/champions/Aatrox`는 변경 03(`ChampionHero`의 client 전환, D14)으로 LCP가 2.98s → 3.15s로 소폭 늘었다.
 
 ---
 
@@ -384,6 +387,7 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 | v1 | 2026-10-12 | Next.js 프로젝트 세팅, 공통 레이아웃, 챔피언 목록(아이콘 격자·검색·역할군 필터), 상세(Hero·스킬·스토리), 스킨 갤러리. Data Dragon만 사용 | 백엔드 없이 첫 화면과 프로젝트 구조를 먼저 검증하기 위해 | Review 통과(체크리스트 전 항목), 코드 수정 없음. 178페이지 정적 생성. Lighthouse 성능 95, LCP 2.88s(목록)·2.89s(아트록스), CLS 0 |
 | 01 | 2026-10-15 | 백엔드 API v2 연결: 목록을 포지션 탭 5개 + 티어 표(`/champions`, `/champions/lane/*`)로 교체, 상세에 포지션 탭과 추천 룬·주문·스킬·아이템 추가, 기간 줄·지연 안내, 푸터 공개 패치 이름, API 없는 빌드 허용 | 수집·집계한 최근 14일 통계를 화면에 보여주기 위해 | PASS with issues. 결함 4개 수정(건메탈 군화, CLS, 360px 열 폭, 검색 포커스). 리스트 262행 API와 불일치 0, 183페이지. Lighthouse `/champions` 96 · LCP 2.77s · CLS 0, `/champions/Aatrox` 95 · 2.98s · 0, 접근성 100 |
 | 02 | 2026-10-17 | 룬 sr-only 요약(`chosenNames`)을 API `perks` 순서 대신 트리 줄 순서로 재정렬(`!db` 변경 04로 `subPerks` 순서가 바뀌어도 화면 격자와 항상 같게), 안 쓰는 `CHAMPION_TAGS` 삭제, `TierBadge` 대비 주석 실측값(6.89:1)로 수정, `layout.tsx` 기본 description 갱신 | 접근성 스크린리더 요약과 시각 정보(강조된 룬)를 항상 같은 순서로 맞추기 위해, 나머지는 이전 검토에서 남은 사소한 정리 | PASS. 발견한 문제 없음, 수정한 파일 없음. 린트·타입·빌드(183페이지) 통과, 대비 실측값이 새 주석과 일치, sr-only 요약이 실제 강조 순서와 일치 |
+| 03 | 2026-10-17 | 상세 페이지 재설계(op.gg 스타일): 스킨 갤러리를 삭제하고 Hero 스플래시 자체를 화살표 전환 스킨 미리보기로 바꿈(`HeroSkinSwitcher` 신규, `ChampionHero`가 client로 전환), 룬 페이지를 가로 2단에서 세로 1단(핵심→사용률·승률→보조→파편)으로 재배치, 룬·스킬·소환사 주문·아이템 아이콘에 공용 호버·포커스·탭 툴팁 추가(`Tooltip` 신규), 스킬 격자를 레벨×Q/W/E/R 축 전환, 레이아웃을 룬 좌/주문·스킬 우 2단 + 아이템 전체 폭 분리로 변경 | 참고 사이트(op.gg)에 가까운 레이아웃으로 정보 밀도를 높이고, 룬·아이템 등 긴 이름을 아이콘만으로 보여줘도 설명을 바로 확인할 수 있게 하기 위해 | PASS with issues. 모바일 탭 첫 번째 터치에서 툴팁이 안 열리는 결함 1건 발견·수정(`Tooltip.tsx`, `onFocus`+`onClick` 경합). 린트·타입·빌드(183페이지, 백엔드 켬/끔 모두) 통과. Lighthouse `/champions` 96·2.78s·0(변동 거의 없음), `/champions/Aatrox` 94·3.15s·0(LCP +0.17s, D14 트레이드오프), 접근성 100 유지 |
 
 ---
 
@@ -392,13 +396,12 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 요약: 기능을 막는 문제는 없다. 아래는 남은 개선 거리와 확인 못 한 점이다.
 
 1. **같은 룬 페이지가 두 번 나온다.** 173명 중 71명(41%)은 룬 1순위와 2순위가 같은 그림이다. 백엔드가 보조 룬 순서만 다른 조합을 따로 세기 때문이며, 프론트가 아니라 `!db` 변경 04(보조 룬을 정렬해 묶기)로 고칠 계획이다.
-2. **상세 페이지 LCP가 줄지 않았다.** 스플래시에 `fetchPriority="high"`를 넣었지만 2.89s → 2.98s로 그대로다. 대부분이 "요소 렌더 지연"이라 다음 성능 작업에서 JS(155KB)와 렌더 지연을 따로 본다.
+2. **상세 페이지 LCP가 줄지 않고 변경 03에서 더 늘었다.** 스플래시에 `fetchPriority="high"`를 넣었지만 2.89s → 2.98s(변경 01) → 3.15s(변경 03)로 계속 "좋음" 기준(2.5s)을 넘는다. 변경 03의 증가분은 `ChampionHero`가 client 컴포넌트가 된 것(D14, 스킨 캡션 상태 때문)과 관련이 있어 보인다. 다음 성능 작업에서 JS(156KB)와 렌더 지연을 따로 본다.
 3. **API 없이 빌드하면 최대 1시간 동안 안내가 보인다.** 백엔드를 끈 채 빌드한 페이지는 첫 재검증 전까지 "통계 서버에 연결하지 못했습니다"가 나온다. 운영 배포는 백엔드를 켠 상태에서 빌드하는 것으로 피한다.
 4. **소문자 상세 주소가 정적 페이지를 덮어쓸 수 있다 (macOS 로컬).** `next start`에서 `/champions/garen`을 열면 404 결과가 `Garen.html`을 덮어써 `/champions/Garen`도 404가 된다. 사용자 결정으로 기록만 하며, 필요해지면 정식 id로 리다이렉트하는 기능을 따로 계획한다.
-5. **스킨 이름을 두 번 읽을 수 있다.** 스킨 미리보기 이미지 `alt`와 아래 `figcaption`이 같은 이름이라 스크린리더가 두 번 읽는다. 계획 규칙("스킨 = 이름 alt")을 바꿔야 해서 그대로 두었다.
-6. **Safari에서 행 전체 클릭을 확인하지 않았다.** 티어 표 행 클릭은 `<tr class="relative">` + 링크 `after:inset-0`에 기대며 Chrome에서만 확인했다. Safari 확인이 필요하다.
-7. **360px에서 "아우렐리온 솔" 이름이 잘린다.** 표 이름 칸이 좁아 69명 중 1명만 말줄임으로 보인다. 지금은 받아들인 상태이며, 표를 다시 다듬을 때 함께 본다.
-8. **헤더 "챔피언" 메뉴가 상세에서도 `aria-current="page"`다.** 하위 경로에서는 `aria-current="true"`가 더 정확하다. 정보 수준이라 그대로 두었다.
-9. **개발 모드에서 Data Dragon이 실패하면 Next 기본 500 화면이 나온다.** `next dev`가 요청마다 `generateStaticParams`를 실행해 그 단계에서 실패하기 때문이다. 운영 빌드에서는 `error.tsx`가 정상으로 나온다.
-10. **오류 화면 두 개가 같은 코드다.** `app/error.tsx`와 `app/champions/error.tsx`의 내용이 같아 문구를 바꿀 때 두 곳을 고쳐야 한다. 정리 시 공통 컴포넌트로 묶을 수 있다.
-11. **`npm audit`가 high 5건을 보고한다.** `eslint-config-next` → `fast-glob` 등 개발용 의존성에서 나온다 (2026-10-16 확인). 템플릿 기본 의존성이라 조치하지 않았다. 의존성을 올릴 때 함께 본다.
+5. **Safari에서 행 전체 클릭을 확인하지 않았다.** 티어 표 행 클릭은 `<tr class="relative">` + 링크 `after:inset-0`에 기대며 Chrome(내장 브라우저)에서만 확인했다. Safari 확인이 필요하다.
+6. **360px에서 "아우렐리온 솔" 이름이 잘린다.** 표 이름 칸이 좁아 69명 중 1명만 말줄임으로 보인다. 지금은 받아들인 상태이며, 표를 다시 다듬을 때 함께 본다.
+7. **헤더 "챔피언" 메뉴가 상세에서도 `aria-current="page"`다.** 하위 경로에서는 `aria-current="true"`가 더 정확하다. 정보 수준이라 그대로 두었다.
+8. **개발 모드에서 Data Dragon이 실패하면 Next 기본 500 화면이 나온다.** `next dev`가 요청마다 `generateStaticParams`를 실행해 그 단계에서 실패하기 때문이다. 운영 빌드에서는 `error.tsx`가 정상으로 나온다. (관련: `next dev`는 없는 챔피언 주소도 200을 반환하는 알려진 동작이 있다 — 운영 빌드(`next start`)에서는 정상적으로 404다. 변경 03 Review에서 다시 확인함)
+9. **오류 화면 두 개가 같은 코드다.** `app/error.tsx`와 `app/champions/error.tsx`의 내용이 같아 문구를 바꿀 때 두 곳을 고쳐야 한다. 정리 시 공통 컴포넌트로 묶을 수 있다.
+10. **`npm audit`가 high 5건을 보고한다.** `eslint-config-next` → `fast-glob` 등 개발용 의존성에서 나온다 (2026-10-16 확인). 템플릿 기본 의존성이라 조치하지 않았다. 의존성을 올릴 때 함께 본다.

@@ -89,6 +89,8 @@ export type DDragonChampionDetailResponse = {
 /** item.json의 아이템 1개 (사용하는 필드만) */
 export type DDragonItem = {
   name: string;
+  /** HTML 태그 포함 설명 (툴팁용) */
+  description: string;
   /** "Boots", "Consumable", "Trinket" 등 */
   tags?: string[];
   /** 이 아이템으로 만드는 상위 아이템 (있으면 하위 재료) */
@@ -111,6 +113,8 @@ export type DDragonSummonerSpell = {
   /** 숫자 ID(문자열) "4". 백엔드 spellIds와 대응 */
   key: string;
   name: string;
+  /** HTML 태그 포함 설명 (툴팁용) */
+  description: string;
   image: DDragonImage;
 };
 
@@ -125,6 +129,8 @@ export type DDragonRune = {
   name: string;
   /** "perk-images/Styles/..." (버전 없는 경로) */
   icon: string;
+  /** 짧은 설명 (HTML 태그 포함, 툴팁용). `longDesc`는 문단이 길어 쓰지 않는다 */
+  shortDesc: string;
 };
 
 /** runesReforged.json의 룬 트리 1개 (정밀·지배 등) */
@@ -196,6 +202,8 @@ export type ChampionDetail = ChampionSummary & {
 export type ItemInfo = {
   name: string;
   iconUrl: string;
+  /** HTML 제거된 설명 (툴팁용). 없으면 빈 문자열일 수 있다 */
+  description?: string;
   tags: string[];
   /** 상위 아이템이 있음 = 하위 재료 */
   hasInto: boolean;
@@ -213,11 +221,13 @@ export type ItemInfo = {
 export type IconInfo = {
   name: string;
   iconUrl: string;
+  /** HTML 제거된 설명 (툴팁용) */
+  description?: string;
 };
 
 /** 화면용 룬 트리 (줄별 룬 목록) */
 export type RuneTreeInfo = IconInfo & {
   id: number;
   /** 0번 = 핵심 룬 줄 */
-  rows: { id: number; name: string; iconUrl: string }[][];
+  rows: { id: number; name: string; iconUrl: string; description?: string }[][];
 };

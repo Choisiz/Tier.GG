@@ -2,6 +2,7 @@ import { DDRAGON_BASE_URL, LOCALE, REVALIDATE_SECONDS } from "./constants";
 import { itemIconUrl, runeIconUrl, summonerSpellIconUrl } from "./images";
 import {
   sortChampions,
+  stripHtml,
   toChampionDetail,
   toChampionSummary,
 } from "./transform";
@@ -132,6 +133,7 @@ const getItemMapForVersion = memoByVersion(async (version) => {
     map.set(itemId, {
       name: item.name,
       iconUrl: itemIconUrl(version, item.image.full),
+      description: stripHtml(item.description),
       tags: item.tags ?? [],
       hasInto: (item.into?.length ?? 0) > 0,
       hasFrom: (item.from?.length ?? 0) > 0,
@@ -193,6 +195,7 @@ const getSummonerSpellMapForVersion = memoByVersion(async (version) => {
     map.set(spell.key, {
       name: spell.name,
       iconUrl: summonerSpellIconUrl(version, spell.image.full),
+      description: stripHtml(spell.description),
     });
   }
   return map;
@@ -218,6 +221,7 @@ const getRuneTreesForVersion = memoByVersion(async (version) => {
           id: rune.id,
           name: rune.name,
           iconUrl: runeIconUrl(rune.icon),
+          description: stripHtml(rune.shortDesc),
         })),
       ),
     }),
