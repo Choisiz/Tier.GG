@@ -84,10 +84,12 @@ function toRuneTree(
   };
 }
 
-/** 고른 룬 이름을 API 순서대로 */
-function chosenNames(tree: RuneTreeView, perks: number[]): string[] {
-  const byId = new Map(tree.rows.flat().map((cell) => [cell.id, cell.name]));
-  return perks.map((id) => byId.get(id) ?? `알 수 없는 룬 #${id}`);
+/**
+ * 고른 룬 이름을 트리 줄 순서대로 (격자에 보이는 순서와 같다).
+ * 트리에서 못 찾은 룬은 `toRuneTree`가 맨 아래 줄에 붙여 두므로 자연히 뒤에 온다.
+ */
+function chosenNames(tree: RuneTreeView): string[] {
+  return tree.rows.flatMap((row) => row.filter((cell) => cell.selected).map((cell) => cell.name));
 }
 
 export function toRunePage(build: RuneBuild, trees: RuneTreeInfo[]): RunePageView {
@@ -112,8 +114,8 @@ export function toRunePage(build: RuneBuild, trees: RuneTreeInfo[]): RunePageVie
     (row) => `${row.label} ${row.cells.find((cell) => cell.selected)?.name ?? ""}`,
   );
   const summary = [
-    `핵심 룬(${primary.name}): ${chosenNames(primary, build.primaryPerks).join(", ")}`,
-    `보조 룬(${secondary.name}): ${chosenNames(secondary, build.subPerks).join(", ")}`,
+    `핵심 룬(${primary.name}): ${chosenNames(primary).join(", ")}`,
+    `보조 룬(${secondary.name}): ${chosenNames(secondary).join(", ")}`,
     `능력치 파편: ${shardNames.join(", ")}`,
   ].join(". ");
 

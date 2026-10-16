@@ -1,6 +1,6 @@
 # 프론트엔드 구현 상태 — Tier.GG 챔피언 화면
 
-> 기준: `front_spec.md` (현재 계획), `docs/contracts/api_contract.md` v2. 코드 상태: 변경 01 Review 수정 반영 후 (2026-10-15).
+> 기준: `front_spec.md` (현재 계획), `docs/contracts/api_contract.md` v2. 코드 상태: 변경 02 Build 반영 후 (2026-10-17).
 > 이 문서는 **지금 구현 상태**만 적는다. 이전 시도와 과정 기록은 git 커밋 `87cfc78`에 있다.
 > 상태 표기: ✅ 완료 / ⚠️ 부분 완료 / ❌ 실패 / ⏸️ 보류
 
@@ -32,7 +32,7 @@
 | 의존성 | dependencies는 `next`, `react`, `react-dom`만. `server-only`는 Next 내장 처리라 설치 안 함 | ✅ |
 | `next.config.ts` | 이미지 `remotePatterns` `https://ddragon.leagueoflegends.com/cdn/**`, Tailwind `turbopack.rules`, 루트 `.env`에서 `API_BASE_URL`만 읽기. `cacheComponents`·`partialPrefetching` 없음 | ✅ |
 | `globals.css` | 다크 색상 토큰(CSS 변수 + `@theme inline`): 배경 `#0b1020`, 표면 `#141b2f`/`#1d2540`, 테두리 `#2a3456`, 글자 `#e7eaf3`, 보조 `#a4adc6`, 골드 `#e3b456`. `color-scheme: dark`, 공통 `focus-visible` 링 | ✅ |
-| `layout.tsx` | `<html lang="ko">`, 제목 템플릿 `%s \| Tier.GG`, 시스템 한글 글꼴, 본문 건너뛰기 링크 | ✅ (기본 `description`이 옛 문구, 13장) |
+| `layout.tsx` | `<html lang="ko">`, 제목 템플릿 `%s \| Tier.GG`, 시스템 한글 글꼴, 본문 건너뛰기 링크, `metadata.description`에 티어·빌드 언급 추가(변경 02) | ✅ |
 | 템플릿 정리 | 샘플 콘텐츠·`public/*.svg` 삭제. `favicon.ico`, `README.md`, `AGENTS.md` 유지 | ✅ |
 
 ## 2. 라우트
@@ -74,7 +74,7 @@
 | `types.ts` | 챔피언 원본·화면용 타입(`ChampionSummary.key` 포함), `DDragonItem`, `DDragonSummonerSpell`, `DDragonRuneTree`, `ItemInfo`(`builtFromBoots` 포함), `IconInfo`, `RuneTreeInfo`. 헷갈리는 필드(`title`, `key`, `tags`, `lore`, 스킨 `id`/`num`)에 주석. `any` 없음 | ✅ |
 | `api.ts` | `getLatestVersion()`(revalidate 3600), `getChampionList()`, `getChampionDetail(id)`(목록에 없으면 `null`), `getChampionKeyMap()`, `getItems(itemIds, patches)`(최신 먼저, 못 찾은 것만 창 안 다른 패치 `{patch}.1`), `getSummonerSpells()`, `getRuneTrees()`. 버전 포함 주소는 `force-cache`. 가공 결과는 버전별 1번, 실패하면 지우고 재시도. `res.ok` 아니면 throw | ✅ |
 | `images.ts` | 스퀘어·스플래시·로딩·`skillIconUrl`·패시브·`itemIconUrl`·`summonerSpellIconUrl`·`runeIconUrl`(`/cdn/img/{icon}`)·`statShardIconUrl`. 스킬은 `image.full` 사용 | ✅ |
-| `transform.ts` | 태그 한글 매핑(`TAG_LABELS`), HTML 제거(`<br>`→줄바꿈, 태그 제거, 공백 정리, 엔티티 6종 복원), 크로마 제외 + `num` 오름차순, `default`→"기본", `Object.hasOwn` + id 일치 확인 | ✅ (`CHAMPION_TAGS` 미사용 상수 남음, 13장) |
+| `transform.ts` | 태그 한글 매핑(`TAG_LABELS`), HTML 제거(`<br>`→줄바꿈, 태그 제거, 공백 정리, 엔티티 6종 복원), 크로마 제외 + `num` 오름차순, `default`→"기본", `Object.hasOwn` + id 일치 확인. 미사용 `CHAMPION_TAGS` 삭제(변경 02) | ✅ |
 | `itemFilter.ts` | ① Data Dragon에 없음 ② `Consumable`/`Trinket` ③ `from` 없고 `gold.total < 1000` → 제외, ④ `Boots` 태그 **또는 `builtFromBoots`** → 신발, ⑤ `into` 있음 → 제외, ⑥ 나머지 → 핵심. `CORE_ITEM_COUNT = 3`, `BOOTS_MIN_PICK_RATE = 5` | ✅ |
 | `statShards.ts` | 공격(5008·5005·5007) / 유연(5008·5010·5001) / 방어(5011·5013·5001), 이름·아이콘 파일 | ✅ |
 
@@ -86,7 +86,7 @@
 |------|-----------|------|
 | `format.ts` | `formatPercent`(1/100 정수로 맞춘 뒤 소수 1자리 사사오입), `formatCount`(천 단위 쉼표), `formatKst`(`Asia/Seoul` "10월 15일 03:52"), `formatPatchMix`(1개 "패치 26.20", 2개 이상 "26.20 67% / 26.19 33%"), `toWindowInfoView` | ✅ |
 | `tierList.ts` | API `rank` 순서 그대로 표 행으로. 다른 주 포지션 이름. Data Dragon에 없는 `championId`는 "챔피언 #950"(링크·아이콘 없음) + 서버 경고 | ✅ |
-| `builds.ts` | 룬: 핵심 4줄 / 보조 3줄(핵심 룬 줄 제외) / 파편 3줄, `selected`, "알 수 없는 룬 #id"·"알 수 없는 파편", sr 요약. 주문 이름·아이콘. 스킬 Q/W/E/R 줄 머리 + 11칸. 아이템 핵심 ≤3 + 신발(5% 이상, API 순서 첫 번째) | ✅ |
+| `builds.ts` | 룬: 핵심 4줄 / 보조 3줄(핵심 룬 줄 제외) / 파편 3줄, `selected`, "알 수 없는 룬 #id"·"알 수 없는 파편", sr 요약. 주문 이름·아이콘. 스킬 Q/W/E/R 줄 머리 + 11칸. 아이템 핵심 ≤3 + 신발(5% 이상, API 순서 첫 번째). `chosenNames`는 sr 요약의 룬 이름을 API `perks` 순서 대신 트리 `rows` 순서로 모은다(변경 02, `!db` 변경 04로 `subPerks` 순서가 바뀌어도 화면 격자 순서와 항상 같게) | ✅ |
 
 ## 6. 공통 레이아웃과 환경 변수
 
@@ -97,7 +97,7 @@
 | `Header` / `NavLink` | sticky 56px, 로고, 메뉴 "챔피언". `NavLink`(client)가 `usePathname`으로 하위 경로까지 강조 + `aria-current="page"` | ✅ |
 | `Footer` | `/meta`의 `patches[0].displayName` → "패치 26.20 · 데이터: Riot Data Dragon" + 고지문. 실패 시 "패치 정보 없음" (오류 안 던짐) | ✅ |
 | `WindowInfo` | 기간 줄 (좁은 화면 줄바꿈), `isStale`이면 `role="status"` 노란 상자 | ✅ |
-| `TierBadge` | 1~5티어(글자 + 색, 글자색 `zinc-950`) / `null` → 회색 "표본 부족" + `title`·sr 설명(`rules.minTierPick`, 없으면 50) | ✅ (주석 "7:1 이상"이 부정확, 13장) |
+| `TierBadge` | 1~5티어(글자 + 색, 글자색 `zinc-950`) / `null` → 회색 "표본 부족" + `title`·sr 설명(`rules.minTierPick`, 없으면 50). 대비 주석을 실측값(최소 6.89:1)에 맞게 수정(변경 02) | ✅ |
 | `StatsNotice` | 집계 전 / 통계 없음 / 연결 실패(`role="status"`) / 빈 목록 문구 | ✅ |
 | 환경 변수 | `next.config.ts`가 `../.env`가 있으면 `node:fs` + `util.parseEnv`로 읽어 **`API_BASE_URL`만** `process.env`에 넣음. 이미 값이 있으면 덮어쓰지 않음. `env` 옵션·`NEXT_PUBLIC_` 없음 | ✅ |
 | `.env.example` | "백엔드 API 서버" 묶음 아래 `API_BASE_URL=` + 주석 2줄 (값 없음) | ✅ |
@@ -162,6 +162,17 @@
 ## 11. 최신 검증 결과
 
 > **쉬운 요약**: 린트·타입·빌드 통과. 백엔드를 켠 빌드와 끈 빌드 모두 성공했다. 리스트 전 행과 상세 173명이 API와 맞았다. (2026-10-15, Build 확인 + Review 수정 후 재확인)
+
+### 변경 02 Build 검증 (2026-10-17)
+
+- `npm run lint`: 오류·경고 0
+- `npx next typegen && npx tsc --noEmit`: 오류 0
+- `npm run build` (백엔드 켬, 로컬 `http://localhost:4000` 응답 확인): 183페이지 성공 (`○ /`, `/champions`, `● /champions/[championId]` 173개, `● /champions/lane/[position]` 5개, 모두 Revalidate 1h). `[api]`·`[view]`·`[stats]` 경고 0줄
+- `chosenNames` 단위 확인: 프로젝트에 테스트 프레임워크가 없다(v1 범위 결정 "테스트 프레임워크 도입 안 함"). scratchpad에서 `tsc`로 `lib/view/builds.ts`와 의존 모듈만 CommonJS로 컴파일해 Node로 직접 실행하는 임시 스크립트로 확인했다(저장소에 파일 추가 없음):
+  - 보조 룬 2개가 서로 다른 트리 줄에 있고, API가 준 `subPerks` 순서가 그 줄 순서와 반대인 가짜 데이터를 넣었을 때, `summary`의 보조 룬 이름 순서가 **트리 줄 순서**(화면 격자 순서)로 나오는지 확인 → 통과
+  - 트리에서 못 찾은 룬 ID가 여전히 "알 수 없는 룬 #id"로 뒤에 붙는지 확인 → 통과
+  - 룬 격자(`primary.rows`/`secondary.rows`)의 `selected` 표시와 칸 위치가 변경 전후 그대로인지 확인 → 통과 (애초에 `toRuneTree`는 손대지 않았다)
+- 빌드된 HTML에서 실제 챔피언(아트록스) sr 요약 확인: `보조 룬(결의): 뼈 방패, 소생` 등 트리 줄 순서로 출력됨
 
 ### 명령
 
@@ -237,7 +248,6 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 |------|------|------|
 | 소문자 상세 주소 | macOS 로컬 `next start`에서 정적 페이지 덮어쓰기. 사용자 결정으로 보류 | ⏸️ |
 | 룬 1·2순위 중복 | 71/173명이 같은 조합(보조 룬 순서만 다름). 백엔드 집계 쪽에서 고칠 일 | ⏸️ |
-| `CHAMPION_TAGS` | `transform.ts`에 쓰지 않는 상수가 남음 | ⚠️ |
-| `TierBadge` 주석 | "7:1 이상"이지만 1티어는 6.89:1 | ⚠️ |
-| `layout.tsx` description | "챔피언 정보와 스킨"만 말하는 옛 문구 | ⚠️ |
 | `npm audit` | high 5건 (`eslint-config-next` → `fast-glob` 등 개발 의존성, 2026-10-16 확인). 조치하지 않음 | ⏸️ |
+
+변경 02에서 해결: `CHAMPION_TAGS` 삭제, `TierBadge` 대비 주석 수정, `layout.tsx` description 갱신.

@@ -26,9 +26,6 @@ export const TAG_LABELS: Record<ChampionTag, string> = {
   Support: "서포터",
 };
 
-/** 역할군 목록 (필터 버튼 순서) */
-export const CHAMPION_TAGS = Object.keys(TAG_LABELS) as ChampionTag[];
-
 /** spells 배열 순서(0~3)에 대응하는 키. 패시브(P)는 별도 */
 const SKILL_KEYS: AbilityKey[] = ["Q", "W", "E", "R"];
 
