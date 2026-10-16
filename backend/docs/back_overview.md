@@ -1,8 +1,8 @@
 # 백엔드 현재 상태 (Overview)
 
 > 이 문서는 백엔드의 **지금 상태만** 적는다. 진행 기록(계획·구현·검토)은 `back_spec.md`, `back_build.md`, `back_review.md`에 있다.
-> 기준: 코드(`backend/src`, `test`, `package.json`), `docs/contracts/api_contract.md` **v2**, `docs/contracts/db_contract.md` **v7**, 수집 로그 `backend/logs/collect-2026-10-15.log`.
-> 최종 확인: 2026-10-16. 다음 Review 에이전트가 덮어써서 최신으로 유지한다.
+> 기준: 코드(`backend/src`, `test`, `package.json`), `docs/contracts/api_contract.md` **v2(문구 정정 2026-10-16)**, `docs/contracts/db_contract.md` **v8**, 수집 로그 `backend/logs/collect-2026-10-15.log`.
+> 최종 확인: 2026-10-17. 다음 Review 에이전트가 덮어써서 최신으로 유지한다.
 
 ## 목차
 
@@ -51,7 +51,7 @@
 | 명령 | `run --preset test --players-per-tier 250` |
 | 표본 플레이어 | **765명** (플래티넘 250, 에메랄드 15 + 250, 다이아 250) |
 | 게임 ID가 0개인 플레이어 | 370명 (약 48%) |
-| HTTP 400으로 실패한 플레이어 | **15명** (10장 1번) |
+| HTTP 400으로 실패한 플레이어 | **15명** (조사 완료, 조치 없음 — `back_spec.md` 12장 V1) |
 | 찾은 게임 ID / 새 게임 | 4,042 / 4,015 |
 | 저장한 게임 | **3,930** (창 안 기존 45 + 3,930) |
 | 건너뛴 게임 | 5분 미만 80, 창 밖 5, 실패 0 |
@@ -141,7 +141,7 @@
 | 5xx·네트워크 | 1·2·4초 뒤 재시도, 최대 3번. 요청 시간 초과 10초 |
 | 401/403 | **키 만료로 보고 바로 멈춤** (종료 코드 2, `key_expired`) |
 | 404·400 | 그 플레이어·게임만 건너뜀 |
-| 연속 실패 | ③~⑤에서 게임이 **연속 20개** 실패하면 멈춤 (`failed`). ②에는 상한 없음 (10장 7번) |
+| 연속 실패 | ②~⑤ 모두 **연속 20개** 실패하면 멈춤 (`failed`, `TooManyFailuresError`). 같은 상수(`maxConsecutiveMatchFailures`)를 공유하고, 성공하면 카운터 리셋 (변경 02) |
 
 ### 3-3. 잠금, 중단, 이어서 모으기
 
@@ -150,12 +150,13 @@
 | 정상 끝 (창 상한·`--max-matches` 포함) | - | 0 / `done` |
 | 다른 수집이 실행 중 | 잠금(`hashtext('tiergg:collector')`)을 못 잡으면 바로 끝 | 3 / 기록 없음 |
 | 키 만료 | 그 자리에서 멈춤. 저장한 게임은 남음 | 2 / `key_expired` |
-| Ctrl+C 1번 | 지금 게임을 마치고 멈춤 (2번이면 바로 종료) | 130 / `failed` "사용자 중단" |
+| Ctrl+C 1번 | 지금 게임을 마치고 멈춤 (2번이면 바로 종료) | 130 / `failed` "사용자 중단", 요약 로그 `stoppedBy=aborted` |
 | 잠금 연결 끊김 | 오류 로그, 지금 게임 뒤 멈춤 | 1 / `failed` "DB 연결 끊김 (수집 잠금 연결)" |
-| 그 밖의 실패 | - | 1 / `failed` |
+| 그 밖의 실패 (②~⑤ 연속 20개 실패 포함) | - | 1 / `failed`, 요약 로그 `stoppedBy=failed` |
 
 - **이어서 모으기:** 같은 명령을 다시 실행하면 된다. 표본은 이미 있으면 건너뛰고, ②에서 저장된 게임을 빼고, 저장도 `ON CONFLICT`로 중복을 막는다.
 - **자동 집계 없음:** 수집 결과는 다음 05:00 KST 예약 작업부터 통계에 들어간다. 바로 보려면 `aggregate`(시험용).
+- **연결 오류 리스너:** `withTransaction`·`readSnapshot`에 `logger`를 넘기면(API 서버·⑤ 저장 모두 실제로 넘김) 빌린 연결의 `'error'` 이벤트를 로그로만 남겨, 문장 사이 짧은 순간 연결이 끊겨도 프로세스가 죽지 않는다 (변경 02).
 
 ### 3-4. `aggregate`와 `purge`
 
@@ -206,10 +207,10 @@ npm run test:integration          # 통합 테스트 (실제 Supabase, 모두 RO
 |-------------------|---------|
 | `sample [--resample] [--seed N]` | ① 표본만 |
 | `matches` | ②~⑤ 저장된 표본으로 게임만 |
-| `--preset test\|main` | `test`: 플래티넘·에메랄드·다이아 100명. `main`: 에메랄드·다이아 200명 (자리만) |
+| `--preset test\|main` | `test`: 플래티넘·에메랄드·다이아 **250명**. `main`: 에메랄드·다이아 200명 (자리만) |
 | `--players-per-tier N` (1~1000), `--games-per-player N` (1~100), `--max-matches N`, `--tiers EMERALD,DIAMOND` | 덮어쓰기. `--tiers`는 플래티넘·에메랄드·다이아만 |
 
-- 표본을 늘릴 때 주의: 표본이 모자란 티어는 **모자란 만큼이 아니라 `playersPerTier`명을 새로 더한다** (10장 4번).
+- 표본을 늘릴 때: 표본이 모자란 티어는 **모자란 만큼만** 더 뽑는다. `--resample`을 주면 `playersPerTier`명 전체를 다시 뽑아 더한다 (변경 02).
 
 ---
 
@@ -236,7 +237,7 @@ npm run test:integration          # 통합 테스트 (실제 Supabase, 모두 RO
 | 404 | `STATS_NOT_FOUND` | 그 챔피언(·포지션) 통계가 창 안에 없음 |
 | 404 | `NOT_FOUND` | 없는 경로, GET/HEAD 외 메서드 |
 | 503 | `STATS_NOT_READY` | `stats_window`가 비어 있음 (첫 집계 전) |
-| 503 | `DB_UNAVAILABLE` | DB 연결 실패 (`/health`는 모든 오류를 이 코드로 바꿈) |
+| 503 | `DB_UNAVAILABLE` | DB 연결 실패 (`/health`는 모든 오류를 이 코드로 바꿈, 응답은 그대로. 서버 로그에는 `logger.error`로 원인이 남는다, 변경 02) |
 | 500 | `INTERNAL_ERROR` | 그 밖. 내부 내용은 로그에만 |
 
 - 모든 오류는 `{ error: { code, message, details? } }`, `no-store`.
@@ -278,7 +279,7 @@ npm run test:integration          # 통합 테스트 (실제 Supabase, 모두 RO
 
 | 이름 | 값 | 뜻 |
 |------|-----|-----|
-| `test` 프리셋 | 플래티넘·에메랄드·다이아, 티어당 100명 | 디비전 I~IV에 고르게 (나머지는 앞 디비전부터) |
+| `test` 프리셋 | 플래티넘·에메랄드·다이아, 티어당 **250명** | 디비전 I~IV 63/63/62/62 (db 계약 v8과 맞춤, 변경 02) |
 | `main` 프리셋 | 에메랄드·다이아, 200명 | 자리만 (본 수집 비율은 아직 안 정함) |
 | `gamesPerPlayer` | 20 | ② `count` |
 | `queue` | 420 | 솔로랭크 |
@@ -289,7 +290,7 @@ npm run test:integration          # 통합 테스트 (실제 Supabase, 모두 RO
 | `perSecondLimit` / `perWindowLimit` | 19 / 98 (120초) | 제한기 |
 | `requestTimeoutMs` | 10,000 | 요청 시간 초과 |
 | `retry5xx` / `retry429` / `default429WaitSec` | 3 / 5 / 10 | 재시도 |
-| `maxConsecutiveMatchFailures` | 20 | ③~⑤ 연속 실패 상한 |
+| `maxConsecutiveMatchFailures` | 20 | ②~⑤ 연속 실패 상한 (변경 02에서 ②도 공유) |
 | `aggregateStatementTimeout` | `5min` | `aggregate` |
 | DB 풀 | 수집 CLI `max 2` (잠금 1 + 저장 1) | |
 
@@ -309,18 +310,20 @@ npm run test:integration          # 통합 테스트 (실제 Supabase, 모두 RO
 
 ## 7. 테스트
 
-요약: 단위 76개 + Review 추가 4개 = **단위 80개**, 통합 17개. 통합 테스트는 실제 Supabase에 쓰지만 모두 ROLLBACK한다.
+요약: 단위 **92개**, 통합 17개. 통합 테스트는 실제 Supabase에 쓰지만 모두 ROLLBACK한다.
 
 | 종류 | 파일 (개수) | 다루는 것 |
 |------|-------------|-----------|
 | 단위 | `transform.test.ts` (20) | 실제 게임 fixture 변환, 건너뛰기 이유, 밴 `-1` → NULL, 스킬 순서, 창 밖 판단 |
-| 단위 | `rules.test.ts` (12) | 프리셋, 디비전 나누기, `windowStart`(초), v1 규칙이 없음 |
-| 단위 | `app.test.ts` (11) | 가짜 DB로 API 응답·오류·캐시 헤더·503 |
+| 단위 | `rules.test.ts` (13) | 프리셋 250명(63/63/62/62), `divisionQuota(250-180)=70`(변경 02), `windowStart`(초), v1 규칙이 없음 |
+| 단위 | `sample.test.ts` (4, 변경 02 신규) | `runSample`: 모자란 만큼만 더함, 이미 충분하면 건너뜀, `--resample`이면 전체 재샘플 |
+| 단위 | `app.test.ts` (12) | 가짜 DB로 API 응답·오류·캐시 헤더·503, `/health` DB 오류 시 서버 로그 1건(변경 02) |
 | 단위 | `client.test.ts` (11) | Riot 응답별 분류, 재시도, `startTime` 10자리 검사 (가짜 fetch) |
 | 단위 | `rateLimiter.test.ts` (7) | 이중 창, 헤더 맞춤, 429 막기 (가짜 시계) |
 | 단위 | `window.test.ts` (7) | `displayName`, `share`, 26시간 경계 |
-| 단위 | `matches.test.ts` (4) | 창 상한, 창 밖, 집계 SQL을 부르지 않음 |
+| 단위 | `matches.test.ts` (6) | 창 상한, 창 밖, 집계 SQL을 부르지 않음, ② 연속 20개 실패→멈춤·중간 성공 시 리셋(변경 02) |
 | 단위 | `runLog.test.ts` (4) | 잠금 연결 끊김에 죽지 않음, 잃은 잠금 release |
+| 단위 | `db.test.ts` (4, 변경 02 신규) | `withTransaction`·`readSnapshot`: `logger` 넘기면 연결 오류가 로그로, 안 넘기면 리스너 없음 |
 | 통합 | `repository.test.ts` (9) | 저장, 창 집계(과거 `p_until`), purge 미리보기, 스냅숏 읽기 전용, 수집 기록 |
 | 통합 | `api.test.ts` (8) | 실제 DB + `createApp`으로 응답, `isStale`, `/health stale` |
 | fixture | `test/fixtures/KR_8408851980.{match,timeline}.json` | 실제 게임 1개 (riotId·소환사 이름은 가짜 값) |
@@ -334,15 +337,15 @@ npm run test:integration          # 통합 테스트 (실제 Supabase, 모두 RO
 
 | 문서 | 내용 |
 |------|------|
-| [`docs/contracts/api_contract.md`](../../docs/contracts/api_contract.md) | API 계약 v2 (이 백엔드가 작성) |
-| [`docs/contracts/db_contract.md`](../../docs/contracts/db_contract.md), [`.dbml`](../../docs/contracts/db_contract.dbml) | DB 계약 v7 (이 백엔드가 읽음) |
-| [`back_spec.md`](./back_spec.md) | 현재 계획 (결정 사항 표 포함) |
+| [`docs/contracts/api_contract.md`](../../docs/contracts/api_contract.md) | API 계약 v2, 문구 정정 2026-10-16 (이 백엔드가 작성) |
+| [`docs/contracts/db_contract.md`](../../docs/contracts/db_contract.md), [`.dbml`](../../docs/contracts/db_contract.dbml) | DB 계약 v8 (이 백엔드가 읽음) |
+| [`back_spec.md`](./back_spec.md) | 현재 계획 (결정 사항 표 D·R·V 포함) |
 | [`back_build.md`](./back_build.md) | 현재 구현 상태 |
-| [`back_review.md`](./back_review.md) | 가장 최근 검토 (변경 01, M1·M2, L1~L8) |
+| [`back_review.md`](./back_review.md) | 가장 최근 검토 (변경 02, PASS) |
 | [`../logs/collect-2026-10-15.log`](../logs/collect-2026-10-15.log) | 최근 테스트 수집 로그 |
 | [`CLAUDE.md`](../../CLAUDE.md) | 작업 규칙 (3·6·9·11장) |
 
-- 정리 전 과정 기록(v1 계획·구현 원문, 변경 01 원문)은 git 커밋 `87cfc78`에 있다.
+- 정리 전 과정 기록(v1 계획·구현 원문, 변경 01·02 원문)은 git 기록(`87cfc78` 등)에 있다.
 
 ---
 
@@ -354,21 +357,14 @@ npm run test:integration          # 통합 테스트 (실제 Supabase, 모두 RO
 |------|------|--------|-----|------|
 | v1 | 2026-10-14 | Riot 수집 CLI(표본 → 게임 ID → 상세·타임라인 → 게임 단위 저장 → `ANALYZE` + 패치별 집계)와 읽기 API 4개(패치 기준, 직전 패치 대체 규칙)를 처음 만듦 | DB 계약 v6에 맞춘 첫 백엔드. 예전 코드의 GET 수집·TRUNCATE·`spell1Casts` 오용을 버림 | 단위 59·통합 14 통과, 실제 3명 26게임 저장, 429 0회. 받은 게임의 57%가 보관 패치 밖이라 버려짐. 따로 Review 없이 변경 01로 넘어감 (커밋 `f62d425`) |
 | 01 | 2026-10-15 | 최근 14일 창으로 전환: `startTime` 요청, `game_start_at` 저장, 수집 뒤 자동 집계 삭제(05:00 KST 예약 작업), `purge_old_games(21)`, API v2(`window`·`displayName`·`isStale`·요청당 `REPEATABLE READ` 스냅숏), `patch` 파라미터·대체 규칙 삭제 | DB v7이 패치 단위에서 14일 창 하나로 바뀌어 v1이 실제 DB에서 동작하지 않았다. 오래된 게임 상세 호출 낭비도 없애려고 | Review PASS with issues (M1 잠금 연결 끊김 고침). 단위 80·통합 17. 창 밖 버림 57% → 0%. 티어당 250명 테스트 수집 3,930게임·429 0회, 예약 작업 2회 성공 (커밋 `5c039fe`) |
+| 02 | 2026-10-16 | 15명 400 원인 조사(조치 없음, V1), 표본 보충을 모자란 만큼만으로 고침(L1), 요약 로그 `stoppedBy`에 `aborted`/`failed` 추가(L2), ② 게임 ID에도 ③~⑤와 같은 연속 20개 실패 상한 공유(L3), `/health` DB 오류를 서버 로그에 남김(L4), `withTransaction`·`readSnapshot`에 선택적 `logger`로 연결 오류 리스너(L5), `test` 프리셋을 250명으로(db 계약 v8과 맞춤), `api_contract.md` 2-4 문구·6장 날짜 순서 정정 | 변경 01 Review가 남긴 L1~L5·문구 문제를 정리하고, db 계약 v8(변경 04)이 확정한 "티어당 250명"에 코드를 맞추려고 | Review PASS (문제 없음). 단위 92·통합 17, 모두 통과. DB에 쓰기 없이 읽기로만 재확인(에메랄드 265명·400 15명 그대로, V1·V2와 일치) |
 
 ---
 
 ## 10. 해결되지 않은 점
 
-요약: 동작을 막는 문제는 없다. 표본·문서 정리와 작은 오류 처리 개선이 남았다.
+요약: 동작을 막는 문제는 없다. 변경 02에서 15명 400 조사·L1~L5·프리셋 250·계약 문구 2건을 모두 처리했다. 남은 것은 실제로 장애를 일으켜 보지 못한 시험 1건과 영향이 작은 운영 메모뿐이다.
 
-1. **HTTP 400으로 실패한 플레이어 15명.** 테스트 수집에서 15명이 ② 게임 ID 조회에 400을 받았다. 이전 키로 뽑은 에메랄드 표본 15명으로 보이며, puuid가 API 키마다 다르게 암호화돼 새 키로는 조회가 안 되는 것으로 추정한다. 원인을 확인한 뒤, 이 15명을 지우거나(되돌릴 수 없어 사용자 승인 필요) 새 키로 다시 뽑는 방법을 정한다.
-2. **계약과 프리셋에는 아직 "티어당 100명"이라고 적혀 있다.** 실제 테스트 수집은 250명(`--players-per-tier 250`)으로 했다. `db_contract.md` 1-3·10장과 `test` 프리셋 기본값(100)을 다음 `!db`·`!백엔드` 변경 때 맞출지 정한다 (`back_spec.md` 3-9).
-3. **`api_contract.md` 2-4의 아이템 거르기 문구가 프론트 실제 동작과 다르다.** 계약은 "`into`가 있는 아이템을 빼고 상위 2개"라고 하지만, 프론트는 핵심 아이템 3개와 신발을 따로 고른다. 백엔드 응답(아이템 전체)은 그대로이므로, 다음 `!백엔드` 변경 때 문구만 고친다.
-4. **표본 보충이 `playersPerTier`명을 통째로 더한다 (L1).** 표본이 모자란 티어는 모자란 만큼이 아니라 정한 인원 전체를 새로 더해, 에메랄드가 265명이 됐다. "목표 인원까지 채우기"로 바꾸는 것을 다음 변경 Plan에서 정한다.
-5. **중단·실패한 실행도 요약 로그에 `stoppedBy=done`이 찍힌다 (L2).** `collection_logs`의 `status`는 맞지만 로그를 읽을 때 헷갈린다. `stoppedBy`에 `aborted`/`failed`를 더하는 것을 권장한다.
-6. **`/health`가 오류 원인을 숨긴다 (L4).** 모든 오류를 `DB_UNAVAILABLE`로 바꾸고 로그를 남기지 않아 장애 원인을 찾기 어렵다. `catch`에서 가린 오류를 `error` 로그로 남기도록 고친다.
-7. **② 게임 ID 단계에는 연속 실패 상한이 없다 (L3).** Riot이 계속 5xx를 주면 플레이어마다 재시도를 기다려 765명이면 1시간 넘게 헛돈다. ②에도 연속 실패 상한(예: 20)을 둔다.
-8. **스냅숏·저장 연결에 기본 오류 리스너가 없다 (L5).** 문장 사이 아주 짧은 순간에 연결이 끊기면 이론상 서버나 수집기가 죽을 수 있다. `pool.on('connect', …)`로 모든 연결에 리스너를 붙이는 것을 권장한다.
-9. **`api_contract.md` 6장 변경 기록 날짜 순서가 거꾸로다 (L8).** v2 초안(10-15) 다음 줄이 v2 구현 반영(10-14)이다. 다음 `!백엔드` Plan/Build가 고친다.
-10. **기록만 해 둔 운영 메모 (L6, L7).** Supabase 풀러가 `application_name`을 `Supavisor`로 바꿔 연결을 이름으로 찾을 수 없고, DB 시계가 로컬보다 약 2초 빠르다. 영향이 작아 조치 계획은 없다.
-11. **연속 실패 중단은 실제로 시험하지 못했다.** ③~⑤에서 게임이 연속 20개 실패하면 멈추는 흐름은 코드와 분류 함수로만 확인했다. Riot 장애를 일부러 만들 수 없어서다. 가짜 Riot 클라이언트로 단위 테스트를 더하는 것을 권장한다.
+1. **③~⑤ 게임 연속 20개 실패는 실제 Riot 장애로 시험하지 못했다.** 코드·분류 함수로만 확인했고, Riot 장애를 일부러 만들 수 없어서다. (②의 연속 실패는 가짜 Riot 클라이언트로 실제로 함수를 돌려 확인했다 — `matches.test.ts`.) 가짜 클라이언트로 ③~⑤ 쪽도 단위 테스트를 더하는 것을 권장한다.
+2. **`aggregate`(시험용) 명령의 연결에는 오류 리스너가 없다.** `withTransaction`·`readSnapshot`에는 변경 02에서 리스너를 붙였지만, `collector/aggregate.ts`의 `aggregateWindowOnPool`은 여전히 `pool.connect()`를 직접 쓴다. 사람이 직접 실행하는 짧은 명령이라 위험은 작다(자동 집계는 DB 예약 작업이 SQL로 직접 함). 다음에 연결 안전성을 더 손대게 되면 같이 본다.
+3. **기록만 해 둔 운영 메모.** Supabase 풀러가 `application_name`을 `Supavisor`로 바꿔 연결을 이름으로 찾을 수 없고, DB 시계가 로컬보다 약 2초 빠르다. 영향이 작아 조치 계획은 없다.

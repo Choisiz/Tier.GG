@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type pg from 'pg';
 import { runMatches } from '../../src/collector/matches.js';
+import { TooManyFailuresError } from '../../src/collector/context.js';
 import type { CollectorContext } from '../../src/collector/context.js';
 import { buildCollectionConfig, RIOT_CLIENT_CONFIG } from '../../src/config/collection.js';
 import { silentLogger } from '../../src/lib/logger.js';
+import { RiotRetryExhaustedError } from '../../src/riot/errors.js';
 import type { RiotClient } from '../../src/riot/client.js';
 import { clone, loadMatch, loadTimeline, OPTS } from '../helpers/fixture.js';
 
@@ -21,7 +23,7 @@ function setup(inWindow: number, ids: string[]) {
     if (/INSERT INTO match_players/.test(sql)) return result([], 10);
     return result([]);
   };
-  const pool = { query, connect: async () => ({ query, release: () => undefined }) } as unknown as pg.Pool;
+  const pool = { query, connect: async () => ({ query, release: () => undefined, on: () => undefined }) } as unknown as pg.Pool;
 
   const calls = { ids: [] as unknown[], match: [] as string[], timeline: [] as string[] };
   const riot = {
@@ -54,6 +56,43 @@ function setup(inWindow: number, ids: string[]) {
     stop: { requested: false },
   };
   return { ctx, calls, sqls };
+}
+
+/** ②(게임 ID) 연속 실패 테스트용: 표본 n명, getMatchIds는 항상 재시도 소진 오류 */
+function setupManyPlayersFailingIds(n: number) {
+  const result = (rows: unknown[], rowCount = rows.length) => ({ rows, rowCount });
+  const query = async (sql: string) => {
+    if (/FROM matches WHERE game_start_at >=/.test(sql)) return result([{ n: 0 }]);
+    if (/FROM ranked_players/.test(sql)) {
+      return result(Array.from({ length: n }, (_, i) => ({ puuid: `P_TEST_${String(i).padStart(4, '0')}` })));
+    }
+    return result([]);
+  };
+  const pool = { query, connect: async () => ({ query, release: () => undefined, on: () => undefined }) } as unknown as pg.Pool;
+  const idsCalls: string[] = [];
+  const riot = {
+    stats: { calls: 0 },
+    async getMatchIds(puuid: string) {
+      idsCalls.push(puuid);
+      throw new RiotRetryExhaustedError('재시도 소진', 503, '/ids');
+    },
+    async getMatch() {
+      throw new Error('③은 불리지 않아야 함');
+    },
+    async getTimeline() {
+      throw new Error('④은 불리지 않아야 함');
+    },
+  } as unknown as RiotClient;
+  const ctx: CollectorContext = {
+    pool,
+    riot,
+    cfg: buildCollectionConfig('test', { tiers: ['EMERALD'] }),
+    riotCfg: RIOT_CLIENT_CONFIG,
+    logger: silentLogger,
+    window: { startMs: OPTS.windowStartMs, startTimeSec: Math.floor(OPTS.windowStartMs / 1000) },
+    stop: { requested: false },
+  };
+  return { ctx, idsCalls };
 }
 
 describe('runMatches (가짜 riot·저장)', () => {
@@ -91,5 +130,27 @@ describe('runMatches (가짜 riot·저장)', () => {
     assert.equal(r.skipped.out_of_window, 1);
     assert.equal(r.saved, 0);
     assert.equal(calls.timeline.length, 0);
+  });
+
+  it('② 연속 20개 5xx(재시도 소진) → TooManyFailuresError, 20명만 부름 (02-4, L3)', async () => {
+    const { ctx, idsCalls } = setupManyPlayersFailingIds(50);
+    await assert.rejects(() => runMatches(ctx), TooManyFailuresError);
+    assert.equal(idsCalls.length, RIOT_CLIENT_CONFIG.maxConsecutiveMatchFailures);
+  });
+
+  it('② 연속 실패가 20에 닿기 전에 한 번 성공하면 카운터가 리셋된다', async () => {
+    const { ctx } = setupManyPlayersFailingIds(40);
+    let n = 0;
+    ctx.riot = {
+      ...ctx.riot,
+      async getMatchIds() {
+        n++;
+        if (n === 10) return []; // 10번째만 성공 → 카운터 리셋
+        throw new RiotRetryExhaustedError('재시도 소진', 503, '/ids');
+      },
+    } as unknown as RiotClient;
+    await assert.rejects(() => runMatches(ctx), TooManyFailuresError);
+    // 리셋이 없었다면 20번째 호출에서 멈췄을 것. 리셋되면 1~9번 실패 + 10번째 성공(리셋) + 그 뒤 연속 20개 실패인 30번째에서 멈춘다
+    assert.equal(n, 30);
   });
 });

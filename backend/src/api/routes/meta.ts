@@ -7,6 +7,7 @@ import {
   STALE_AFTER_HOURS,
   WINDOW_DAYS,
 } from '../../config/api.js';
+import { formatError } from '../../lib/logger.js';
 import { lastDoneAt } from '../../repositories/logRepository.js';
 import { readAggregatedAt, readWindow } from '../../repositories/statsRepository.js';
 import type { ApiDeps } from '../app.js';
@@ -22,7 +23,8 @@ export function metaRouter({ db, logger, now, warnIfStale }: ApiDeps): Router {
     let aggregatedAt: Date | null;
     try {
       aggregatedAt = await readAggregatedAt(db);
-    } catch {
+    } catch (err) {
+      logger.error('health DB 확인 실패', { error: formatError(err) });
       throw new ApiError(503, 'DB_UNAVAILABLE', '데이터베이스에 연결할 수 없습니다.');
     }
     res.set('Cache-Control', 'no-store').json({

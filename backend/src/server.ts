@@ -15,7 +15,7 @@ function main(): void {
   // health는 풀에 바로, 통계 엔드포인트는 요청마다 스냅숏 트랜잭션 1개 (변경 01-6-4)
   const db: ApiDb = {
     query: (text, values) => pool.query(text, values),
-    snapshot: (fn) => readSnapshot(pool, fn),
+    snapshot: (fn) => readSnapshot(pool, fn, logger),
   };
   const app = createApp(db);
   const server = app.listen(port, () => logger.info('API 서버 시작', { url: `http://localhost:${port}/api/v1` }));

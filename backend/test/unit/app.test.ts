@@ -5,7 +5,18 @@ import { after, before, describe, it } from 'node:test';
 import type { Server } from 'node:http';
 import { createApp, type ApiDb } from '../../src/api/app.js';
 import type { Queryable } from '../../src/db/tx.js';
-import { silentLogger } from '../../src/lib/logger.js';
+import { silentLogger, type Logger } from '../../src/lib/logger.js';
+
+/** 호출을 기록만 하는 가짜 로거 (02-5, L4) */
+function capturingLogger(): Logger & { errors: { msg: string; fields?: Record<string, unknown> }[] } {
+  const errors: { msg: string; fields?: Record<string, unknown> }[] = [];
+  return {
+    errors,
+    info: () => {},
+    warn: () => {},
+    error: (msg, fields) => errors.push({ msg, fields }),
+  };
+}
 
 type Handler = (sql: string, values?: unknown[]) => unknown[] | Error;
 
@@ -65,8 +76,8 @@ function fullHandler(sql: string, values?: unknown[]): unknown[] {
   return [];
 }
 
-async function serve(db: ApiDb): Promise<{ base: string; server: Server }> {
-  const server = createApp(db, silentLogger, { now: () => NOW }).listen(0);
+async function serve(db: ApiDb, logger: Logger = silentLogger): Promise<{ base: string; server: Server }> {
+  const server = createApp(db, logger, { now: () => NOW }).listen(0);
   await new Promise<void>((r) => server.once('listening', () => r()));
   return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`, server };
 }
@@ -153,6 +164,22 @@ describe('API (가짜 ApiDb)', () => {
       const r = await fetch(down.base + path);
       assert.equal(r.status, 503, path);
       assert.equal(((await r.json()) as { error: { code: string } }).error.code, 'DB_UNAVAILABLE');
+    }
+  });
+
+  it('/health DB 오류 → 503이지만 서버 로그에 원인이 남는다 (02-5, L4)', async () => {
+    const logger = capturingLogger();
+    const connErr = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:5432'), { code: 'ECONNREFUSED' });
+    const s = await serve(fakeDb(() => connErr), logger);
+    try {
+      const r = await fetch(s.base + '/health');
+      assert.equal(r.status, 503);
+      assert.equal(((await r.json()) as { error: { code: string } }).error.code, 'DB_UNAVAILABLE');
+      const hit = logger.errors.filter((e) => e.msg.includes('health'));
+      assert.equal(hit.length, 1);
+      assert.ok(String(hit[0]?.fields?.error).includes('ECONNREFUSED'));
+    } finally {
+      close(s);
     }
   });
 

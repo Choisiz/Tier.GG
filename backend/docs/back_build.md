@@ -1,7 +1,7 @@
 # 백엔드 구현 기록 — 수집 워커 + 챔피언 통계 API
 
-> 기준: `backend/docs/back_spec.md` (승인됨), `docs/contracts/api_contract.md` v2, `docs/contracts/db_contract.md` v7
-> 이 문서는 **지금 구현 상태만** 적는다. v1(패치 기준) 구현 기록과 시도 과정은 git 커밋 `87cfc78`에 남아 있다.
+> 기준: `backend/docs/back_spec.md` (승인됨, 변경 02 포함), `docs/contracts/api_contract.md` v2(문구 정정 2026-10-16), `docs/contracts/db_contract.md` v8
+> 이 문서는 **지금 구현 상태만** 적는다. v1(패치 기준)·변경 01 구현 기록과 시도 과정은 git 기록에 남아 있다.
 > 상태 표기: ✅ 완료 / ⚠️ 부분 완료 / ❌ 실패 / ⏸️ 보류
 
 ## 목차
@@ -29,14 +29,14 @@
 
 ## 1. 요약
 
-> 요약: 계획서 2-1의 구조대로 API 서버와 수집 CLI가 동작한다. 최근 14일 창 수집기, 시험용 집계, API v2가 들어가 있다. 검사·테스트 모두 통과했고, 티어당 250명 테스트 수집으로 3,930게임을 429 없이 모았다.
+> 요약: 계획서 2-1의 구조대로 API 서버와 수집 CLI가 동작한다. 최근 14일 창 수집기, 시험용 집계, API v2가 들어가 있다. 변경 02에서 표본 보충(L1)·요약 로그 표기(L2)·② 연속 실패 상한(L3)·`/health` 로그(L4)·연결 오류 리스너(L5)를 고치고, `test` 프리셋을 250명으로 맞추고 API 계약 문구 2건을 고쳤다. 검사·테스트 모두 통과했고, 티어당 250명 테스트 수집으로 3,930게임을 429 없이 모았다.
 
 | 항목 | 결과 |
 |------|------|
 | `npm run typecheck` (`tsc --noEmit`) | 오류 0 |
 | `npm run lint` (eslint 9 + typescript-eslint 8) | 오류 0 |
-| `npm test` (단위, DB·네트워크 없음) | **80개** 통과 / 실패 0 |
-| `npm run test:integration` (실제 Supabase, 모두 ROLLBACK) | **17개** 통과 / 실패 0 (약 4초). 끝난 뒤 테스트 데이터 0줄 |
+| `npm test` (단위, DB·네트워크 없음) | **92개** 통과 / 실패 0 |
+| `npm run test:integration` (실제 Supabase, 모두 ROLLBACK) | **17개** 통과 / 실패 0 (약 7초). 끝난 뒤 테스트 데이터 0줄 |
 | `npm audit` | 취약점 0 |
 | 패치 기준 이름 `grep` (계획 10-1) | `src`·`test`에 0건 (`rules.test.ts`의 "`keepPatches`가 없음" 확인 1줄만) |
 | 비밀값 `grep` | `backend/`, 수집·API 로그, `api_contract.md`, `.env.example`에 키·접속 문자열·비밀번호 값 0건 |
@@ -54,11 +54,11 @@
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
 | 환경 변수 | `src/config/env.ts`. `loadDbEnv`, `loadRiotEnv`(CLI만 부름), `loadApiPort`(기본 4000). 형식만 검사하고 값은 출력하지 않음. `RIOT_API_KEY`는 비어 있지 않은지만 본다 (형식을 엄격히 보면 잘못된 키 시험이 401까지 가지 못함) | ✅ |
-| 수집 프리셋 | `src/config/collection.ts`. `test`(플래티넘·에메랄드·다이아 100명, 20게임), `main`(에메랄드·다이아 200명, 자리만). `windowDays 14`(= `WINDOW_DAYS`), `maxGamesPerWindow 25,000`, `keepDays 21`. `divisionQuota(100)` = 25/25/25/25. `windowStart(nowMs, days)` → `{ ms, sec }`. `--tiers`는 디비전 있는 티어만, `--players-per-tier` 1~1000 | ✅ |
+| 수집 프리셋 | `src/config/collection.ts`. `test`(플래티넘·에메랄드·다이아 **250명**, 20게임, db 계약 v8과 맞춤, 변경 02-7), `main`(에메랄드·다이아 200명, 자리만). `windowDays 14`(= `WINDOW_DAYS`), `maxGamesPerWindow 25,000`, `keepDays 21`. `divisionQuota(250)` = 63/63/62/62. `windowStart(nowMs, days)` → `{ ms, sec }`. `--tiers`는 디비전 있는 티어만, `--players-per-tier` 1~1000 | ✅ |
 | API 규칙 상수 | `src/config/api.ts`. 50판, 10%, `WINDOW_DAYS 14`, `STALE_AFTER_HOURS 26`, 상위 2개, max-age 600 | ✅ |
 | DB 풀 | `src/db/pool.ts`. API `max 5`, CLI `max 2`. 유휴 연결 오류는 가린 뒤 로그. `isDbConnectionError`로 연결 오류 판별 | ✅ |
-| 트랜잭션 | `src/db/tx.ts`. `Queryable` 타입, `withTransaction(pool, fn)`, `inTransaction(client, fn)` | ✅ |
-| 스냅숏 | `src/db/snapshot.ts` `readSnapshot(pool, fn)`: `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY` → `fn(client)` → `COMMIT` (예외면 `ROLLBACK`). BEGIN·ROLLBACK이 실패한 연결은 풀에 돌려주지 않고 버림 | ✅ |
+| 트랜잭션 | `src/db/tx.ts`. `Queryable` 타입, `withTransaction(pool, fn, logger?)`, `inTransaction(client, fn)`. `logger`를 넘기면 빌린 연결에 `'error'` 리스너를 붙여 로그만 남긴다 (변경 02-6, L5) | ✅ |
+| 스냅숏 | `src/db/snapshot.ts` `readSnapshot(pool, fn, logger?)`: `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY` → `fn(client)` → `COMMIT` (예외면 `ROLLBACK`). BEGIN·ROLLBACK이 실패한 연결은 풀에 돌려주지 않고 버림. `logger`를 넘기면 빌린 연결에 `'error'` 리스너 (변경 02-6, L5) | ✅ |
 | 로그·가리기 | `src/lib/logger.ts`. 한 줄 `시각 레벨 [영역] 메시지 key=value`. `DATABASE_URL` 전체·비밀번호(디코딩 포함, 잘못된 `%` 인코딩도 원문은 가림)·사용자·호스트, `RIOT_API_KEY`, `postgresql://…`·`RGAPI-…` 모양을 `***`로. puuid는 앞 8자만 | ✅ |
 
 ### 2-2. Riot 클라이언트
@@ -101,8 +101,8 @@
 |------|-----------|------|
 | 0 준비 | 잠금 전용 연결에서 `pg_try_advisory_lock(hashtext('tiergg:collector'))`. 실패하면 종료 코드 3. 남은 `running` → `failed`('비정상 종료로 남은 기록'), 새 `running` 1줄. 잠금 뒤 `windowStart(now, 14)`를 한 번 정해 `ctx.window`로 넘김 (②·③이 같은 값). `countMatchesSince(창 시작)` | ✅ |
 | 잠금 연결 끊김 | `CollectorLock.acquire(pool, onLost?)`가 잠금 연결에 `'error'` 리스너를 붙여 `lost`로 표시하고 `onLost`를 1번 부름. CLI는 오류 로그(가림) + 지금 게임 뒤 멈춤 → `failed` "DB 연결 끊김 (수집 잠금 연결)", 종료 코드 1. 잃은 잠금의 `release()`는 unlock 없이 연결을 버림. `purge --yes`도 같은 리스너 (Review M1에서 고침) | ✅ |
-| ① 표본 | 디비전마다 page 1에서 요청 티어·디비전과 같고 `inactive`가 아닌 사람만, 시드 있는 무작위(mulberry32). 시드 로그 (`--seed`로 재현). `ON CONFLICT (puuid) DO UPDATE`. 그 티어 표본이 `playersPerTier`명 이상이면 건너뜀, 적으면 `playersPerTier`명을 새로 더함 | ✅ |
-| ② 게임 ID | `queue=420&start=0&count=20&startTime={초}`. 메모리 `Map`(처음 찾은 puuid) → DB에 있는 ID 제거 → 숫자 내림차순. 400·404 플레이어는 건너뜀 (연속 실패 상한 없음) | ✅ |
+| ① 표본 | 디비전마다 page 1에서 요청 티어·디비전과 같고 `inactive`가 아닌 사람만, 시드 있는 무작위(mulberry32). 시드 로그 (`--seed`로 재현). `ON CONFLICT (puuid) DO UPDATE`. 그 티어 표본이 `playersPerTier`명 이상이면 건너뜀, 적으면 **모자란 만큼만** 더 뽑음(`--resample`이면 전체를 다시 뽑아 더함, 변경 02-2, L1) | ✅ |
+| ② 게임 ID | `queue=420&start=0&count=20&startTime={초}`. 메모리 `Map`(처음 찾은 puuid) → DB에 있는 ID 제거 → 숫자 내림차순. 400·404 플레이어는 건너뜀, ③~⑤와 같은 연속 20개 실패 상한을 공유(`riotCfg.maxConsecutiveMatchFailures`), 성공하면 리셋 (변경 02-4, L3) | ✅ |
 | ③ 상세 | 미리 거르기. 창 안 게임 + 이번 저장 수 ≥ 25,000이면 ③ 전에 멈춤 (`window_full`, `done`). 걸리면 ④를 부르지 않음 | ✅ |
 | ④ 타임라인 + ⑤ 저장 | 게임 1개 = 트랜잭션 1개. `INSERT … (match_id, puuid, patch, game_start_at)` `ON CONFLICT DO NOTHING` → 0줄이면 ROLLBACK(`duplicate`) → `match_players` 10줄 한 문장 INSERT → COMMIT | ✅ |
 | 자동 집계 없음 | `run`·`matches`는 ①~⑤만. 끝에 로그 "집계는 매일 05:00 KST DB 예약 작업이 한다. 바로 보려면 … aggregate (시험용)" | ✅ |
@@ -110,7 +110,7 @@
 | `purge` | 미리보기(잠금 없이 읽기만): 전체 게임 수, 21일보다 오래된 게임 수, 가장 오래된·최근(`newestRemoveStartAt`) 시작 시각. `--yes`면 수집 잠금 → `SELECT purge_old_games(21)`. **`--yes`는 한 번도 실행하지 않았다** | ✅ |
 | 오류 처리 | 401/403 → `key_expired`, 종료 코드 2. Ctrl+C → 지금 게임 뒤 멈춤, `failed`('사용자 중단'), 130 (두 번 누르면 바로 종료). 게임 하나의 오류(404, 400, 재시도 실패, DB 22xxx·23xxx)는 그 게임만 건너뜀, ③~⑤ 연속 20개면 `failed`. 그 밖의 오류는 가린 메시지(500자)로 `failed`, 1 | ✅ |
 | 종료 기록 | `finished_at`, `players`(② 표본 수), `matches_saved`. 중간에 멈춰도 그때까지 저장한 수를 남김. `aggregate`·`purge`는 기록하지 않음 | ✅ |
-| 진행·요약 로그 | 50게임마다 진행률. 끝에 2줄: 호출(수, 429, 재시도, 상태별, 제한기 대기)과 게임(`players`, `playersFailed`, `playersNoGames`, `inWindowBefore`, ID 수, 저장, 건너뜀 이유별, 경고, `stoppedBy`, 패치). 중단·실패한 실행도 `stoppedBy=done`으로 찍힘 (L2) | ⚠️ |
+| 진행·요약 로그 | 50게임마다 진행률. 끝에 2줄: 호출(수, 429, 재시도, 상태별, 제한기 대기)과 게임(`players`, `playersFailed`, `playersNoGames`, `inWindowBefore`, ID 수, 저장, 건너뜀 이유별, 경고, `stoppedBy`, 패치). `stoppedBy`의 기본값이 `'done'`으로 남아 있으면 `cli/collect.ts`의 catch 블록이 예외 종류에 따라 `'aborted'`(Ctrl+C) 또는 `'failed'`(그 밖)로 맞춘다. `collection_logs.status`는 원래부터 정확했다 (변경 02-3, L2) | ✅ |
 
 ### 2-5. 읽기 API
 
@@ -119,7 +119,7 @@
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
 | `ApiDb`·앱 | `createApp(db, logger, { now })`. `ApiDb = Queryable + snapshot(fn)`. `server.ts`는 풀로(`readSnapshot`), 테스트는 롤백 연결로 만든다. SIGINT/SIGTERM 종료 | ✅ |
-| `GET /api/v1/health` | 한 문장 `SELECT (SELECT aggregated_at FROM stats_window WHERE id = 1)` → `{status, db, stats: {state: fresh/stale/empty, aggregatedAt}}`. 항상 200, 실패하면 503 `DB_UNAVAILABLE` (원인 로그 없음, L4). `no-store` | ⚠️ |
+| `GET /api/v1/health` | 한 문장 `SELECT (SELECT aggregated_at FROM stats_window WHERE id = 1)` → `{status, db, stats: {state: fresh/stale/empty, aggregatedAt}}`. 항상 200, 실패하면 503 `DB_UNAVAILABLE`(응답은 그대로, catch에서 `logger.error('health DB 확인 실패', …)` 1줄을 남겨 서버 로그에서 원인을 구분할 수 있게 함, 변경 02-5, L4). `no-store` | ✅ |
 | `GET /api/v1/meta` | `window`, `lastCollectedAt`(마지막 `done`), `positions`, `rules{minTierPick, secondaryPositionMinShare, windowDays, staleAfterHours}`. 스냅숏 1개 | ✅ |
 | `GET /api/v1/champions` | `champion_tier_view`를 `tier NULLS LAST, tier_score DESC, champion_id`로 읽고, 주 포지션에 그 포지션이 있는 챔피언만. `positionShare`는 SQL 창 함수. 응답에 `window` | ✅ |
 | `GET /api/v1/champions/:championId` | 주 포지션 탭, 선택 포지션 `stats`, 아이템 전체, 룬·스펠·스킬 상위 2개. 조합 승률 `win/pick`, 사용률 `pick/champion.pick` (SQL `round(…, 2)`). 응답에 `window` | ✅ |
@@ -134,23 +134,25 @@
 
 ### 2-6. 테스트
 
-> 요약: 단위 80개, 통합 17개. 모두 고정 시각을 쓰고, 통합 테스트는 2021년 가짜 게임·가짜 패치 `0.8`·`0.9`, 가짜 ID `KR_90000000xx`, `TEST_…` puuid만 쓰며 모두 ROLLBACK한다.
+> 요약: 단위 92개, 통합 17개. 모두 고정 시각을 쓰고, 통합 테스트는 2021년 가짜 게임·가짜 패치 `0.8`·`0.9`, 가짜 ID `KR_90000000xx`, `TEST_…` puuid만 쓰며 모두 ROLLBACK한다.
 
 | 파일 | 내용 | 상태 |
 |------|------|------|
 | `test/fixtures/KR_8408851980.*.json` | 실제 게임 1개. puuid → `TEST_PUUID_01…10`, `riotIdGameName`·`summonerName` → `Player01…`, `riotIdTagline` → `TEST`, `summonerId` → `TEST_SUMMONER_01…`. 타임라인은 `SKILL_LEVEL_UP`과 `info.participants`만 (570KB → 26KB). `gameStartTimestamp 1791263990514` | ✅ |
 | `test/helpers/fixture.ts`, `db.ts` | 창 시작 `2026-09-30T00:00:00Z` 고정 / `fakeGames(n, { patch, startMs, firstId })`, `FAKE_UNTIL = 2021-01-15` | ✅ |
 | `unit/transform.test.ts` (20) | 1번 참가자 = 계약 6-3 값 26개, `game_start_at`, 가공 입력, 시작 시각 경계(`bad_format`·`out_of_window`) | ✅ |
-| `unit/rules.test.ts` (12) | 프리셋 100명 → 25×4, 창 설정값, `windowStart().sec = 1790816400`, `mainPositions`, `validate`, 로그 가리기, v1 설정이 없음 | ✅ |
-| `unit/app.test.ts` (11) | 가짜 `ApiDb`: 집계 전 503 + `no-store`, `/health empty`, `?patch=` 무시, `snapshot` 1번·첫 쿼리 `stats_window`, 오류 형식, CORS 없음 | ✅ |
+| `unit/rules.test.ts` (13) | 프리셋 250명 → 63/63/62/62, `divisionQuota(Math.max(0, 250-180)) = 70`(변경 02-2), 창 설정값, `windowStart().sec = 1790816400`, `mainPositions`, `validate`, 로그 가리기, v1 설정이 없음 | ✅ |
+| `unit/sample.test.ts` (4, 신규) | `runSample` 가짜 riot·pool: have=180/playersPerTier=250 → 모자란 70명만, have=0 → 250명 전체, 이미 충분하면 건너뜀, `--resample`이면 전체를 다시 뽑음 (변경 02-2, L1) | ✅ |
+| `unit/app.test.ts` (12) | 가짜 `ApiDb`: 집계 전 503 + `no-store`, `/health empty`, `?patch=` 무시, `snapshot` 1번·첫 쿼리 `stats_window`, 오류 형식, CORS 없음, **`/health` DB 오류 시 로그 1회**(변경 02-5, L4) | ✅ |
 | `unit/client.test.ts` (11) | 401/403 재시도 없음, 429·503 재시도와 포기, 404/400, `startTime` URL·10자리 검사, 키가 URL에 없음 | ✅ |
 | `unit/rateLimiter.test.ts` (7) | 창 대기, 300회 시험, 429 막기, 헤더 반영, 동시 호출 | ✅ |
 | `unit/window.test.ts` (7) | `displayName`, `share` 39.98/60.02, 26시간 경계, 상태 3가지, 경고 1시간 1번 | ✅ |
-| `unit/matches.test.ts` (4) | 창 상한 `window_full`, 창 밖 타임라인 0번, 집계·`ANALYZE`·`purge` SQL 없음, INSERT에 `game_start_at` | ✅ |
+| `unit/matches.test.ts` (6) | 창 상한 `window_full`, 창 밖 타임라인 0번, 집계·`ANALYZE`·`purge` SQL 없음, INSERT에 `game_start_at`, **② 연속 20개 5xx → `TooManyFailuresError`·20명만 호출, 중간에 1번 성공하면 카운터 리셋**(변경 02-4, L3) | ✅ |
 | `unit/runLog.test.ts` (4) | 잠금 연결 끊김에 죽지 않고 `onLost` 1번, 잃은 잠금 release, 정상 release, 잠금 실패 시 연결 반환 | ✅ |
+| `unit/db.test.ts` (4, 신규) | `withTransaction`·`readSnapshot`에 `logger`를 넘기면 빌린 연결의 `'error'` 이벤트가 로그로 남고, 안 넘기면 리스너를 붙이지 않음(기존과 같음) (변경 02-6, L5) | ✅ |
 | `integration/repository.test.ts` (9) | 저장·duplicate, `countMatchesSince`, 창 집계(과거 `until`), P0002 + SAVEPOINT, purge 미리보기(`purge_old_games`는 실행 안 함), 스냅숏 `repeatable read`·`on`·쓰기 25006 거부·실패 뒤 재사용, `collection_logs` | ✅ |
 | `integration/api.test.ts` (8) | 2021년 60게임(`0.8` 24, `0.9` 36) 집계 → `createApp(롤백 ApiDb, 고정 시계)`: `/health fresh`, `/meta window`, 목록·상세, `?patch=` 같은 응답, 404 2종, `aggregated_at − 27h` → `isStale`·`/health stale` | ✅ |
-| 연속 20개 실패 | 분류 함수와 흐름은 있으나 실제로 일으켜 시험하지 않음 (Riot 장애를 만들 수 없음) | ⚠️ |
+| ③~⑤ 연속 20개 실패 | 분류 함수와 흐름은 있으나 실제로 일으켜 시험하지 않음 (Riot 장애를 만들 수 없음). ②의 연속 실패는 가짜 riot로 시험함 (변경 02-4) | ⚠️ |
 
 ---
 
@@ -193,8 +195,8 @@ npm run test:integration            # 실제 Supabase, 모두 ROLLBACK. 05:00 KS
 | `matches --preset test` | 저장된 표본으로 게임만 |
 | 공통 옵션 | `--max-matches N`, `--players-per-tier N`, `--games-per-player N`, `--tiers EMERALD,DIAMOND`, `--seed N` |
 
-- 종료 코드: 0 정상, 1 실패(`aggregate`의 P0002, 잠금 연결 끊김 포함), 2 키 만료, 3 다른 수집이 실행 중, 130 사용자 중단(Ctrl+C).
-- 표본이 모자란 티어는 모자란 만큼이 아니라 `--players-per-tier`명을 새로 더한다. 인원을 늘릴 때는 총 인원을 계산해 옵션을 준다.
+- 종료 코드: 0 정상, 1 실패(`aggregate`의 P0002, 잠금 연결 끊김, ②~⑤ 연속 20개 실패 포함), 2 키 만료, 3 다른 수집이 실행 중, 130 사용자 중단(Ctrl+C).
+- 표본이 모자란 티어는 모자란 만큼만 더 뽑는다 (변경 02-2). `--resample`을 주면 `--players-per-tier`명 전체를 다시 뽑아 더한다.
 
 ---
 
@@ -278,7 +280,7 @@ npm run test:integration            # 실제 Supabase, 모두 ROLLBACK. 05:00 KS
 
 | # | 계획 | 구현 | 이유 |
 |---|------|------|------|
-| 1 | 표본이 "있으면" ①을 건너뜀 | 그 티어 표본이 `playersPerTier`명 **이상**이면 건너뜀. 적으면 `playersPerTier`명을 새로 더함 | 검증용 몇 명만 남은 티어가 그 몇 명으로만 수집되는 것을 막으려고. 다만 "모자란 만큼"이 아니라 전원을 더해 에메랄드가 265명이 됐다 (L1) |
+| 1 | 표본이 "있으면" ①을 건너뜀 | 그 티어 표본이 `playersPerTier`명 **이상**이면 건너뜀. 적으면 **모자란 만큼만** 더 뽑음(`--resample`이면 전체를 다시 뽑아 더함) | 검증용 몇 명만 남은 티어가 그 몇 명으로만 수집되는 것을 막으려고. 처음엔 "모자란 만큼"이 아니라 전원을 더해 에메랄드가 265명이 됐었는데(L1), 변경 02-2에서 고쳤다 |
 | 2 | 건너뛰기 이유 5개 | `duplicate`(다른 실행이 먼저 저장)를 로그 집계에 추가 | ⑤의 ROLLBACK 경우를 셀 이름. DB 영향 없음 |
 | 3 | 종료 코드 0/1/2/130 | 잠금 실패에 **3** 추가 | "다른 수집이 실행 중"을 실패와 구별 |
 | 4 | `collection_logs`는 실행마다 | `run`, `sample`, `matches`만 기록 | `meta.lastCollectedAt`이 수집 시각만 뜻하게 |
@@ -299,7 +301,7 @@ npm run test:integration            # 실제 Supabase, 모두 ROLLBACK. 05:00 KS
 
 ## 6. 계약 변경 요청
 
-> 요약: 없음. v7의 `stats_window`, `stats_window_patch`, `champion_tier_view`, `refresh_window_stats`, `purge_old_games`, `patch_sort_key`만으로 구현했다. 경고 개수는 `collection_logs`에 컬럼이 없어 stdout 요약에만 남긴다.
+> 요약: 없음. v8의 `stats_window`, `stats_window_patch`, `champion_tier_view`, `refresh_window_stats`, `purge_old_games`, `patch_sort_key`만으로 구현했다. 경고 개수는 `collection_logs`에 컬럼이 없어 stdout 요약에만 남긴다. `api_contract.md`(백엔드가 쓰는 계약)의 2-4 문구와 6장 날짜 순서는 변경 02-8에서 고쳤다 (응답 필드·형식은 그대로).
 
 ---
 
@@ -307,5 +309,6 @@ npm run test:integration            # 실제 Supabase, 모두 ROLLBACK. 05:00 KS
 
 > 요약: 동작을 막는 문제는 없다. 남은 문제는 모두 `back_overview.md`의 "해결되지 않은 점"에 번호로 정리돼 있다.
 
-- 이 문서에서 ⚠️인 항목: 요약 로그 `stoppedBy=done`(L2), `/health` 오류 원인 숨김(L4), 연속 20개 실패를 실제로 시험하지 않음.
-- 그 밖: ② 400 플레이어 15명, 계약의 "티어당 100명" 문구, 표본 보충 방식(L1), ② 연속 실패 상한 없음(L3), 연결 기본 오류 리스너(L5).
+- 변경 02에서 L1~L5(표본 보충, 요약 로그 표기, ② 연속 실패 상한, `/health` 로그, 연결 오류 리스너), `test` 프리셋 250명, API 계약 문구 2건을 모두 고쳤다.
+- 15명 400 플레이어: 원인을 조사해 "이전 만료 키 시기에 뽑히고 재확인 안 된 표본"으로 확인했고, 영향이 작아(② 호출 0.17%) 조치하지 않았다 (변경 02-1, 결정 V1).
+- 이 문서에서 ⚠️인 항목: ③~⑤ 연속 20개 실패를 실제 Riot 장애로 시험하지 않음(가짜 riot로는 확인함).

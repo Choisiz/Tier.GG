@@ -61,7 +61,7 @@ const BASE = {
 } as const;
 
 export const PRESETS: Record<string, CollectionConfig> = {
-  test: { preset: 'test', tiers: ['PLATINUM', 'EMERALD', 'DIAMOND'], playersPerTier: 100, ...BASE },
+  test: { preset: 'test', tiers: ['PLATINUM', 'EMERALD', 'DIAMOND'], playersPerTier: 250, ...BASE },
   // 본 수집 (자리만). 4:4:2 비율과 마스터 이상은 테스트 뒤 정한다.
   main: { preset: 'main', tiers: ['EMERALD', 'DIAMOND'], playersPerTier: 200, ...BASE },
 };
