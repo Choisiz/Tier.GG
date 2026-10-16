@@ -14,57 +14,66 @@ export default function SkillOrder({ set }: { set: SkillOrderSet }) {
       <p className="text-xs text-muted">
         사용 {first.pickRate} · 승률 {first.winRate} · {first.pick}게임
       </p>
-      <table className="border-separate border-spacing-0.5 text-xs">
-        <caption className="sr-only">스킬 찍는 순서 1~11레벨</caption>
-        <thead>
-          <tr>
-            <th scope="col" className="w-8 font-normal text-muted">
-              레벨
-            </th>
-            {set.heads.map((head) => (
-              <th key={head.key} scope="col" className="pb-1 text-center font-normal">
-                <Tooltip content={head.description}>
-                  <span className="flex flex-col items-center gap-1">
-                    {head.iconUrl ? (
-                      <Image
-                        src={head.iconUrl}
-                        alt=""
-                        width={20}
-                        height={20}
-                        className="size-5 rounded-sm"
-                      />
-                    ) : null}
-                    <span className="font-bold text-accent">{head.key}</span>
-                    {head.name ? <span className="sr-only">{head.name}</span> : null}
-                  </span>
-                </Tooltip>
+      <div className="overflow-x-auto">
+        <table className="border-separate border-spacing-0.5 text-xs">
+          <caption className="sr-only">스킬 찍는 순서 1~11레벨</caption>
+          <thead>
+            <tr>
+              <th scope="col" className="sticky left-0 z-10 w-10 bg-surface font-normal text-muted">
+                레벨
               </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {LEVELS.map((level) => (
-            <tr key={level}>
-              <th scope="row" className="h-7 w-8 text-center font-normal text-muted sm:h-8">
-                {level}
-              </th>
-              {set.heads.map((head) => {
-                const chosen = first.order[level - 1] === head.key;
-                return (
-                  <td
-                    key={head.key}
-                    className={`h-7 w-7 rounded-sm text-center font-bold sm:h-8 sm:w-8 ${
-                      chosen ? "bg-accent text-accent-foreground" : "bg-surface-2"
-                    }`}
-                  >
-                    {chosen ? head.key : ""}
-                  </td>
-                );
-              })}
+              {LEVELS.map((level) => (
+                <th
+                  key={level}
+                  scope="col"
+                  className="h-7 w-7 text-center font-normal text-muted sm:h-8 sm:w-8"
+                >
+                  {level}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {set.heads.map((head) => (
+              <tr key={head.key}>
+                <th
+                  scope="row"
+                  className="sticky left-0 z-10 w-10 bg-surface text-center font-normal"
+                >
+                  <Tooltip content={head.description}>
+                    <span className="flex flex-col items-center gap-1">
+                      {head.iconUrl ? (
+                        <Image
+                          src={head.iconUrl}
+                          alt=""
+                          width={20}
+                          height={20}
+                          className="size-5 rounded-sm"
+                        />
+                      ) : null}
+                      <span className="font-bold text-accent">{head.key}</span>
+                      {head.name ? <span className="sr-only">{head.name}</span> : null}
+                    </span>
+                  </Tooltip>
+                </th>
+                {LEVELS.map((level) => {
+                  const chosen = first.order[level - 1] === head.key;
+                  return (
+                    <td
+                      key={level}
+                      className={`h-7 w-7 rounded-sm text-center font-bold sm:h-8 sm:w-8 ${
+                        chosen ? "bg-accent text-accent-foreground" : "bg-surface-2"
+                      }`}
+                    >
+                      {chosen ? head.key : ""}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {second ? (
         <p className="text-xs text-muted">
           <span className="font-semibold text-foreground">2순위</span>{" "}

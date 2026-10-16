@@ -77,15 +77,14 @@ export default function PositionStatsPanel({
         <BuildCard title="추천 룬" empty={view.runes.length === 0}>
           <RunePage pages={view.runes} />
         </BuildCard>
-        <div className="space-y-4">
-          <BuildCard title="소환사 주문" empty={view.spells.length === 0}>
-            <SummonerSpells combos={view.spells} />
-          </BuildCard>
-          <BuildCard title="스킬 순서" note="1~11레벨" empty={view.skills.builds.length === 0}>
-            <SkillOrder set={view.skills} />
-          </BuildCard>
-        </div>
+        <BuildCard title="소환사 주문" empty={view.spells.length === 0}>
+          <SummonerSpells combos={view.spells} />
+        </BuildCard>
       </div>
+
+      <BuildCard title="스킬 순서" note="1~11레벨" empty={view.skills.builds.length === 0}>
+        <SkillOrder set={view.skills} />
+      </BuildCard>
 
       <BuildCard
         title="많이 완성한 아이템"

@@ -95,11 +95,13 @@ export default function RunePage({ pages }: { pages: RunePageView[] }) {
 
       <p className="sr-only">{page.summary}</p>
 
-      <div className="space-y-4">
-        <RuneTree tree={page.primary} keystone />
-        <p className="text-xs text-muted">
-          사용 {page.pickRate} · 승률 {page.winRate} · {page.pick}게임
-        </p>
+      <div className="space-y-4 lg:grid lg:grid-cols-[2fr_1.5fr_1fr] lg:items-start lg:gap-3 lg:space-y-0">
+        <div className="space-y-2">
+          <RuneTree tree={page.primary} keystone />
+          <p className="text-xs text-muted">
+            사용 {page.pickRate} · 승률 {page.winRate} · {page.pick}게임
+          </p>
+        </div>
         <RuneTree tree={page.secondary} keystone={false} />
         <div className="space-y-2">
           <p className="text-sm font-semibold">능력치 파편</p>
