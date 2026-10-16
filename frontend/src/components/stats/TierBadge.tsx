@@ -1,6 +1,6 @@
 import type { Tier } from "@/lib/api/types";
 
-/** 티어 배지 색 (글자 #09090b 기준 대비 7:1 이상). 색은 보조, 글자가 항상 함께 보인다 */
+/** 티어 배지 색 (글자 #09090b 기준 대비 최소 6.89:1, 기준 4.5:1 이상). 색은 보조, 글자가 항상 함께 보인다 */
 const TIER_CLASSES: Record<Exclude<Tier, null>, string> = {
   1: "bg-red-400 text-zinc-950",
   2: "bg-orange-400 text-zinc-950",

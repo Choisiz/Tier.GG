@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     template: "%s | Tier.GG",
     default: "Tier.GG",
   },
-  description: "리그 오브 레전드 챔피언 정보와 스킨을 한눈에 볼 수 있는 Tier.GG",
+  description: "리그 오브 레전드 챔피언 티어와 추천 빌드, 스킨을 한눈에 볼 수 있는 Tier.GG",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
