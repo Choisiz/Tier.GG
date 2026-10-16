@@ -1,6 +1,6 @@
 # DB 계획 (`!db`)
 
-- 상태: **현재 계획** (계약 v7, 마이그레이션 001~015 적용됨, 2026-10-14 승인분까지 반영)
+- 상태: **현재 계획** (계약 v8, 마이그레이션 001~016 적용됨, 2026-10-16 승인분(변경 04)까지 반영)
 - 기준 계약: `docs/contracts/db_contract.dbml` (우선), `docs/contracts/db_contract.md`
 - 대상: Supabase 무료 플랜, PostgreSQL 17, Session pooler 접속
 - 이 문서는 **지금 유효한 계획만** 둔다. 바뀐 계획은 덮어쓴다. v1과 변경 01~03의 원문은 git 커밋 `87cfc78`의 `db/docs/db_spec.md`에 있다 (CLAUDE.md 6장 "영역 문서 관리").
@@ -34,7 +34,7 @@
 | 항목 | 내용 |
 |------|------|
 | 테이블 | 원본 3 (`ranked_players`, `matches`, `match_players`), 집계 7 (`stats_window`, `stats_window_patch`, `champion`, `champion_item`, `champion_rune`, `champion_spell`, `champion_skill`), 운영 1 (`collection_logs`) + 실행기 메타 `schema_migrations` |
-| 제약 조건 | PK, FK(삭제 동작 포함), 유니크, NOT NULL, 기본값, CHECK(허용 값, 범위, 형식) |
+| 제약 조건 | PK, FK(삭제 동작 포함), 유니크, NOT NULL, 기본값, CHECK(허용 값, 범위, 형식, 정렬 순서) |
 | 인덱스 | PK·유니크 + `match_players (champion_id, team_position)` 1개 |
 | 보안 | 모든 테이블 RLS 켜기, 정책 없음, `anon`·`authenticated` 권한 회수 |
 | 함수 | `refresh_window_stats`, `purge_old_games`, 보조 `patch_sort_key`, `tier_from_score` |
@@ -105,7 +105,7 @@
 
 ## 3. 마이그레이션 파일 목록
 
-> 요약: 001~015가 적용되어 있다. 앞 파일 중 일부(002, 005~008)가 만든 객체는 뒤 파일(009, 012)이 바꾸거나 지웠다. 지금 DB의 모양은 4~8장이 기준이다.
+> 요약: 001~016이 적용되어 있다. 앞 파일 중 일부(002, 005~008, 013)가 만든 객체는 뒤 파일(009, 012, 016)이 바꾸거나 지웠다. 지금 DB의 모양은 4~8장이 기준이다.
 
 | 파일 | 하는 일 | 지금 남은 결과 |
 |------|---------|----------------|
@@ -121,18 +121,19 @@
 | `010_ranked_players_platinum.sql` | `ranked_players.tier`에 `PLATINUM` 허용 | 그대로 |
 | `011_matches_game_start_at.sql` | 테스트 26게임 삭제(안전장치) 뒤 `matches.game_start_at NOT NULL` 추가 | 그대로 |
 | `012_window_aggregate_tables.sql` | 옛 뷰·함수·집계 테이블 삭제(안전장치), `stats_window`·`stats_window_patch`·집계 5개 생성, RLS, `REVOKE` | 그대로 |
-| `013_create_window_functions.sql` | `refresh_window_stats`, `purge_old_games`, `REVOKE EXECUTE` | 그대로 |
+| `013_create_window_functions.sql` | `refresh_window_stats`, `purge_old_games`, `REVOKE EXECUTE` | `purge_old_games` 그대로. `refresh_window_stats`는 016이 다시 만듦 |
 | `014_create_champion_tier_view.sql` | 14일 창 기준 `champion_tier_view`, `REVOKE` | 그대로 |
 | `015_schedule_daily_refresh.sql` | `pg_cron` 켜기, 작업 `tiergg_daily_refresh` 등록 | 그대로 |
+| `016_rune_sub_perk_sorted.sql` | `refresh_window_stats` 다시 만듦(룬 보조 정렬, 나머지 본문은 013과 같음), 함수 주석·`REVOKE`, `ANALYZE` 뒤 현재 창 그대로 재집계, CHECK `champion_rune_sub_perk_order_check`, 오래된 주석 수정 (7-3) | 그대로 |
 
-- 다음 파일은 `016_….sql`이다.
+- 다음 파일은 `017_….sql`이다.
 - 테이블·컬럼에 `COMMENT ON`을 단다. 원본 컬럼 주석에는 Riot JSON 경로를 적는다 (계약 6장).
 
 ---
 
 ## 4. 테이블
 
-> 요약: 원본은 Riot 값 그대로, 집계는 원본을 센 개수만, 운영은 수집 기록이다. 이름·순서는 dbml v7과 같고, CHECK는 dbml 메모의 허용 값을 DB가 강제하도록 단 것이다.
+> 요약: 원본은 Riot 값 그대로, 집계는 원본을 센 개수만, 운영은 수집 기록이다. 이름·순서는 dbml v8과 같고, CHECK는 dbml 메모의 허용 값을 DB가 강제하도록 단 것이다.
 
 ### 4-1. 공통 규칙
 
@@ -163,7 +164,7 @@
 | `stats_window_patch` | `patch text`, `games int` (NOT NULL) | PK `patch`. 패치 형식 CHECK, `games > 0` |
 | `champion` | `champion_id`, `position`, `pick`, `win`, `ban` | PK `(champion_id, position)`. `champion_id > 0`, 포지션 CHECK, 개수 CHECK, `ban ≥ 0` |
 | `champion_item` | `champion_id`, `position`, `item_id`, `pick`, `win` | PK `(champion_id, position, item_id)`, `item_id > 0` |
-| `champion_rune` | `id` identity, `champion_id`, `position`, 룬 11개, `pick`, `win` | PK `id`, UNIQUE `champion_rune_page_key (champion_id, position, 룬 11개)` (자동 이름은 63자를 넘어 직접 지정) |
+| `champion_rune` | `id` identity, `champion_id`, `position`, 룬 11개, `pick`, `win` | PK `id`, UNIQUE `champion_rune_page_key (champion_id, position, 룬 11개)` (자동 이름은 63자를 넘어 직접 지정). `champion_rune_sub_perk_order_check`: `sub_perk1 < sub_perk2` (016) |
 | `champion_spell` | `champion_id`, `position`, `spell1_id`, `spell2_id`, `pick`, `win` | PK `(champion_id, position, spell1_id, spell2_id)`, `spell1_id < spell2_id` |
 | `champion_skill` | `champion_id`, `position`, `skill_order`, `pick`, `win` | PK `(champion_id, position, skill_order)`, `champion_skill_skill_order_check`: `skill_order ~ '^[QWER]{11}$'` |
 
@@ -208,7 +209,7 @@
 | 주인 | 백엔드와 마이그레이션 모두 `DATABASE_URL`(`postgres` 역할)로 접속하므로 모든 객체의 주인이 같다 |
 
 - **Supabase 기본 권한(`pg_default_acl`)이 public 새 객체에 `anon`·`authenticated` 권한을 자동으로 준다.** 그래서 새 테이블·뷰·시퀀스·함수는 마이그레이션에서 이름을 적어 하나씩 `REVOKE`한다. `ALTER DEFAULT PRIVILEGES`는 지속 설정 변경이라 쓰지 않고, 대신 테스트 006이 스키마 전체를 자동 검사한다 (결정 사항 표).
-- **pg_cron 권한:** 확장이 `cron.schedule`·`cron.unschedule` 등에 `PUBLIC` EXECUTE를, `cron.job`·`cron.job_run_details`에 `PUBLIC` 읽기를 기본으로 준다. 하지만 `anon`·`authenticated`는 `cron` 스키마 USAGE가 없어 실제로 부를 수도 볼 수도 없다 (42501). 확장 주인(`supabase_admin`)이 준 권한이라 `postgres`로 회수도 안 될 가능성이 크다. **기본값을 유지**하고 마이그레이션에서 `cron` 권한을 바꾸지 않는다. 테스트 011이 `cron` 스키마 USAGE나 직접 부여가 생기면 실패한다. 이상이 보이면 고치지 말고 메인 에이전트에게 보고한다.
+- **pg_cron 권한:** 확장이 `cron.schedule`·`cron.unschedule` 등에 `PUBLIC` EXECUTE를, `cron.job`·`cron.job_run_details`에 `PUBLIC` 읽기를 기본으로 준다. 하지만 `anon`·`authenticated`는 `cron` 스키마 USAGE가 없어 실제로 부를 수도 볼 수도 없다 (42501). 확장 주인(`supabase_admin`)이 준 권한이라 `postgres`로 회수도 안 될 가능성이 크다. **기본값을 유지**하고 마이그레이션에서 `cron` 권한을 바꾸지 않는다. 테스트 011이 `cron` 스키마 USAGE나 `cron` 스키마 함수 전체 중 어느 것에라도 직접 부여가 생기면 실패한다. 이상이 보이면 고치지 말고 메인 에이전트에게 보고한다.
 - `cron`은 PostgREST 노출 스키마가 아니다. 대시보드에서 노출 스키마 설정을 바꾸지 않는다.
 
 ---
@@ -252,14 +253,19 @@
 |--------|---------|---------|-----------|
 | `champion` | `team_position IS NOT NULL` | `champion_id`, `team_position` | 전부 |
 | `champion_item` | 위 + 아이템 `> 0` | `item_id` (한 줄 안 중복은 1번) | **전부** |
-| `champion_rune` | 위 | 룬 11개 컬럼 | **상위 10개** |
+| `champion_rune` | 위 + `sub_perk1 <> sub_perk2` | 룬 11개 컬럼. 단 보조 2개는 `least(sub_perk1, sub_perk2)`, `greatest(sub_perk1, sub_perk2)` | **상위 10개** |
 | `champion_spell` | 위 + `summoner1_id <> summoner2_id` | `least(s1, s2)`, `greatest(s1, s2)` | **상위 10개** |
 | `champion_skill` | 위 + `length(skill_order) >= 11` (NULL·빈 문자열·10자 이하 제외) | `left(skill_order, 11)` | **상위 10개** |
 
 - `champion.ban`: `tmp_base` 전체(포지션 NULL 줄 포함)에서 챔피언별 `count(DISTINCT match_id)`. 양 팀이 같은 챔피언을 밴해도 그 게임은 1번. 같은 챔피언의 모든 포지션 줄에 같은 값. `champion` 줄에 LEFT JOIN, 없으면 0.
 - 포지션 NULL 줄은 `pick`에서 빠지고 `stats_window.games`·`ban`에는 포함된다.
 - 상위 N개: `row_number() OVER (PARTITION BY champion_id, team_position ORDER BY pick DESC, win DESC, 키 ASC) <= 10`. 키를 마지막 정렬에 넣어 결과가 매번 같다.
-- 스펠이 같은 번호인 줄은 게임에서 나올 수 없지만, 들어오면 `spell1_id < spell2_id` CHECK 때문에 집계 전체가 실패하므로 뺀다.
+- 스펠이 같은 번호인 줄은 게임에서 나올 수 없지만, 들어오면 `spell1_id < spell2_id` CHECK 때문에 집계 전체가 실패하므로 뺀다. 보조 룬이 같은 번호인 줄도 같은 이유로 뺀다 (`sub_perk1 < sub_perk2` CHECK).
+- **룬 보조 정렬 (016, 변경 04):** Riot은 보조 룬 2개(`perks.styles[1].selections[0..1]`)를 누른 순서대로 준다. 같은 페이지가 순서만 바뀌어 두 줄로 세어지지 않게 작은 번호 → `sub_perk1`, 큰 번호 → `sub_perk2`로 묶는다. 원본은 누른 순서 그대로 둔다.
+  - `GROUP BY`에는 `least(…)`, `greatest(…)` **식을 그대로** 쓴다. `sub_perk1`이라고만 쓰면 PostgreSQL은 별칭이 아니라 원본 컬럼으로 묶는다 (스펠 블록과 같은 방식). 바깥 `row_number()`의 `ORDER BY g.sub_perk1, g.sub_perk2`는 정렬된 값을 가리킨다.
+  - 핵심 룬 4개(`primary_perk1`~`4`)는 칸마다 그 줄의 룬만 나오고, 파편 3개(`stat_offense`·`flex`·`defense`)는 칸마다 뜻이 다르다 (예: `5008`이 공격·유연 칸에 모두 나옴). 그래서 **정렬하지 않는다.**
+  - 016 적용 전 스냅숏에서 1순위와 2순위가 순서만 다른 같은 페이지인 챔피언 × 포지션이 106개였고, 적용 뒤 0개다. 바뀐 값은 `db_build.md`에 있다.
+  - 보조 룬 2개의 **값 순서는 번호순**이다. 화면에서 룬 줄 순서로 보여 주려면 프론트가 Data Dragon `runesReforged.json` 줄 순서로 다시 정렬한다 (결정 04-E).
 - `champion_rune.id`는 재집계마다 새 번호를 받는다. 백엔드는 `id`를 고정 키로 쓰지 않는다.
 
 | 저장 개수 | 이유 |
@@ -359,15 +365,15 @@ ORDER BY start_time DESC LIMIT 7;
 
 ## 9. 수집 범위와 용량
 
-> 요약: KR 솔로랭크, 최근 14일에 시작한 게임만 받고 원본은 21일 보관한다. 본 수집 규모에서도 약 165~180MB로 무료 한도 500MB 안이며, 집계는 창 1개라 시간이 지나도 늘지 않는다.
+> 요약: KR 솔로랭크, 최근 14일에 시작한 게임만 받고 원본은 21일 보관한다. 상한 규모(25,000게임)에서도 약 165~180MB로 무료 한도 500MB 안이며, 집계는 창 1개라 시간이 지나도 늘지 않는다.
 
 | 구분 | 내용 |
 |------|------|
-| 테스트 수집 | 플래티넘·에메랄드·다이아. 계약 문구는 티어당 100명이지만, 실제 테스트 수집은 사용자 결정으로 티어당 약 250명(765명)으로 했다. 인원·디비전 배분·플레이어당 게임 수는 백엔드 수집기 설정이고 DB는 허용 값만 강제한다 |
-| 본 수집 | 에메랄드 이상 (에메랄드 : 다이아 : 마스터 이상 = 4 : 4 : 2), 테스트 뒤 다시 정함. 마스터 이상은 디비전이 없어 별도 리그 API가 필요 |
+| 수집 대상 | 플래티넘·에메랄드·다이아 티어당 250명 (실제 765명, 계약 v8). 인원·디비전 배분·플레이어당 게임 수는 백엔드 수집기 설정이고 DB는 허용 값만 강제한다 |
+| 마스터 이상 | 디비전이 없어 같은 방식으로 고르게 뽑을 수 없어 지금은 수집하지 않는다. `ranked_players.tier`는 계속 허용한다 (결정 04-C) |
 | 수집 기간 | 게임 ID 목록을 `startTime = 지금 − 14일`(초)로 요청. 창 밖 게임은 받지 않음 |
 
-본 수집 예상 (14일 창 최대 25,000게임, 원본 21일):
+용량 상한 계산 (14일 창 최대 25,000게임, 원본 21일). 지금 규모는 14일 약 4천 게임, DB 약 90~100MB다:
 
 | 테이블 | 줄 수 | 용량 |
 |--------|-------|------|
@@ -398,7 +404,8 @@ ORDER BY start_time DESC LIMIT 7;
 | `008_ranked_players_tier.sql` | 허용 6개, 거부 6개(`IRON`~`GOLD`, `platinum`, `''`), CHECK 정의 |
 | `009_window_boundary.sql` | 창 경계 (정확히 14일 전 포함, 1µs 더 이전 제외, 끝 제외, 미래 제외, 9줄 제외), 패치 구성 합계 = games, 반환 `patches` 순서, `p_days = 1` 재집계 |
 | `010_purge_old_games.sql` | 정확히 21일은 남음, 21일 + 1초 삭제, CASCADE, 집계 유지, 인자 오류(13, NULL, 현재 창보다 짧음), 두 번째 호출 0 |
-| `011_daily_refresh_job.sql` | `pg_cron` 있음, 작업 1개, 일정 `0 20 * * *`·`active`, 명령 문자열, 실행 계정·DB, `anon`·`authenticated`의 `cron` 스키마 USAGE·직접 부여 없음 (`PUBLIC` 기본값은 `[주의]` NOTICE). 작업을 실행하지 않는다 |
+| `011_daily_refresh_job.sql` | `pg_cron` 있음, 작업 1개, 일정 `0 20 * * *`·`active`, 명령 문자열, 실행 계정·DB, `anon`·`authenticated`의 `cron` 스키마 USAGE 없음, **`cron` 스키마 모든 함수**에 직접 부여 없음 (결정 04-D. `PUBLIC` 기본값은 `[주의]` NOTICE). 작업을 실행하지 않는다 |
+| `012_rune_sub_perk_order.sql` | 실제 데이터(롤백, `stats_window`가 있을 때만): 같은 창 재집계 결과와 원본에서 `least`/`greatest`로 따로 계산한 상위 10개의 `EXCEPT` 양방향 0줄, 1순위 = 2순위 0개, 순서만 다른 쌍 0개. 샘플 11게임(`KR_91…`, 패치 `0.9`): 두 순서 `(8453, 8473)`·`(8473, 8453)` → 1줄 7/3, 다른 조합 2/1, 핵심 룬 칸만 바꾼 페이지는 별도 1/0, 같은 보조 룬 줄 제외(`champion` pick에는 포함), 1순위. CHECK 거부 2건(`(8473, 8453)`, `(8453, 8453)`, 23514)·통과 1건, 제약 정의 `convalidated` |
 
 - 새 테스트는 번호를 붙여 넣기만 하면 `verify.mjs`가 이름순으로 돈다. 새 테이블을 만들면 `verify.mjs`의 `TABLES` 목록(전후 줄 수 비교)에도 넣어야 한다 (`db/scripts/` 수정이라 승인 필요).
 - `refresh_window_stats`를 부르는 테스트는 롤백 안에서 실제 스냅숏을 지웠다 되돌리므로 실행마다 죽은 줄이 생긴다 (autovacuum이 정리).
@@ -485,6 +492,13 @@ ORDER BY start_time DESC LIMIT 7;
 | 집계는 **매일 05:00 KST(20:00 UTC)** pg_cron 작업 `tiergg_daily_refresh`, 별도 마이그레이션 015 (D23) | 수집과 집계를 분리. 확장 켜기는 따로 승인할 지속 설정이고, 실패해도 구조 변경은 이미 끝나 있음 | 2026-10-14 |
 | 예약 작업 시간 제한 5분 (`SET statement_timeout`) | Supabase 기본 2분에 맡기지 않음. 실제 집계는 수 초 | 2026-10-14 |
 | pg_cron 기본 `PUBLIC` 권한은 **그대로 둔다** | `anon`·`authenticated`는 `cron` 스키마 USAGE가 없어 실제로 못 씀(42501 확인). 확장 주인 권한이라 회수도 안 될 가능성이 큼. 테스트 011이 USAGE 생기면 실패 | 2026-10-14 |
+| 016 적용 때 `ANALYZE` 뒤 **같은 창으로 다시 집계** (04-A) | 화면이 바로 고쳐지고 CHECK를 한 번에 검증된 상태로 걸 수 있음. 원본은 그대로이고 매일 작업과 같은 동작. `aggregated_at`만 마이그레이션 시각이 됨 | 2026-10-16 |
+| `champion_rune` CHECK `sub_perk1 < sub_perk2` + 같은 보조 룬 줄은 집계에서 뺌 (04-B) | 정렬 규칙을 DB가 강제하고, 나올 수 없는 값 1줄 때문에 집계 전체가 실패하지 않게 (스펠과 같음). 실제 같은 번호 줄 0건 | 2026-10-16 |
+| `ranked_players.tier`의 `MASTER`~`CHALLENGER`는 계속 허용, 지금은 수집하지 않음 (04-C) | 구조 변경 없이 끝나고 나중에 다시 마이그레이션할 필요가 없음. `IRON`~`GOLD` 거부는 그대로 | 2026-10-16 |
+| 테스트 011 직접 부여 검사를 `cron` 스키마 모든 함수로 넓힘 (04-D) | 테스트 파일만 바뀌고 몇 줄. `schedule`·`unschedule` 말고 다른 cron 함수 부여도 잡음 | 2026-10-16 |
+| 보조 룬 값 순서는 DB가 번호순만 보장, 화면 순서는 프론트가 Data Dragon 줄 순서로 (04-E) | 이름·이미지·룬 구조를 DB에 두지 않는 원칙. API 계약 변경 없음 | 2026-10-16 |
+| 계약 v8 (04-F) | CHECK가 하나 늘고 집계 규칙이 바뀜. 수집 범위 문구(티어당 250명)도 실제와 맞춤 | 2026-10-16 |
+| 실행기(`migrate.mjs`)의 작은 번호 경고는 넣지 않음 (04-G) | 범위를 작게. "새 번호는 항상 마지막보다 크게" 규칙으로 충분 | 2026-10-16 |
 
 ---
 
@@ -495,7 +509,7 @@ ORDER BY start_time DESC LIMIT 7;
 | 단계 | 수정 가능 경로 | 비고 |
 |------|----------------|------|
 | Plan | `db/docs/db_spec.md` | 맨 아래 `## 이번 변경 (승인 대기)` 절만 |
-| Build | `db/migrations/` | **새 번호 파일만** (016~). 적용된 001~015 수정 금지 |
+| Build | `db/migrations/` | **새 번호 파일만** (017~). 적용된 001~016 수정 금지 |
 | Build | `db/tests/` | 검증 SQL 수정·추가 |
 | Build | `db/docs/db_build.md` | 기능별 상태 갱신 |
 | Build | `db/docs/db_spec.md` | 구현 뒤 이번 변경을 본문에 합치고 임시 절 삭제, 결정 사항 표 갱신 |
@@ -521,4 +535,5 @@ ORDER BY start_time DESC LIMIT 7;
 - 11레벨 전에 끝난 게임(이른 항복, 레벨이 낮은 서포터)은 스킬 집계에서 빠진다.
 - 우디르, 니달리·제이스·엘리스처럼 스킬 구조가 다른 챔피언도 같은 규칙으로 센다.
 - `matches.puuid`는 "처음 찾은 표본 1명"이라, 다른 티어 표본이 같은 게임에 나오면 먼저 찾은 쪽만 남는다.
+- `champion_rune`의 보조 룬 2개는 번호순으로 저장된다. 룬 줄 순서(위 줄 → 아래 줄)는 DB가 모른다 (Data Dragon을 DB에 두지 않는 원칙). 화면 순서는 프론트가 정한다.
 - 시퀀스는 롤백되지 않아 검증 실행마다 `collection_logs_id_seq`, `champion_rune_id_seq`가 올라간다. 백엔드는 id를 순서 번호로 가정하지 않는다.

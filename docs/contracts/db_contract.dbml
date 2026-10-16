@@ -1,4 +1,5 @@
 // Tier.GG DB 계약 (DB ↔ 백엔드) - dbdiagram.io용 DBML
+// v8 (2026-10-16) - 변경 04: 룬 보조 정렬, 수집 범위 티어당 250명
 // v7 (2026-10-14) - 변경 03: 패치 기준 → 최근 14일 창. game_start_at, stats_window, stats_window_patch
 // 원칙
 //  1. 원본 컬럼은 Riot 응답 필드 이름을 snake_case로 그대로 쓴다.
@@ -40,8 +41,8 @@ TableGroup "운영" [color: #5F5E5A, note: '수집이 언제 돌았고 결과가
 Table ranked_players [headercolor: #0F6E56, note: '''
 ① 수집 대상 플레이어 (표본)
 - 출처: league-v4 /lol/league/v4/entries/{queue}/{tier}/{division}
-- 테스트 수집: 플래티넘 · 에메랄드 · 다이아 각 100명, 디비전 I~IV 고르게 (티어별 인원은 백엔드 수집기 설정)
-- 본 수집: 에메랄드 이상, 에메랄드 : 다이아 : 마스터 이상 = 4 : 4 : 2 (테스트 뒤 다시 정함)
+- 수집: 플래티넘 · 에메랄드 · 다이아 티어당 250명, 디비전 I~IV 고르게 (인원은 백엔드 수집기 설정)
+- 마스터 이상은 허용 값만 남기고 지금은 수집하지 않음
 - 이 사람들의 puuid로 게임 ID를 찾는다
 '''] {
   puuid text [pk, note: '플레이어 고유 ID. 응답의 puuid']
@@ -85,8 +86,8 @@ Table match_players [headercolor: #0F6E56, note: '''
   primary_perk3 int [not null, note: 'perks.styles[0].selections[2].perk (예: 8140)']
   primary_perk4 int [not null, note: 'perks.styles[0].selections[3].perk (예: 8135)']
   sub_style int [not null, note: '보조 룬 트리. perks.styles[1].style (예: 8000 정밀)']
-  sub_perk1 int [not null, note: 'perks.styles[1].selections[0].perk (예: 8299)']
-  sub_perk2 int [not null, note: 'perks.styles[1].selections[1].perk (예: 9104)']
+  sub_perk1 int [not null, note: 'perks.styles[1].selections[0].perk (예: 8299). 누른 순서 그대로. 정렬은 집계 함수가']
+  sub_perk2 int [not null, note: 'perks.styles[1].selections[1].perk (예: 9104). 누른 순서 그대로. 정렬은 집계 함수가']
   stat_offense int [not null, note: '능력치 파편 공격. perks.statPerks.offense (예: 5008)']
   stat_flex int [not null, note: '능력치 파편 유연. perks.statPerks.flex (예: 5008)']
   stat_defense int [not null, note: '능력치 파편 방어. perks.statPerks.defense (예: 5011)']
@@ -170,6 +171,8 @@ Table champion_rune [headercolor: #534AB7, note: '''
 - 룬 페이지 전체(트리 2개 + 룬 6개 + 파편 3개)가 같아야 같은 조합으로 센다
 - 룬을 하나씩 따로 세면 존재할 수 없는 페이지가 나올 수 있어서 조합 단위로 센다
 - 조합이 많아서 챔피언 x 포지션마다 상위 10개만 저장
+- 보조 룬 2개는 누른 순서와 무관하게 작은 번호 → sub_perk1, 큰 번호 → sub_perk2 (스펠과 같은 방식).
+  두 보조 룬이 같은 줄은 뺀다. 핵심 룬 4개와 파편 3개는 칸이 정해져 있어 그대로. CHECK champion_rune_sub_perk_order_check (sub_perk1 < sub_perk2)
 '''] {
   id bigint [pk, increment]
   champion_id int [not null]
@@ -180,8 +183,8 @@ Table champion_rune [headercolor: #534AB7, note: '''
   primary_perk3 int [not null]
   primary_perk4 int [not null]
   sub_style int [not null]
-  sub_perk1 int [not null]
-  sub_perk2 int [not null]
+  sub_perk1 int [not null, note: '두 보조 룬 중 작은 번호. CHECK sub_perk1 < sub_perk2']
+  sub_perk2 int [not null, note: '두 보조 룬 중 큰 번호']
   stat_offense int [not null]
   stat_flex int [not null]
   stat_defense int [not null]
@@ -241,6 +244,7 @@ Table champion_skill [headercolor: #534AB7, note: '''
 // ───────────── 집계 호출 규칙 (db_contract.md 9-4) ─────────────
 // 집계: pg_cron 작업 tiergg_daily_refresh, 매일 20:00 UTC(05:00 KST): ANALYZE matches, match_players; SELECT refresh_window_stats(14)
 // 백엔드는 refresh_window_stats(14) 직전에 같은 연결에서 ANALYZE matches, match_players 를 실행한다 (9-4)
+// ANALYZE는 규모와 관계없이 항상 한다 (5,000게임도 통계가 틀리면 2분 초과)
 // purge_old_games(21)은 집계 뒤, 사용자 확인(--yes) 뒤에만 실행한다
 
 

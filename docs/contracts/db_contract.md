@@ -2,11 +2,21 @@
 
 > 이 문서는 `!db`가 작성하고 `!백엔드`가 읽는 계약 문서다. 테이블 구조, 수집 범위, 집계 함수, 저장 규칙을 정한다. (CLAUDE.md 9장)
 
-- 상태: **v7 승인됨 (2026-10-14, 변경 03)**
-- 기준: `docs/contracts/db_contract.dbml` (v7, 2026-10-14 변경 03). 이 문서와 dbml이 다르면 dbml이 우선이다.
+- 상태: **v8 승인됨 (2026-10-16, 변경 04)**
+- 기준: `docs/contracts/db_contract.dbml` (v8, 2026-10-16 변경 04). 이 문서와 dbml이 다르면 dbml이 우선이다.
 - DB: Supabase 무료 플랜 (PostgreSQL 17, 500MB)
 - 범위: 챔피언 티어리스트(포지션별 1~5티어) + 챔피언 상세 추천(아이템, 룬, 스펠, 스킬) 통계는 최근 14일 게임 기준.
 - 전적 검색과 AI 피드백용 테이블은 이번 범위에 포함하지 않는다.
+
+### v7 → v8 변경 (변경 04, 2026-10-16)
+
+| 변경 | 이유 |
+|------|------|
+| `champion_rune`: 보조 룬 2개를 `least`/`greatest`로 정렬해 묶고, 두 보조 룬이 같은 줄은 뺀다. CHECK `champion_rune_sub_perk_order_check` (`sub_perk1 < sub_perk2`) 추가 (마이그레이션 `016_rune_sub_perk_sorted.sql`) | Riot은 보조 룬을 누른 순서대로 준다. 같은 페이지가 순서만 바뀌어 두 줄로 세어져 1순위와 2순위가 같은 페이지인 챔피언 × 포지션이 106개였다 (변경 뒤 0개) |
+| 수집 범위를 실제와 맞춤: 플래티넘·에메랄드·다이아 **티어당 250명**. 본 수집(에메랄드 이상 4 : 4 : 2) 계획은 지금은 두지 않는다. `MASTER`~`CHALLENGER`는 허용 값만 남긴다 | 사용자 결정. 실제 수집은 765명으로 했다 |
+| 보안 장에 pg_cron 기본 권한 판단, 9-4에 `ANALYZE`를 규모와 관계없이 하는 이유 추가 | 문서에 빠져 있었음 |
+
+- 원본 저장 형식과 API 응답 모양은 바뀌지 않는다. `champion_rune`의 보조 룬 2개 **값 순서만** 번호순이 된다 (화면의 룬 줄 순서는 프론트가 Data Dragon으로 정한다).
 
 ### v6 → v7 변경 (변경 03, 2026-10-14)
 
@@ -47,7 +57,7 @@
 
 ## 1. 수집 범위
 
-> 요약: KR 서버 **솔로랭크**, **최근 14일에 시작한** 게임만 모은다. 원본은 **21일** 보관한다. 첫 실제 수집(**테스트**)은 **플래티넘·에메랄드·다이아 각 100명**, **본 수집**은 **에메랄드 이상**이다. 14일 창에 최대 **2만 5천 게임**이다.
+> 요약: KR 서버 **솔로랭크**, **최근 14일에 시작한** 게임만 모은다. 원본은 **21일** 보관한다. 수집 대상은 **플래티넘·에메랄드·다이아 티어당 250명**이다. 용량은 14일 창 최대 **2만 5천 게임**을 상한으로 계산했다.
 
 ### 1-1. 수집 기준
 
@@ -55,9 +65,9 @@
 |------|------|------|
 | 서버 | KR | 한국 서비스 |
 | 큐 | 솔로랭크. 게임 ID 목록을 `queue=420`으로 요청 | 일반·자유랭크는 실력·조합 편차가 큼. DB에는 큐 컬럼이 없으므로 요청 단계에서 거른다 |
-| 티어 | 테스트: 플래티넘·에메랄드·다이아 각 100명 (1-3). 본 수집: 에메랄드 이상 (에메랄드 : 다이아 : 마스터 이상 = 4 : 4 : 2, 테스트 뒤 다시 정함) | 표본 품질. 한 티어에 몰리지 않게 비율 고정 |
+| 티어 | 플래티넘·에메랄드·다이아 티어당 250명 (디비전 I~IV 고르게, 인원 배분은 백엔드 설정, 1-3) | 표본 품질. 한 티어에 몰리지 않게 티어별 인원 고정 |
 | 원본 보관 | **시작 시각 기준 최근 21일** (통계 창 14일 + 여유 7일) | 무료 용량. 오래된 원본은 `purge_old_games`로 삭제 |
-| 창당 게임 수 | 최근 14일 최대 25,000게임 | 아래 용량 계산 기준 |
+| 창당 게임 수 | 상한 최근 14일 25,000게임 (지금 약 4천 게임) | 아래 용량 상한 계산 기준 |
 | 수집 기간 | 게임 ID 목록을 `startTime = 지금 − 14일`(초)로 요청 | 창 밖 게임은 처음부터 받지 않는다 |
 | 플레이어당 게임 수 | 최대 20게임 (권장) | 원챔 장인 한 명이 통계를 좌우하지 않게 |
 | 제외 게임 | `gameDuration < 300`(5분 미만, 다시하기) | 정상 게임이 아님. **저장하지 않는다** |
@@ -65,9 +75,12 @@
 | 타임라인 원본 | 저장하지 않음 | 한 판 약 570KB. 스킬 순서만 뽑아 `skill_order`에 저장 |
 | 집계 결과 | **현재 창 1개만** (집계할 때마다 통째로 다시 만듦) | 약 4~10MB로 고정 |
 
-- `ranked_players.tier` 허용 값: `PLATINUM`, `EMERALD`, `DIAMOND`, `MASTER`, `GRANDMASTER`, `CHALLENGER` (CHECK `ranked_players_tier_check`). `IRON`~`GOLD`는 저장할 수 없다.
+- `ranked_players.tier` 허용 값: `PLATINUM`, `EMERALD`, `DIAMOND`, `MASTER`, `GRANDMASTER`, `CHALLENGER` (CHECK `ranked_players_tier_check`). `IRON`~`GOLD`는 저장할 수 없다. `MASTER`·`GRANDMASTER`·`CHALLENGER`는 지금 수집하지 않지만 나중을 위해 계속 허용한다 (변경 04 결정 04-C).
 
-### 1-2. 용량 계산 (14일 창 25,000게임, 원본 21일 보관)
+### 1-2. 용량 상한 계산 (14일 창 25,000게임, 원본 21일 보관)
+
+- 지금 범위(765명)는 14일 약 4천 게임, DB 약 90~100MB다. 아래 표는 규모를 키웠을 때의 **상한 계산**이다.
+
 
 | 테이블 | 줄 수 | 1줄 크기 | 용량 |
 |--------|-------|----------|------|
@@ -84,12 +97,12 @@
 - 25,000게임이면 참가자 25만 줄, 챔피언 × 포지션당 평균 약 1,000판이다.
 - 개발 키 기준 속도: 게임 1개 = `getMatch` + `timeline` 2회 호출. 2분 100회 제한이면 시간당 약 1,500게임, 25,000게임은 약 17시간이다.
 
-### 1-3. 개발 단계 운영 (테스트 수집)
+### 1-3. 개발 단계 운영
 
-- 첫 실제 수집은 **테스트 수집**으로 수집 → 저장 → 집계 → 화면 흐름을 검증한다.
-- 표본: **플래티넘·에메랄드·다이아 각 100명, 모두 300명.** 각 티어에서 디비전 I~IV에 25명씩 고르게 고른다. `league-v4` `/lol/league/v4/entries/RANKED_SOLO_5x5/{tier}/{division}`만 쓴다.
-- 마스터·그랜드마스터·챌린저는 디비전이 없어 같은 방식으로 고르게 뽑을 수 없으므로 테스트에서 뺀다. 본 수집 때 별도 리그 API로 다시 정한다.
-- 예상 규모: 약 2,200~2,700게임 (300명 × 14일 안 게임 평균 약 8~10게임(상한 20), 겹침 약 10% 제외, 상한 약 5,400), Riot 호출 약 5,700회·개발 키로 약 2시간, 약 13MB (상한이면 약 25MB). 챔피언 × 포지션당 평균 약 30판이라 티어는 대부분 NULL("표본 부족")이다.
+- 수집 → 저장 → 집계 → 화면 흐름을 개발 키로 운영한다.
+- 표본: **플래티넘·에메랄드·다이아 티어당 250명, 모두 약 750명 (실제 765명).** 각 티어에서 디비전 I~IV에 고르게 고른다. `league-v4` `/lol/league/v4/entries/RANKED_SOLO_5x5/{tier}/{division}`만 쓴다.
+- 마스터·그랜드마스터·챌린저는 디비전이 없어 같은 방식으로 고르게 뽑을 수 없어 지금은 수집하지 않는다.
+- 실제 규모 (2026-10-16): 3,975게임, `match_players` 39,750줄, DB 약 90~100MB. `champion` 606줄 중 티어가 나온 줄(50판 이상) 187개.
 - 티어·디비전별 인원, 디비전 안에서 고르는 방법, 플레이어당 게임 수는 **백엔드 수집기 설정**이다. DB는 허용 값(1-1)만 확인한다.
 - 개발 키(24시간 만료)를 사용자가 매일 직접 발급해 `.env`에 넣고, 수집은 명령어로 직접 실행한다.
 - 키가 만료되면(401/403) 수집을 멈추고 `collection_logs.status = 'key_expired'`로 기록한다.
@@ -107,7 +120,7 @@
 
 | 묶음 | 테이블 | 한 줄의 의미 | 설명 |
 |------|--------|--------------|------|
-| 원본 | `ranked_players` | 플레이어 1명 | 수집 대상 표본(테스트: 플래티넘~다이아, 본 수집: 에메랄드 이상). 이 사람들의 게임 ID를 찾는다 |
+| 원본 | `ranked_players` | 플레이어 1명 | 수집 대상 표본(플래티넘·에메랄드·다이아). 이 사람들의 게임 ID를 찾는다 |
 | 원본 | `matches` | 게임 1개 | 게임 ID, 찾을 때 쓴 표본 플레이어, 패치, 시작 시각 |
 | 원본 | `match_players` | 게임 속 플레이어 1명 | **핵심.** 게임당 10줄. 챔피언, 포지션, 승패, 밴, 스펠, 룬, 최종 아이템, 스킬 순서 |
 | 집계 | `stats_window` | 현재 창 1개 (0~1줄) | 창 시작·끝, 전체 게임 수(픽률·밴률 분모), 집계 시각 |
@@ -142,7 +155,7 @@
 
 ## 4. ERD
 
-> 요약: dbml v7을 Mermaid로 옮긴 그림이다. 각 테이블 이름 옆에 설명을 붙였다.
+> 요약: dbml v8을 Mermaid로 옮긴 그림이다. 각 테이블 이름 옆에 설명을 붙였다.
 
 ```mermaid
 erDiagram
@@ -235,8 +248,8 @@ erDiagram
         int primary_perk3 UK
         int primary_perk4 UK
         int sub_style UK
-        int sub_perk1 UK
-        int sub_perk2 UK
+        int sub_perk1 UK "두 보조 룬 중 작은 번호, sub_perk1 < sub_perk2"
+        int sub_perk2 UK "두 보조 룬 중 큰 번호"
         int stat_offense UK
         int stat_flex UK
         int stat_defense UK
@@ -272,7 +285,7 @@ erDiagram
     }
 ```
 
-- `champion_rune`의 `UK`는 `(champion_id, position, 룬 11개)` 전체에 걸린 유니크 키 1개다.
+- `champion_rune`의 `UK`는 `(champion_id, position, 룬 11개)` 전체에 걸린 유니크 키 1개다. CHECK `champion_rune_sub_perk_order_check`: `sub_perk1 < sub_perk2`.
 
 ---
 
@@ -282,7 +295,7 @@ erDiagram
 
 | 단계 | Riot API / SQL | 하는 일 | 채우는 곳 |
 |------|----------------|---------|-----------|
-| ① | `league-v4` `/lol/league/v4/entries/RANKED_SOLO_5x5/{tier}/{division}` (테스트: 플래티넘·에메랄드·다이아, 본 수집: 에메랄드·다이아), 마스터 이상은 `league-v4` `masterleagues`·`grandmasterleagues`·`challengerleagues` `/by-queue/RANKED_SOLO_5x5` | 티어·디비전별 인원은 백엔드 수집기 설정 (1-1, 1-3) | `ranked_players` (upsert) |
+| ① | `league-v4` `/lol/league/v4/entries/RANKED_SOLO_5x5/{tier}/{division}` (플래티넘·에메랄드·다이아). 마스터 이상용 `league-v4` `masterleagues`·`grandmasterleagues`·`challengerleagues` `/by-queue/RANKED_SOLO_5x5`는 지금은 쓰지 않음 | 티어·디비전별 인원은 백엔드 수집기 설정 (1-1, 1-3) | `ranked_players` (upsert) |
 | ② | `match-v5` `/lol/match/v5/matches/by-puuid/{puuid}/ids?queue=420&startTime={지금 − 14일, 초}` | 솔로랭크 게임 ID 목록. 이미 `matches`에 있는 ID는 건너뜀 | (메모리, 아직 저장 안 함) |
 | ③ | `match-v5` `/lol/match/v5/matches/{matchId}` | 패치, 시작 시각, 참가자 10명, 밴 | (메모리) |
 | ④ | `match-v5` `/lol/match/v5/matches/{matchId}/timeline` | `SKILL_LEVEL_UP` 이벤트로 스킬 순서 | (메모리) |
@@ -361,7 +374,7 @@ erDiagram
 | `team_position` | Riot 빈 문자열 `""`은 NULL |
 | `ban_champion_id` | `info.teams[].bans[]`에서 `pickTurn = participantId`인 항목의 `championId`. `-1`(밴 없음)이거나 짝이 없으면 NULL. 짝이 없으면 수집 로그에 경고 |
 | 스펠 | `summoner1Id`/`summoner2Id`는 Riot 값 그대로 저장 (D/F 위치 유지). 정렬은 집계 함수가 한다 |
-| 룬 | `perks.styles[0]` = 핵심, `[1]` = 보조. 선택 룬은 `selections` 순서 그대로 |
+| 룬 | `perks.styles[0]` = 핵심, `[1]` = 보조. 선택 룬은 `selections` 순서 그대로 저장한다. 보조 룬 정렬은 집계 함수가 한다 |
 | 아이템 | `item0`~`item5`는 Riot 값 그대로. 빈 칸은 `0` (NULL 아님). 같은 아이템 2개도 그대로 |
 | `skill_order` | timeline `SKILL_LEVEL_UP` 중 그 참가자의 `levelUpType = 'NORMAL'` 이벤트만(카이사 등의 `EVOLVE` 제외), `timestamp` 순, `skillSlot` 1→`Q` 2→`W` 3→`E` 4→`R`로 이어 붙임. 허용 형식 `^[QWER]*$` |
 | `ranked_players` | `rank`는 Riot 값 그대로. 표본 갱신은 upsert |
@@ -414,7 +427,7 @@ erDiagram
 | `champion.pick` / `win` | 대상 게임의 `match_players` 중 `team_position IS NOT NULL`, 챔피언 × 포지션별 줄 수 / 그중 `win = true` |
 | `champion.ban` | 대상 게임 중 `ban_champion_id = 그 챔피언`인 **게임 수** (`count(DISTINCT match_id)`, 양 팀이 같은 챔피언을 밴해도 1번). 포지션과 무관하게 같은 값 |
 | `champion_item` | 각 줄의 `item0`~`item5` 중 `0`(빈 칸)과 NULL을 빼고, **한 줄 안의 중복은 1번만** 센다 (예시의 `1036` 2개 → 1). 하위 재료도 포함. **모든 아이템 저장** |
-| `champion_rune` | 트리 2개 + 룬 6개 + 파편 3개가 모두 같은 조합끼리 센다. 챔피언 × 포지션마다 **상위 10개** |
+| `champion_rune` | 트리 2개 + 룬 6개 + 파편 3개가 모두 같은 조합끼리 센다. 보조 룬 2개는 `sub_perk1 = least(sub_perk1, sub_perk2)`, `sub_perk2 = greatest(…)`로 정렬해 묶는다 (누른 순서만 다른 페이지는 같은 조합). 두 보조 룬이 같은 줄은 뺀다. 핵심 룬 4개와 파편 3개는 칸이 정해져 있어 그대로. 챔피언 × 포지션마다 **상위 10개**. 저장 형식 CHECK `champion_rune_sub_perk_order_check`: `sub_perk1 < sub_perk2` (v8, 변경 04) |
 | `champion_spell` | `spell1_id = least(summoner1_id, summoner2_id)`, `spell2_id = greatest(…)`. 두 주문이 같은 줄(`summoner1_id = summoner2_id`)은 뺀다. **상위 10개** |
 | `champion_skill` | `skill_order`가 11자 이상인 줄만(NULL·빈 문자열·10자 이하 제외), `left(skill_order, 11)`로 묶는다 (예: `EQQWQRQEQEREEW` → `EQQWQRQEQER`). **상위 10개** (v5, 변경 01. v4의 "`skill_priority`가 NULL이 아닌 줄만, 모두 저장"(D3)을 대체). 저장 형식은 CHECK `champion_skill_skill_order_check`: `skill_order ~ '^[QWER]{11}$'` (Q·W·E·R 정확히 11자). |
 
@@ -464,7 +477,7 @@ erDiagram
 
 | 순서 | SQL | 이유 |
 |------|-----|------|
-| 1 | `ANALYZE matches, match_players` | 대량 수집·삭제 직후 통계가 "페이지는 있는데 줄은 0개"로 남으면 플래너가 원본을 1줄로 보고 느린 Nested Loop를 고른다. 2만 5천 게임에서 집계가 3~5분을 넘겼고, `ANALYZE` 후 5~7초였다 (db_review M2). `ANALYZE` 자체는 0.35~3.3초 |
+| 1 | `ANALYZE matches, match_players` | 대량 수집·삭제 직후 통계가 "페이지는 있는데 줄은 0개"로 남으면 플래너가 원본을 1줄로 보고 느린 Nested Loop를 고른다. 2만 5천 게임에서 집계가 3~5분을 넘겼고, `ANALYZE` 후 5~7초였다 (db_review M2). `ANALYZE` 자체는 0.35~3.3초. 5,000게임도 통계가 틀리면 2분을 넘겼다 (`ANALYZE` 뒤 1.6초). 수집 규모와 관계없이 항상 실행한다 |
 | 2 | `SELECT refresh_window_stats(14)` | 하루 1번 예약 작업이 실행. 백엔드 aggregate 명령(시험용)도 같은 순서 |
 | 3 | `SELECT purge_old_games(21)` | 집계를 마친 뒤, 사용자 확인(`--yes`) 뒤에만 |
 
@@ -482,12 +495,12 @@ erDiagram
 | # | 항목 | 결정 |
 |---|------|------|
 | 1 | Supabase 프로젝트 | 생성 완료 (무료 플랜, 500MB) |
-| 2 | 수집 티어 | 테스트: 플래티넘·에메랄드·다이아 각 100명, 디비전 I~IV 고르게 (변경 02). 본 수집: 에메랄드 이상 4 : 4 : 2 (테스트 뒤 다시 정함) |
+| 2 | 수집 티어 | 플래티넘·에메랄드·다이아 티어당 250명, 디비전 I~IV 고르게 (변경 04, 사용자 결정). 마스터 이상은 지금 수집하지 않음 |
 | 3 | 티어 표시 최소 표본 | 챔피언 × 포지션 **50판** 미만이면 티어 NULL ("표본 부족") |
 | 4 | 통계 기준 | 최근 14일에 시작한 게임 (변경 03). 패치 대체 규칙 없음. 패치 구성을 함께 표시 |
 | 5 | 추천 개수 | 화면에는 카테고리별 상위 2개 (프론트 작업 때 조정 가능) |
 | 6 | 원본 보관 | 시작 시각 기준 21일 (변경 03) |
-| 7 | 스키마 | dbml v7 (원본 3, 집계 7, 운영 1). 집계는 개수만, 비율·티어는 조회할 때 계산 |
+| 7 | 스키마 | dbml v8 (원본 3, 집계 7, 운영 1). 집계는 개수만, 비율·티어는 조회할 때 계산 |
 | 8 | 아이템 | `item0~5` 모든 아이템을 센다. 하위 재료는 프론트가 Data Dragon으로 거른다. 아이템 테이블 없음 |
 | 9 | 주 포지션 | 최대 2개, 2순위는 10% 이상일 때만 (백엔드) |
 | 10 | 운영 | 개발 키 24시간마다 수동 재발급, 수집은 수동 실행 |
@@ -495,6 +508,7 @@ erDiagram
 | 12 | 집계 전 통계 | `refresh_window_stats` 직전에 `ANALYZE matches, match_players` (변경 02, M2) |
 | 13 | 집계 보관 | 현재 14일 창 스냅숏 1개만 (D13) |
 | 14 | 집계 시점 | 매일 05:00 KST(20:00 UTC) pg_cron 작업 `tiergg_daily_refresh` (D23). 수집 뒤 자동 집계 없음 |
+| 15 | 룬 조합 | 보조 룬 2개는 순서와 관계없이 같은 조합 (변경 04) |
 
 ---
 
@@ -508,3 +522,4 @@ erDiagram
 - 뷰를 만들면 `security_invoker = true`로 만들어 RLS를 우회하지 않게 한다.
 - Riot API 키와 DB 접속 정보는 루트 `.env`에만 둔다. 값은 문서·로그·커밋에 출력하지 않는다.
 - Supabase 기본 권한(`pg_default_acl`)이 새 객체에 `anon`·`authenticated` 권한을 주므로, 새 테이블·시퀀스·뷰·함수는 만들 때마다 이름을 적어 `REVOKE`한다. 보안 테스트는 스키마의 모든 객체를 자동으로 검사한다 (db_review L2).
+- pg_cron: `cron.schedule` 등에 확장 기본 `PUBLIC` EXECUTE가 있지만 `anon`·`authenticated`는 `cron` 스키마 USAGE가 없어 부를 수 없다(42501 확인). 기본값을 유지하고 USAGE를 주지 않는다. 테스트 011이 USAGE·직접 부여를 검사한다.
