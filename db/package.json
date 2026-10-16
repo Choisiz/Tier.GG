@@ -1,0 +1,17 @@
+{
+  "name": "tiergg-db",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tier.GG DB 마이그레이션 실행기와 샘플 검증",
+  "scripts": {
+    "migrate": "node --env-file=../.env scripts/migrate.mjs up",
+    "migrate:status": "node --env-file=../.env scripts/migrate.mjs status",
+    "migrate:fresh-check": "node --env-file=../.env scripts/migrate.mjs fresh-check",
+    "verify": "node --env-file=../.env scripts/verify.mjs",
+    "verify:fresh": "node --env-file=../.env scripts/verify.mjs --fresh"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
+}

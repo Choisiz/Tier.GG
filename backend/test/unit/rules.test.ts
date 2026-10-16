@@ -1,0 +1,152 @@
+// mainPositions, validate, 수집 설정·표본 도우미, 로그 가리기
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { mainPositions } from '../../src/api/mainPositions.js';
+import { parseChampionIdParam, parsePositionParam } from '../../src/api/validate.js';
+import { divisionQuota, buildCollectionConfig, windowStart } from '../../src/config/collection.js';
+import { eligibleEntries, pickRandom, seededRandom } from '../../src/collector/sample.js';
+import { sortIdsNewestFirst } from '../../src/collector/matches.js';
+import { redact } from '../../src/lib/logger.js';
+
+describe('mainPositions', () => {
+  it('2순위 9.9% → 1개, 10.0% → 2개', () => {
+    assert.deepEqual(
+      mainPositions([
+        { position: 'TOP', pick: 901 },
+        { position: 'MIDDLE', pick: 99 },
+      ]),
+      ['TOP'],
+    );
+    assert.deepEqual(
+      mainPositions([
+        { position: 'TOP', pick: 90 },
+        { position: 'MIDDLE', pick: 10 },
+      ]),
+      ['TOP', 'MIDDLE'],
+    );
+  });
+
+  it('3순위는 항상 제외', () => {
+    assert.deepEqual(
+      mainPositions([
+        { position: 'TOP', pick: 40 },
+        { position: 'MIDDLE', pick: 30 },
+        { position: 'JUNGLE', pick: 30 },
+      ]),
+      ['TOP', 'JUNGLE'],
+    );
+  });
+
+  it('동률은 포지션 이름 순', () => {
+    assert.deepEqual(
+      mainPositions([
+        { position: 'UTILITY', pick: 5 },
+        { position: 'BOTTOM', pick: 5 },
+      ]),
+      ['BOTTOM', 'UTILITY'],
+    );
+    assert.deepEqual(mainPositions([]), []);
+  });
+});
+
+describe('validate', () => {
+  it('position (대문자 정확히)', () => {
+    assert.equal(parsePositionParam('TOP', true).ok, true);
+    assert.equal(parsePositionParam('top', true).ok, false);
+    assert.equal(parsePositionParam(undefined, true).ok, false);
+    assert.deepEqual(parsePositionParam(undefined, false), { ok: true, value: null });
+    assert.equal(parsePositionParam(['TOP', 'MIDDLE'], false).ok, false);
+  });
+
+  it('championId ^[1-9][0-9]{0,4}$', () => {
+    assert.deepEqual(parseChampionIdParam('23'), { ok: true, value: 23 });
+    assert.deepEqual(parseChampionIdParam('99999'), { ok: true, value: 99999 });
+    for (const bad of ['0', '023', '100000', '-1', 'Aatrox', '1.5', '']) {
+      assert.equal(parseChampionIdParam(bad).ok, false, bad);
+    }
+  });
+});
+
+describe('수집 설정·표본', () => {
+  it('티어당 100명 → 25/25/25/25, 50명 → 13/13/12/12', () => {
+    assert.deepEqual(divisionQuota(100), { I: 25, II: 25, III: 25, IV: 25 });
+    assert.deepEqual(divisionQuota(50), { I: 13, II: 13, III: 12, IV: 12 });
+    assert.deepEqual(divisionQuota(3), { I: 1, II: 1, III: 1, IV: 0 });
+  });
+
+  it('표본 보충: have=180, playersPerTier=250 → 모자란 70명 (02-2)', () => {
+    const q = divisionQuota(Math.max(0, 250 - 180));
+    assert.equal(q.I + q.II + q.III + q.IV, 70);
+  });
+
+  it('test 프리셋과 덮어쓰기', () => {
+    const c = buildCollectionConfig('test');
+    assert.deepEqual(c.tiers, ['PLATINUM', 'EMERALD', 'DIAMOND']);
+    assert.equal(c.playersPerTier, 250);
+    assert.equal(c.gamesPerPlayer, 20);
+    assert.equal(c.maxMatchesPerRun, null);
+    assert.equal(c.windowDays, 14);
+    assert.equal(c.maxGamesPerWindow, 25_000);
+    assert.equal(c.keepDays, 21);
+    assert.ok(!('keepPatches' in c) && !('maxGamesPerPatch' in c));
+    const o = buildCollectionConfig('test', { tiers: ['emerald'], maxMatches: 30 });
+    assert.deepEqual(o.tiers, ['EMERALD']);
+    assert.equal(o.maxMatchesPerRun, 30);
+    assert.throws(() => buildCollectionConfig('test', { tiers: ['MASTER'] }));
+    assert.throws(() => buildCollectionConfig('nope'));
+  });
+
+  it('windowStart: 2026-10-15T01:00:00Z − 14일 → sec 1790816400, ms 끝 3자리 버림', () => {
+    const now = Date.parse('2026-10-15T01:00:00Z');
+    assert.deepEqual(windowStart(now, 14), { ms: now - 14 * 86_400_000, sec: 1790816400 });
+    const w = windowStart(now + 999, 14);
+    assert.equal(w.sec, 1790816400);
+    assert.equal(w.ms, now + 999 - 14 * 86_400_000);
+  });
+
+  it('inactive 제외, 요청 티어·디비전만', () => {
+    const e = eligibleEntries(
+      [
+        { puuid: 'a', tier: 'EMERALD', rank: 'I' },
+        { puuid: 'b', tier: 'EMERALD', rank: 'I', inactive: true },
+        { puuid: 'c', tier: 'DIAMOND', rank: 'I' },
+        { puuid: 'd', tier: 'EMERALD', rank: 'II' },
+      ],
+      'EMERALD',
+      'I',
+    );
+    assert.deepEqual(e.map((x) => x.puuid), ['a']);
+  });
+
+  it('같은 시드면 같은 무작위 선택, 중복 없음', () => {
+    const items = Array.from({ length: 205 }, (_, i) => i);
+    const a = pickRandom(items, 13, seededRandom(42));
+    const b = pickRandom(items, 13, seededRandom(42));
+    assert.deepEqual(a, b);
+    assert.equal(new Set(a).size, 13);
+    assert.equal(pickRandom([1, 2], 5, seededRandom(1)).length, 2);
+  });
+
+  it('게임 ID 숫자 내림차순', () => {
+    assert.deepEqual(sortIdsNewestFirst(['KR_9', 'KR_10', 'KR_8408851980']), ['KR_8408851980', 'KR_10', 'KR_9']);
+  });
+});
+
+describe('logger 가리기', () => {
+  it('DATABASE_URL·비밀번호·호스트·RIOT_API_KEY를 가린다 (잘못된 % 인코딩 포함)', () => {
+    const before = { db: process.env.DATABASE_URL, key: process.env.RIOT_API_KEY };
+    process.env.DATABASE_URL = 'postgresql://user.abc:p%ZZass@db.example.com:5432/postgres';
+    process.env.RIOT_API_KEY = 'RGAPI-11111111-2222-3333-4444-555555555555';
+    try {
+      const s = redact(
+        'fail postgresql://user.abc:p%ZZass@db.example.com:5432/postgres host=db.example.com pw=p%ZZass key=RGAPI-11111111-2222-3333-4444-555555555555',
+      );
+      assert.ok(!s.includes('p%ZZass') && !s.includes('db.example.com') && !s.includes('RGAPI-1'), s);
+    } finally {
+      if (before.db === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = before.db;
+      if (before.key === undefined) delete process.env.RIOT_API_KEY;
+      else process.env.RIOT_API_KEY = before.key;
+    }
+  });
+});

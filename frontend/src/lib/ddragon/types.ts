@@ -16,7 +16,7 @@ export type DDragonImage = { full: string };
 export type DDragonChampionSummary = {
   /** "Aatrox" (URL·이미지용) */
   id: string;
-  /** 숫자 ID(문자열) "266". 매치 데이터의 championId와 대응 (이번 단계 미사용) */
+  /** 숫자 ID(문자열) "266". 백엔드 API의 championId와 대응 */
   key: string;
   /** "아트록스" */
   name: string;
@@ -86,12 +86,64 @@ export type DDragonChampionDetailResponse = {
   data: Record<string, DDragonChampionDetail>;
 };
 
+/** item.json의 아이템 1개 (사용하는 필드만) */
+export type DDragonItem = {
+  name: string;
+  /** "Boots", "Consumable", "Trinket" 등 */
+  tags?: string[];
+  /** 이 아이템으로 만드는 상위 아이템 (있으면 하위 재료) */
+  into?: string[];
+  /** 이 아이템의 재료 (없으면 기본 아이템) */
+  from?: string[];
+  gold: { total: number };
+  image: DDragonImage;
+};
+
+/** item.json 응답. 키 = 아이템 ID 문자열 ("3047") */
+export type DDragonItemListResponse = {
+  data: Record<string, DDragonItem>;
+};
+
+/** summoner.json의 소환사 주문 1개 */
+export type DDragonSummonerSpell = {
+  /** 문자열 id "SummonerFlash" */
+  id: string;
+  /** 숫자 ID(문자열) "4". 백엔드 spellIds와 대응 */
+  key: string;
+  name: string;
+  image: DDragonImage;
+};
+
+/** summoner.json 응답. 키 = 문자열 id */
+export type DDragonSummonerSpellListResponse = {
+  data: Record<string, DDragonSummonerSpell>;
+};
+
+/** runesReforged.json의 룬 1개 */
+export type DDragonRune = {
+  id: number;
+  name: string;
+  /** "perk-images/Styles/..." (버전 없는 경로) */
+  icon: string;
+};
+
+/** runesReforged.json의 룬 트리 1개 (정밀·지배 등) */
+export type DDragonRuneTree = {
+  id: number;
+  name: string;
+  icon: string;
+  /** 0번 = 핵심 룬 줄, 1~3번 = 일반 룬 줄 */
+  slots: { runes: DDragonRune[] }[];
+};
+
 /* ───────── 화면용 가공 타입 ───────── */
 
 /** 화면용 챔피언 요약 (리스트 카드) */
 export type ChampionSummary = {
   /** 영문 id "Aatrox" (상세 URL에 사용) */
   id: string;
+  /** 숫자 ID(문자열) "266". 백엔드 API 호출·매핑에 사용 */
+  key: string;
   /** 한글 이름 */
   name: string;
   /** 칭호 */
@@ -138,4 +190,34 @@ export type ChampionDetail = ChampionSummary & {
   abilities: ChampionAbility[];
   /** parentSkin 없는 것만, num 오름차순 */
   skins: ChampionSkin[];
+};
+
+/** ID로 찾는 아이템 정보 (itemFilter·화면 매핑용) */
+export type ItemInfo = {
+  name: string;
+  iconUrl: string;
+  tags: string[];
+  /** 상위 아이템이 있음 = 하위 재료 */
+  hasInto: boolean;
+  /** 재료가 있음 */
+  hasFrom: boolean;
+  /**
+   * 재료 중에 `Boots` 태그 아이템이 있음 (3단계 신발).
+   * 건메탈 군화 `3172`는 3단계 신발인데 태그에 `Boots`가 없어(`NonbootsMovement`) 태그만으로는 못 찾는다.
+   */
+  builtFromBoots: boolean;
+  goldTotal: number;
+};
+
+/** ID로 찾는 소환사 주문·룬 정보 */
+export type IconInfo = {
+  name: string;
+  iconUrl: string;
+};
+
+/** 화면용 룬 트리 (줄별 룬 목록) */
+export type RuneTreeInfo = IconInfo & {
+  id: number;
+  /** 0번 = 핵심 룬 줄 */
+  rows: { id: number; name: string; iconUrl: string }[][];
 };

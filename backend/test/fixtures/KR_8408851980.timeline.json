@@ -1,0 +1,1040 @@
+{
+  "metadata": {
+    "dataVersion": "2",
+    "matchId": "KR_8408851980",
+    "participants": [
+      "TEST_PUUID_01",
+      "TEST_PUUID_02",
+      "TEST_PUUID_03",
+      "TEST_PUUID_04",
+      "TEST_PUUID_05",
+      "TEST_PUUID_06",
+      "TEST_PUUID_07",
+      "TEST_PUUID_08",
+      "TEST_PUUID_09",
+      "TEST_PUUID_10"
+    ]
+  },
+  "info": {
+    "frameInterval": 60000,
+    "participants": [
+      {
+        "participantId": 1,
+        "puuid": "TEST_PUUID_01"
+      },
+      {
+        "participantId": 2,
+        "puuid": "TEST_PUUID_02"
+      },
+      {
+        "participantId": 3,
+        "puuid": "TEST_PUUID_03"
+      },
+      {
+        "participantId": 4,
+        "puuid": "TEST_PUUID_04"
+      },
+      {
+        "participantId": 5,
+        "puuid": "TEST_PUUID_05"
+      },
+      {
+        "participantId": 6,
+        "puuid": "TEST_PUUID_06"
+      },
+      {
+        "participantId": 7,
+        "puuid": "TEST_PUUID_07"
+      },
+      {
+        "participantId": 8,
+        "puuid": "TEST_PUUID_08"
+      },
+      {
+        "participantId": 9,
+        "puuid": "TEST_PUUID_09"
+      },
+      {
+        "participantId": 10,
+        "puuid": "TEST_PUUID_10"
+      }
+    ],
+    "frames": [
+      {
+        "timestamp": 0,
+        "events": []
+      },
+      {
+        "timestamp": 60028,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 1,
+            "timestamp": 3458,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 6,
+            "skillSlot": 1,
+            "timestamp": 13386,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 3,
+            "timestamp": 14955,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 4,
+            "skillSlot": 2,
+            "timestamp": 22278,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 9,
+            "skillSlot": 3,
+            "timestamp": 23848,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 7,
+            "skillSlot": 3,
+            "timestamp": 29793,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 1,
+            "timestamp": 30795,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 10,
+            "skillSlot": 1,
+            "timestamp": 52177,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 8,
+            "skillSlot": 1,
+            "timestamp": 56755,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 120042,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 5,
+            "skillSlot": 2,
+            "timestamp": 61304,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 2,
+            "timestamp": 78610,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 7,
+            "skillSlot": 1,
+            "timestamp": 81416,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 3,
+            "timestamp": 88030,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 1,
+            "timestamp": 94544,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 4,
+            "skillSlot": 1,
+            "timestamp": 99956,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 8,
+            "skillSlot": 2,
+            "timestamp": 103299,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 6,
+            "skillSlot": 2,
+            "timestamp": 103934,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 3,
+            "timestamp": 116901,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 9,
+            "skillSlot": 1,
+            "timestamp": 117569,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 180058,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 5,
+            "skillSlot": 1,
+            "timestamp": 120777,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 8,
+            "skillSlot": 3,
+            "timestamp": 125793,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 2,
+            "timestamp": 126095,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 6,
+            "skillSlot": 3,
+            "timestamp": 126396,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 1,
+            "timestamp": 132577,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 7,
+            "skillSlot": 2,
+            "timestamp": 134448,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 10,
+            "skillSlot": 2,
+            "timestamp": 145977,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 9,
+            "skillSlot": 3,
+            "timestamp": 159945,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 1,
+            "timestamp": 165194,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 2,
+            "timestamp": 165762,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 8,
+            "skillSlot": 1,
+            "timestamp": 179891,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 240067,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 5,
+            "skillSlot": 3,
+            "timestamp": 183328,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 4,
+            "skillSlot": 3,
+            "timestamp": 183862,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 6,
+            "skillSlot": 1,
+            "timestamp": 193181,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 7,
+            "skillSlot": 2,
+            "timestamp": 193415,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 10,
+            "skillSlot": 3,
+            "timestamp": 214472,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 1,
+            "timestamp": 223793,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 9,
+            "skillSlot": 2,
+            "timestamp": 228505,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 8,
+            "skillSlot": 1,
+            "timestamp": 229541,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 1,
+            "timestamp": 238597,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 300184,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 1,
+            "timestamp": 240935,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 6,
+            "skillSlot": 2,
+            "timestamp": 264132,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 5,
+            "skillSlot": 1,
+            "timestamp": 275700,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 4,
+            "skillSlot": 2,
+            "timestamp": 277237,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 4,
+            "timestamp": 291476,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 10,
+            "skillSlot": 1,
+            "timestamp": 293618,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 360214,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 4,
+            "timestamp": 313122,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 8,
+            "skillSlot": 4,
+            "timestamp": 313627,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 1,
+            "timestamp": 322113,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 7,
+            "skillSlot": 2,
+            "timestamp": 324718,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 6,
+            "skillSlot": 4,
+            "timestamp": 342204,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 1,
+            "timestamp": 359011,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 420232,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 9,
+            "skillSlot": 3,
+            "timestamp": 367704,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 10,
+            "skillSlot": 1,
+            "timestamp": 393768,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 5,
+            "skillSlot": 1,
+            "timestamp": 395672,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 4,
+            "timestamp": 396345,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 1,
+            "timestamp": 396746,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 4,
+            "skillSlot": 2,
+            "timestamp": 402893,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 7,
+            "skillSlot": 4,
+            "timestamp": 404630,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 6,
+            "skillSlot": 2,
+            "timestamp": 412754,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 480240,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 3,
+            "timestamp": 423608,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 1,
+            "timestamp": 465734,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 540247,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 4,
+            "skillSlot": 4,
+            "timestamp": 487827,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 5,
+            "skillSlot": 4,
+            "timestamp": 491238,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 9,
+            "skillSlot": 4,
+            "timestamp": 509991,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 10,
+            "skillSlot": 4,
+            "timestamp": 510292,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 6,
+            "skillSlot": 2,
+            "timestamp": 510793,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 1,
+            "timestamp": 511264,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 3,
+            "timestamp": 519830,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 600259,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 6,
+            "skillSlot": 2,
+            "timestamp": 545526,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 7,
+            "skillSlot": 2,
+            "timestamp": 553416,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 2,
+            "timestamp": 568666,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 4,
+            "skillSlot": 2,
+            "timestamp": 581071,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 8,
+            "skillSlot": 1,
+            "timestamp": 593736,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 660273,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 3,
+            "timestamp": 606945,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 1,
+            "timestamp": 625264,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 10,
+            "skillSlot": 1,
+            "timestamp": 636495,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 9,
+            "skillSlot": 3,
+            "timestamp": 643494,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 720293,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 7,
+            "skillSlot": 3,
+            "timestamp": 665925,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 1,
+            "timestamp": 669198,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 4,
+            "skillSlot": 1,
+            "timestamp": 691323,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 2,
+            "timestamp": 707483,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 4,
+            "timestamp": 708687,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 3,
+            "timestamp": 719357,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 780302,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 8,
+            "skillSlot": 2,
+            "timestamp": 722464,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 840312,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 4,
+            "timestamp": 781270,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 10,
+            "skillSlot": 2,
+            "timestamp": 782172,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 6,
+            "skillSlot": 1,
+            "timestamp": 798354,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 4,
+            "skillSlot": 2,
+            "timestamp": 804467,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 5,
+            "skillSlot": 1,
+            "timestamp": 806543,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 7,
+            "skillSlot": 2,
+            "timestamp": 807846,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 4,
+            "timestamp": 813939,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 9,
+            "skillSlot": 1,
+            "timestamp": 824700,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 900318,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 6,
+            "skillSlot": 4,
+            "timestamp": 860261,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 3,
+            "timestamp": 860762,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 3,
+            "timestamp": 867090,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 2,
+            "timestamp": 884269,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 960322,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 10,
+            "skillSlot": 1,
+            "timestamp": 907201,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 8,
+            "skillSlot": 1,
+            "timestamp": 911143,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 7,
+            "skillSlot": 3,
+            "timestamp": 940160,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 4,
+            "skillSlot": 1,
+            "timestamp": 941629,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 9,
+            "skillSlot": 3,
+            "timestamp": 942131,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 3,
+            "timestamp": 943203,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 1020322,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 5,
+            "skillSlot": 2,
+            "timestamp": 978171,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 6,
+            "skillSlot": 1,
+            "timestamp": 995947,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 3,
+            "timestamp": 1005650,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 1080325,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 2,
+            "timestamp": 1043752,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 7,
+            "skillSlot": 4,
+            "timestamp": 1053638,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 4,
+            "skillSlot": 4,
+            "timestamp": 1059238,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 9,
+            "skillSlot": 1,
+            "timestamp": 1070939,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 5,
+            "skillSlot": 1,
+            "timestamp": 1072542,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 10,
+            "skillSlot": 2,
+            "timestamp": 1080091,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 1140330,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 6,
+            "skillSlot": 1,
+            "timestamp": 1087681,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 1200353,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 3,
+            "skillSlot": 2,
+            "timestamp": 1141573,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 9,
+            "skillSlot": 4,
+            "timestamp": 1159000,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 8,
+            "skillSlot": 2,
+            "timestamp": 1166762,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 3,
+            "timestamp": 1171176,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 10,
+            "skillSlot": 4,
+            "timestamp": 1176040,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 1260369,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 9,
+            "skillSlot": 1,
+            "timestamp": 1232977,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 7,
+            "skillSlot": 3,
+            "timestamp": 1234546,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 5,
+            "skillSlot": 2,
+            "timestamp": 1255559,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 1,
+            "skillSlot": 2,
+            "timestamp": 1258117,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      },
+      {
+        "timestamp": 1295678,
+        "events": [
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 4,
+            "skillSlot": 1,
+            "timestamp": 1262619,
+            "type": "SKILL_LEVEL_UP"
+          },
+          {
+            "levelUpType": "NORMAL",
+            "participantId": 2,
+            "skillSlot": 3,
+            "timestamp": 1274769,
+            "type": "SKILL_LEVEL_UP"
+          }
+        ]
+      }
+    ]
+  }
+}
