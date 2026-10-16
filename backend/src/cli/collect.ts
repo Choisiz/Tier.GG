@@ -188,6 +188,8 @@ async function collectCommand(args: Args, pool: pg.Pool, logger: Logger, stop: {
       // runMatches가 중간에 던져도 m에 그때까지 저장한 수가 남아 있다
       const saved = m?.saved ?? 0;
       const players = m && m.players > 0 ? m.players : null;
+      // 요약 로그의 stoppedBy가 기본값 'done'으로 남지 않게, 예외로 끝났으면 맞춘다 (02-3, L2)
+      if (m && m.stoppedBy === 'done') m.stoppedBy = err instanceof UserAbortError ? 'aborted' : 'failed';
       if (err instanceof RiotKeyExpiredError) {
         logger.error('Riot 키 만료(401/403). 수집을 멈춤. 키를 재발급해 .env에 넣고 같은 명령을 다시 실행하세요 (저장한 게임은 건너뜀).', {
           status: err.status,

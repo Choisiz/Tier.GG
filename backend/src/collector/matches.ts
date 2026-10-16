@@ -43,7 +43,8 @@ export interface MatchesResult {
   warnings: TransformWarnings;
   /** 요약 로그용 (집계에는 쓰지 않음) */
   savedPatches: Set<string>;
-  stoppedBy: 'done' | 'max_matches' | 'window_full';
+  /** 'aborted'·'failed'는 cli/collect.ts가 예외로 끝났을 때 요약 로그용으로 맞춘다 (02-3, L2). 기본값은 'done' */
+  stoppedBy: 'done' | 'max_matches' | 'window_full' | 'aborted' | 'failed';
 }
 
 /** 'KR_8408851980' → 8408851980n (숫자 내림차순 정렬용) */
@@ -115,6 +116,7 @@ export async function runMatches(ctx: CollectorContext, out: MatchesResult = cre
     path: `/lol/match/v5/matches/by-puuid/…/ids?queue=${cfg.queue}&start=0&count=${cfg.gamesPerPlayer}&startTime=${window.startTimeSec}`,
   });
   const firstFinder = new Map<string, string>();
+  let idsConsecutiveFailures = 0;
   for (const [i, puuid] of puuids.entries()) {
     if (ctx.stop.requested) throw new UserAbortError();
     try {
@@ -127,10 +129,16 @@ export async function runMatches(ctx: CollectorContext, out: MatchesResult = cre
       out.idsFound += ids.length;
       if (ids.length === 0) out.playersNoGames++;
       for (const id of ids) if (!firstFinder.has(id)) firstFinder.set(id, puuid);
+      idsConsecutiveFailures = 0;
     } catch (err) {
       if (!isPerMatchError(err)) throw err;
       out.playersFailed++;
-      logger.warn('② 플레이어 건너뜀', { puuid: shortPuuid(puuid), error: formatError(err) });
+      idsConsecutiveFailures++;
+      logger.warn('② 플레이어 건너뜀', { puuid: shortPuuid(puuid), error: formatError(err), consecutive: idsConsecutiveFailures });
+      // ③~⑤와 같은 상한을 재사용 (Riot 쪽 장애 신호라는 점에서 같은 기준이면 충분, 02-4·L3)
+      if (idsConsecutiveFailures >= riotCfg.maxConsecutiveMatchFailures) {
+        throw new TooManyFailuresError(`② 게임 ID 조회 연속 ${idsConsecutiveFailures}개 실패`);
+      }
     }
     if ((i + 1) % 50 === 0) logger.info('② 진행', { done: i + 1, of: puuids.length, unique: firstFinder.size });
   }
@@ -197,11 +205,15 @@ export async function runMatches(ctx: CollectorContext, out: MatchesResult = cre
         continue;
       }
       // ⑤ 저장: 게임 1개 = 트랜잭션 1개. 이미 있으면(다른 실행이 저장) ROLLBACK
-      const r = await withTransaction(pool, async (client) => {
-        const res = await saveMatch(client, t.match, t.players);
-        if (res === 'duplicate') throw new DuplicateSignal();
-        return res;
-      }).catch((err: unknown) => {
+      const r = await withTransaction(
+        pool,
+        async (client) => {
+          const res = await saveMatch(client, t.match, t.players);
+          if (res === 'duplicate') throw new DuplicateSignal();
+          return res;
+        },
+        logger,
+      ).catch((err: unknown) => {
         if (err instanceof DuplicateSignal) return 'duplicate' as const;
         throw err;
       });

@@ -74,10 +74,15 @@ describe('수집 설정·표본', () => {
     assert.deepEqual(divisionQuota(3), { I: 1, II: 1, III: 1, IV: 0 });
   });
 
+  it('표본 보충: have=180, playersPerTier=250 → 모자란 70명 (02-2)', () => {
+    const q = divisionQuota(Math.max(0, 250 - 180));
+    assert.equal(q.I + q.II + q.III + q.IV, 70);
+  });
+
   it('test 프리셋과 덮어쓰기', () => {
     const c = buildCollectionConfig('test');
     assert.deepEqual(c.tiers, ['PLATINUM', 'EMERALD', 'DIAMOND']);
-    assert.equal(c.playersPerTier, 100);
+    assert.equal(c.playersPerTier, 250);
     assert.equal(c.gamesPerPlayer, 20);
     assert.equal(c.maxMatchesPerRun, null);
     assert.equal(c.windowDays, 14);

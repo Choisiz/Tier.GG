@@ -62,7 +62,6 @@ export async function runSample(
   const seed = opts.seed ?? (Date.now() ^ (process.pid << 16)) >>> 0;
   const rand = seededRandom(seed);
   const existing = await countRankedPlayersByTier(pool, cfg.tiers);
-  const quota = divisionQuota(cfg.playersPerTier);
   const out: SampleResult = { seed, sampledTiers: [], skippedTiers: [], upserted: 0, calls: 0 };
   logger.info('① 표본 시작', { seed, tiers: cfg.tiers.join(','), playersPerTier: cfg.playersPerTier, resample: opts.resample });
 
@@ -73,6 +72,8 @@ export async function runSample(
       out.skippedTiers.push(tier);
       continue;
     }
+    // --resample이면 전체를 다시 뽑아 더한다. 아니면 모자란 만큼만 채운다 (02-2, L1)
+    const quota = divisionQuota(opts.resample ? cfg.playersPerTier : Math.max(0, cfg.playersPerTier - have));
     const rows: SamplePlayer[] = [];
     for (const division of DIVISIONS) {
       if (ctx.stop.requested) throw new UserAbortError();
