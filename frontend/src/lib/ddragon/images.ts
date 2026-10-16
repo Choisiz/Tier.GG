@@ -27,3 +27,23 @@ export function skillIconUrl(version: string, imageFull: string): string {
 export function passiveIconUrl(version: string, imageFull: string): string {
   return `${DDRAGON_BASE_URL}/cdn/${version}/img/passive/${imageFull}`;
 }
+
+/** 아이템 아이콘: /cdn/{version}/img/item/{image.full} */
+export function itemIconUrl(version: string, imageFull: string): string {
+  return `${DDRAGON_BASE_URL}/cdn/${version}/img/item/${imageFull}`;
+}
+
+/** 소환사 주문 아이콘: /cdn/{version}/img/spell/{image.full} (챔피언 스킬과 같은 폴더) */
+export function summonerSpellIconUrl(version: string, imageFull: string): string {
+  return `${DDRAGON_BASE_URL}/cdn/${version}/img/spell/${imageFull}`;
+}
+
+/** 룬·룬 트리 아이콘: /cdn/img/{icon} (버전 없음) */
+export function runeIconUrl(icon: string): string {
+  return `${DDRAGON_BASE_URL}/cdn/img/${icon}`;
+}
+
+/** 능력치 파편 아이콘: /cdn/img/perk-images/StatMods/{file}.png (버전 없음, Data Dragon JSON에는 없음) */
+export function statShardIconUrl(file: string): string {
+  return `${DDRAGON_BASE_URL}/cdn/img/perk-images/StatMods/${file}.png`;
+}

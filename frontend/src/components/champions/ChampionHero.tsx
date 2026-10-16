@@ -27,7 +27,8 @@ export default function ChampionHero({
           src={splashUrl}
           alt=""
           fill
-          priority
+          fetchPriority="high"
+          loading="eager"
           sizes="(min-width: 1152px) 1152px, 100vw"
           className="object-cover object-top"
         />

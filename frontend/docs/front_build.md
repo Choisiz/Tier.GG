@@ -147,3 +147,201 @@
 | 검증 | `npm run lint` 오류 0, `npx tsc --noEmit` 오류 0, `npm run build` 성공(178페이지) | ✅ |
 
 - 검토했지만 보류한 이름 변경(사용자 결정): `ChampionAbility`/`AbilityKey`/`abilities` ↔ `skill` 용어 혼용, `IMMUTABLE` → `CACHE_FOREVER`.
+
+---
+
+## 변경 01 (2026-10-15): 백엔드 API 연결 (포지션·티어·추천 빌드)
+
+> 작성: Build 에이전트 / 기준: `front_spec.md` 변경 01 (승인됨, D1~D9 추천안), `docs/contracts/api_contract.md` v2 (승인됨), `api.md`
+> 확인 시점: Data Dragon `16.20.1`, API `window` 14일 · 3,952게임 · 26.20 66.8% / 26.19 33.2%, 집계 2026-10-14T18:52:26Z (10월 15일 03:52 KST)
+> **쉬운 요약**: 챔피언 리스트를 포지션 탭 5개 + 티어 표로 바꾸고, 상세에 포지션 탭과 추천 룬·주문·스킬·아이템을 붙였다. 모든 통계 화면에 기간·패치 구성·집계 시각을 보여준다. 백엔드가 꺼져 있어도 빌드는 통과하고 안내가 들어간다. 새 의존성은 없다.
+
+### 01-B1. API 클라이언트 (`src/lib/api/`)
+
+> 요약: 계약 v2 타입을 옮기고, 오류를 화면이 쓰는 몇 가지 상태로 바꾼다. 모든 파일 첫 줄이 `import "server-only"`다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| `config.ts` | `getApiBaseUrl()` (끝 `/` 제거, 값 없으면 `null` — 기본값 없음), `API_REVALIDATE_SECONDS = 3600`, `API_TIMEOUT_MS = 10000` | ✅ |
+| `types.ts` | 계약 v2 그대로: `Position`, `Tier`(1~5 \| null), `WindowPatch`, `StatsWindow`, `MetaResponse`, `TierRow`, `TierListResponse`, `PositionSummary`, `StatsSummary`, `ItemBuild`, `RuneBuild`, `SpellBuild`, `SkillBuild`, `ChampionStatsResponse`, `ApiErrorBody` | ✅ |
+| `client.ts` | `fetchApi<T>()`: `fetch(url, { next: { revalidate: 3600 }, signal: AbortSignal.timeout(10000) })`. 결과 `{ ok, data }` 또는 `kind`: `not_ready`(503 STATS_NOT_READY) / `not_found`(404 STATS_NOT_FOUND) / `invalid`(400 INVALID_PARAMETER, 404 NOT_FOUND → 서버 로그에 `code`) / `unavailable`(연결 실패·시간 초과·DB_UNAVAILABLE·500·JSON 아님·URL 없음). 분기는 `error.code`로만. 로그에 기본 URL을 쓰지 않음 | ✅ |
+| `api.ts` | `getMeta()`, `getTierList(position)`, `getChampionStats(key, position?)` → `StatsState`(ok / not_ready / not_found / unavailable). `requireStats()`: 빌드 중이 아닐 때 `unavailable`이면 오류를 던짐 (D6) | ✅ |
+| `positions.ts` | `POSITIONS`, 한글 이름(탑·정글·미드·원딜·서폿), 소문자 URL 조각 ↔ API 값, `tierListHref()` | ✅ |
+| `buildPhase.ts` | `process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD` (`next/constants`). **정적 생성 작업 프로세스에서도 이 값이 보이는 것을 확인했다** — 백엔드를 끈 빌드가 오류 없이 안내 페이지를 만들었다 (01-B7) | ✅ |
+
+### 01-B2. Data Dragon 추가 (`src/lib/ddragon/`)
+
+> 요약: 아이템·소환사 주문·룬 파일을 버전 포함 주소(영구 캐시)로 불러 ID 찾기 표를 만든다. 아이템 거르기 규칙과 능력치 파편 표를 한 곳에 둔다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| `types.ts` | `ChampionSummary.key` 추가. 원본 `DDragonItem`, `DDragonSummonerSpell`, `DDragonRuneTree`, 가공 `ItemInfo`, `IconInfo`, `RuneTreeInfo` | ✅ |
+| `api.ts` | `getChampionKeyMap()`(key → 요약), `getItems(itemIds, patches)`(최신 버전 먼저, 못 찾은 것만 창 안 다른 패치 `{patch}.1`이 `versions.json`에 있으면 한 번 더), `getSummonerSpells()`, `getRuneTrees()`. 가공 결과는 버전별로 한 번만 만든다(실패하면 지우고 다시 시도). 모두 `force-cache` | ✅ |
+| `images.ts` | `itemIconUrl`, `summonerSpellIconUrl`, `runeIconUrl`(`/cdn/img/{icon}`), `statShardIconUrl` | ✅ |
+| `itemFilter.ts` | D3 규칙: ① Data Dragon에 없음 ② `Consumable`/`Trinket` ③ `from` 없고 `gold.total < 1000` → 제외, ④ `Boots` 태그 **또는 신발로 만드는 아이템(`builtFromBoots`, Review 수정)** → 신발, ⑤ `into` 있음 → 제외, ⑥ 나머지 → 핵심. `CORE_ITEM_COUNT = 3`, `BOOTS_MIN_PICK_RATE = 5` | ✅ (Review에서 ④ 보완) |
+| `statShards.ts` | 공격(5008·5005·5007) / 유연(5008·5010·5001) / 방어(5011·5013·5001), 이름·아이콘 파일 | ✅ |
+
+### 01-B3. 화면용 매핑 (`src/lib/view/`)
+
+> 요약: API 숫자 ID를 이름·아이콘이 붙은 객체로 바꾸고, 숫자는 서버에서 글자로 만들어 클라이언트에 넘긴다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| `format.ts` | `formatPercent`(소수 1자리 사사오입, 01-B8의 3번), `formatCount`(천 단위 쉼표), `formatKst`(`Asia/Seoul` 고정 "10월 15일 03:52"), `formatPatchMix`(1개면 "패치 26.20", 2개 이상 "26.20 67% / 26.19 33%", `displayName`만 사용), `toWindowInfoView` | ✅ |
+| `tierList.ts` | `TierRow` + 챔피언 key 표 → 표 행 (순서는 API `rank` 그대로, 다른 주 포지션 이름). Data Dragon에 없는 `championId`는 "챔피언 #950"(링크·아이콘 없음) + 서버 경고 1줄 | ✅ |
+| `builds.ts` | 룬: 핵심 트리 4줄 / 보조 트리 3줄(핵심 룬 줄 제외) / 파편 3줄, 고른 것만 `selected`, 못 찾은 ID는 "알 수 없는 룬 #id"·"알 수 없는 파편", 스크린리더 요약 글자. 주문: 이름·아이콘. 스킬: Q/W/E/R 줄 머리 + 11칸 순서. 아이템: `itemFilter`로 핵심 ≤3 + 신발(사용률 5% 이상, API 순서 첫 번째) | ✅ |
+
+### 01-B4. 챔피언 리스트 (`/champions`, `/champions/lane/[position]`)
+
+> 요약: 탑은 `/champions`, 나머지 4개는 `/champions/lane/{jungle|middle|bottom|utility}`. 모두 미리 만든 정적 페이지다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 라우트 | `/champions` = `TierListPage(TOP)`, SSG + `revalidate 3600`. `lane/[position]`: `generateStaticParams` + `dynamicParams = false` + `revalidate 3600` | ✅ |
+| `top` → 308 | `lane/[position]` 페이지가 `top`이면 `permanentRedirect("/champions")`. 빌드 때 `top.meta`에 `status 308, location /champions`로 저장됨 (01-B8의 1번) | ✅ |
+| 잘못된 조각 | `/champions/lane/TOP`, `/champions/lane/Jungle`, `/champions/lane/mid`, `/champions/lane` → 404 | ✅ |
+| `PositionNav` | `<nav aria-label="포지션">` + `Link` 5개, 현재 탭 `aria-current="page"` + 강조, 모바일에서 탭 줄만 가로 스크롤 | ✅ |
+| `TierTable` (client) | 검색(한글·영문 부분 일치, `rank` 유지, 결과 수 `aria-live`), `<table>` + `caption`(sr-only) + `th scope="col"`. 열: #·챔피언·티어·승률·픽률 / `sm` 이상 밴률·게임 / `md` 이상 "미드 겸용". 챔피언 이름 링크 1개, `after:inset-0`으로 행 전체 클릭. 결과 없음 → 문구 + [검색 지우기] | ✅ |
+| `TierBadge` | 1~5티어(글자 + 색, 글자색 `zinc-950`) / `null` → 회색 "표본 부족" + `title`·sr 문구 "최근 14일 50게임 미만이라 티어를 매기지 않았습니다"(`/meta` `rules.minTierPick`, 없으면 50) | ✅ |
+| 상태 | `champions: []` → "이 포지션의 최근 14일 통계가 아직 없습니다", `STATS_NOT_READY` → 집계 전 문구, 빌드 중 `unavailable` → "통계 서버에 연결하지 못했습니다", 서비스 중 `unavailable` → 오류(직전 페이지 유지 / `champions/error.tsx`) | ✅ |
+| v1 정리 | `ChampionBrowser.tsx`, `ChampionCard.tsx` 삭제 (다른 곳에서 쓰지 않음 확인). 역할군 필터·가나다 정렬 없음 | ✅ |
+| 로딩 | `champions/loading.tsx`를 제목 + 기간 줄 + 탭 5개 + 검색 + 10행 스켈레톤으로 교체 (`lane/[position]`에도 적용됨) | ✅ |
+
+### 01-B5. 챔피언 상세 (`/champions/[championId]`)
+
+> 요약: Hero 아래에 "포지션별 통계와 추천 빌드" 영역을 두고, 주 포지션 1~2개를 탭으로 보여준다. 스킬·스킨·스토리는 v1 그대로다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 호출 | 빌드 때 `position` 없이 1번 → `positions[]`. 2순위가 있으면 `?position=…` 1번 더. 2순위가 `STATS_NOT_FOUND`(또는 집계 전)면 그 탭만 뺀다. 두 응답의 `aggregatedAt`이 다르면 서버 경고 1줄, 1순위 기간 표시 | ✅ |
+| `PositionTabs` (client) | `role="tablist"/"tab"/"tabpanel"`, `aria-selected`, `aria-controls`, `aria-labelledby`, 로빙 `tabIndex`, ←/→·Home/End, 숨은 패널 `hidden`. 두 패널 모두 정적 HTML에 있음. 탭 1개면 탭 줄 없이 제목("탑")만 | ✅ |
+| 탭 글자 | "정글 · 2티어 · 86%", `tier null`이면 "탑 · 표본 부족 · 11%" (`positionShare` 정수 반올림) | ✅ |
+| `PositionStatsPanel` | 요약 줄(티어 배지·승률·픽률·밴률·게임, `null`이면 "표본 부족 (50게임 미만)" + "표본이 적어 참고용입니다."), `lg` 이상 2열(왼쪽 룬 / 오른쪽 주문·스킬·아이템), 빈 영역 "표본이 부족해 추천이 없습니다" | ✅ |
+| `RunePage` (client) | 1순위 전체 페이지(핵심 트리 4줄, 핵심 룬 줄은 크게 / 보조 트리 3줄 / 파편 3줄), 고르지 않은 룬은 흐리게 + `alt=""` + `aria-hidden`, 고른 룬만 `alt`=이름. 2개면 "1순위/2순위" 버튼(`aria-pressed`, 사용률·승률). sr-only 요약 "핵심 룬(정밀): …" | ✅ |
+| `SummonerSpells` | 상위 2조합, 아이콘 2개 + "점멸 + 점화" + 사용·승률·게임 (API 순서) | ✅ |
+| `SkillOrder` | `<table>` + `caption` "스킬 찍는 순서 1~11레벨", 줄 머리 `th scope="row"`(아이콘 + 글자 + sr 스킬 이름), 고른 칸에 글자 "Q" 표시, 칸 22px(`sm` 이상 28px). 2순위는 "Q E W Q Q R …" 한 줄 + 사용·승률 | ✅ |
+| `CoreItems` | 핵심 3개 + "신발" 1개(5% 미만이면 칸 숨김), 제목 옆 "게임이 끝날 때 가지고 있던 아이템 기준 · 구매 순서 아님" | ✅ |
+| 통계 없음 | `STATS_NOT_FOUND` → "최근 14일 통계가 없습니다.", `STATS_NOT_READY` → 집계 전 문구, 빌드 중 연결 실패 → "통계 서버에 연결하지 못했습니다." Hero·스킬·스킨·스토리는 정상 | ✅ |
+| "← 목록" 링크 | 1순위 포지션 탭 주소 + 글자 "정글 티어 목록" (통계 없으면 `/champions`, "탑 티어 목록") | ✅ |
+| 제목 구조 | `h1` 챔피언 이름(Hero), `h2` "포지션별 통계와 추천 빌드", 빌드 카드 `h3` | ✅ |
+| D7 `generateMetadata` | `getChampionDetail`을 try/catch, 실패하면 `{ title: "챔피언" }` → "챔피언 \| Tier.GG" | ✅ |
+| D4 LCP | Hero 스플래시 `priority` → `fetchPriority="high"` + `loading="eager"`. 리스트 아이콘 첫 10행 `loading="eager"`, 첫 1개 `fetchPriority="high"`. Lighthouse 측정은 Review가 한다 | ✅ |
+| 로딩 | `[championId]/loading.tsx`에 통계 제목·기간 줄·탭 2개·요약 줄·빌드 카드 4개 스켈레톤 추가 | ✅ |
+
+### 01-B6. 공통 (기간 줄, 지연 안내, 푸터, 환경 변수)
+
+> 요약: 통계 화면 위에 기간 한 줄, 집계가 멈추면 노란 안내, 푸터는 공개 패치 이름. API 주소는 루트 `.env`에서 하나만 읽는다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| `WindowInfo` | "최근 14일 · 3,952게임 · 26.20 67% / 26.19 33% · 10월 15일 03:52 집계", 좁은 화면에서 줄바꿈. `isStale`이면 `role="status"` 노란 상자 "통계 갱신이 지연되고 있습니다 (마지막 집계 …)" | ✅ |
+| `StatsNotice` | 집계 전 / 통계 없음 / 연결 실패(`role="status"`) / 포지션 빈 목록 문구 | ✅ |
+| D5 푸터 | `/meta`의 `window.patches[0].displayName` → "패치 26.20", 실패 시 "패치 정보 없음" (오류를 던지지 않음) | ✅ |
+| D8 `next.config.ts` | 루트 `../.env`가 있으면 `node:fs` + `util.parseEnv`로 읽어 **`API_BASE_URL`만** `process.env`에 넣음. 이미 값이 있으면 덮어쓰지 않음. `env` 옵션 안 씀 | ✅ |
+| `.env.example` | "백엔드 API 서버" 묶음 아래 `API_BASE_URL=` + 주석 2줄 (값 없음) | ✅ |
+| 의존성 | 변경 없음 (`package.json`, `package-lock.json` diff 0). `server-only`는 Next 내장 처리라 설치 안 함 | ✅ |
+
+### 01-B7. 자체 검증 결과
+
+> 요약: 린트·타입·빌드 모두 통과. 백엔드를 켠 빌드와 끈 빌드 둘 다 성공했다. 리스트 5개 탭 262행이 API와 모두 같고, 상세 173개 전부 탭 수가 API와 같다.
+
+**명령**
+
+| 명령 / 확인 | 결과 |
+|-------------|------|
+| `npm run lint` | ✅ 오류 0, 경고 0 |
+| `npx next typegen && npx tsc --noEmit` | ✅ 오류 0. `any` 0건 |
+| `npm run build` (백엔드 켬) | ✅ 성공, 183페이지. `○ /champions`, `● /champions/lane/[position]` 5개(top은 308 저장, 01-B8의 1번), `● /champions/[championId]` 173개, 모두 Revalidate 1h. 빌드 로그의 `[api]`·`[view]`·`[stats]` 경고 0줄 |
+| `npm run build` (백엔드 끔, `.next/cache/fetch-cache` 비움) | ✅ 성공, 같은 페이지 수. 경고 `[api] 통계 서버에 연결하지 못했습니다 (/meta, 연결 실패(TypeError)) …` 7줄 (작업 프로세스 7개마다 1줄, 01-B8의 2번) |
+| 백엔드 끈 빌드 결과 HTML | `/champions`, `/champions/lane/jungle`: 탭 5개 + "통계 서버에 연결하지 못했습니다." + 푸터 "패치 정보 없음". `/champions/Aatrox`, `/champions/MonkeyKing`: Hero·스킬(P/Q/W/E/R)·스킨(13개/10개)·스토리 + 같은 안내 |
+| `lib/api/` 밖 `fetch(` / `lib/ddragon/` 밖 Data Dragon 주소 | ✅ 0건 / 0건. `lib/api/*.ts` 6개 모두 `server-only` |
+| 브라우저 번들 `.next/static` | ✅ `localhost:4000`·`/api/v1`·`NEXT_PUBLIC_`·`API_BASE_URL` 문자열 0건 |
+| 마지막 상태 | 백엔드 켠 상태로 다시 빌드해 둠. 띄운 서버(백엔드 4000, `next start` 3100, `next dev` 3101, 가짜 API 4100) 모두 종료 |
+
+**리스트 (백엔드 켬 + `next start`, HTML과 API 직접 비교)**
+
+| 확인 | 결과 |
+|------|------|
+| 5개 탭 행 수 (HTML = API) | 탑 69 · 정글 53 · 미드 63 · 원딜 26 · 서폿 51 = **262행, 순위·이름·티어·승률·픽률·밴률·게임 불일치 0** |
+| 티어 / 표본 부족 | 탑 47/22 · 정글 41/12 · 미드 42/21 · 원딜 24/2 · 서폿 32/19. 티어 오름차순, `null`은 모두 맨 뒤 "표본 부족" (예: 탑 69위 아크샨) |
+| 현재 탭 | 각 페이지 포지션 nav의 `aria-current="page"`가 탑·정글·미드·원딜·서폿으로 맞음 |
+| 기간 줄 | "최근 14일 · 3,952게임 · 26.20 67% / 26.19 33% · 10월 15일 03:52 집계" (`/meta`와 같음, KST) |
+| 푸터 / 내부 버전 | "패치 26.20". 화면 글자에 `16.20` 0건 |
+| 제목 | "탑 챔피언 티어 \| Tier.GG", "정글 챔피언 티어 \| Tier.GG" 등 |
+| 주소 | `/champions/lane/top` → **308** `Location: /champions`, `/champions/lane/TOP`·`/lane/Jungle`·`/lane/mid`·`/champions/lane` → **404**, 그 뒤에도 `/champions`·`/lane/jungle` 200, `/lane/top` 308 그대로 |
+
+**상세**
+
+| 확인 | 결과 |
+|------|------|
+| 173명 전부 | 200, 탭 수가 API `positions[]`와 모두 같음(불일치 0), 핵심 아이템 3개 미만 0명, "알 수 없는 룬·주문·파편" 0건 |
+| 아트록스 (탑 1개) | 탭 줄 없이 "탑", 2티어 290게임. 룬 정복자·승전보·전설: 가속·최후의 저항 + 뼈 방패·소생, 파편 적응형/적응형/체력 증가(레벨 비례). 핵심 쇼진의 창·월식·갈라진 하늘, 신발 판금 장화(70.3%). 롱소드·도란·충전형 물약·제어 와드 이미지 0개. 이미지 66개, 장식(`alt=""`) 29개. 스킬 1순위 `QEWQQRQEQER` 격자, 2순위 한 줄 |
+| 오공 (정글 + 탑) | 탭 "정글 · 2티어 · 86%" / "탑 · 표본 부족 · 11%", 첫 탭 `aria-selected="true"`·`tabIndex 0`, 둘째 패널 `hidden`. 정글: 삼위일체·칠흑의 양날 도끼·죽음의 무도 + 헤르메스의 발걸음. 탑: 칠흑의 양날 도끼·삼위일체·월식 + 판금 장화. "← 정글 티어 목록" → `/champions/lane/jungle` |
+| 카밀 (탑 + 서폿) | 탭 "탑 · 1티어 · 61%" / "서폿 · 5티어 · 37%", 두 패널 빌드 모두 API ID와 같은 이름 |
+| 징크스 (원딜) | 신발 칸 **숨김** (상세의 신발 장화 0.16%, 탐욕의 군화 0.16%). 핵심 마법광학 장치 C44·루난의 허리케인·무한의 대검. "← 원딜 티어 목록" |
+| 쓰레쉬·아리 | 핵심 솔라리·태양의 썰매·기사의 맹세 + 신속의 장화 / 악의·그림자불꽃·존야 + 주문투척자의 신발 |
+| 이미지 | 상세 6명 + 리스트 2개의 Data Dragon 이미지 주소 334개(스플래시·로딩 제외) 모두 200. `/_next/image` 경유 파편 아이콘 200 `image/png` |
+| LCP 속성 | 상세 HTML에 `fetchPriority="high"` 있음, `priority` 사용 0건 |
+| 제목 | "아트록스 - 다르킨의 검 \| Tier.GG" |
+
+**상태 (가짜 API 서버를 scratchpad에서 띄우고 `API_BASE_URL`만 바꾼 `next dev`로 확인, 프로젝트·DB 변경 없음)**
+
+| 상황 | 결과 |
+|------|------|
+| `/meta`·탑 목록 503 STATS_NOT_READY | 탭 5개 + "아직 집계된 통계가 없습니다. 매일 05:00(KST)에 집계됩니다.", 푸터 "패치 정보 없음" |
+| 정글 목록 `champions: []` + `isStale: true` + 패치 1개 | "최근 14일 · 2,481게임 · 패치 26.20 · 10월 13일 05:00 집계" + "통계 갱신이 지연되고 있습니다 (마지막 집계 10월 13일 05:00)" + "이 포지션의 최근 14일 통계가 아직 없습니다." |
+| 미드 목록 500 (서비스 중) | `requireStats`가 오류를 던져 error 경계로 감 (서버 로그 `[api] … HTTP 500 INTERNAL_ERROR` 1줄) |
+| 아트록스 404 STATS_NOT_FOUND / 쓰레쉬 503 | "최근 14일 통계가 없습니다." / 집계 전 문구, Hero·스킬·스킨·스토리 정상 |
+| 징크스: tier null, 룬 ID·파편 ID 일부 없음, 아이템 없는 ID, 주문·스킬 `[]` | "표본 부족 (50게임 미만)" + "표본이 적어 참고용입니다.", "알 수 없는 룬 #1"·"알 수 없는 파편" 회색 칸, 주문·스킬·아이템 "표본이 부족해 추천이 없습니다", 서버 경고 `[view] Data Dragon에 없는 아이템 (Jinx BOTTOM): 999999` |
+
+### 01-B8. 계획과 다른 점
+
+1. **`/champions/lane/top` 308 방식**: 처음에 `next.config.ts`의 `redirects()`로 했으나 Next의 리다이렉트 경로 비교가 대소문자를 구분하지 않아 `/champions/lane/TOP`까지 308이 되었다 (완료 기준은 404). 그래서 `generateStaticParams`에 `top`을 넣고 페이지에서 `permanentRedirect("/champions")`를 부르도록 바꿨다. 빌드 표에 `● /champions/lane/top`이 보여 lane 경로가 **4개가 아니라 5개**로 나온다 (top은 HTML 대신 308 응답으로 저장). 동작은 계획과 같다.
+2. **빌드 경고 줄 수**: 계획은 "경고 1줄(실패 수 합계)"이지만 정적 생성은 작업 프로세스 7개가 따로 돌아 합계를 모을 방법이 없다. 프로세스마다 첫 실패 1번만 경고해 **7줄**이 나온다.
+3. **퍼센트 반올림**: `toFixed(1)`만 쓰면 이진 소수 오차로 `2.15 → "2.1"`처럼 내림이 되어 API 값과 비교할 때 262행 중 40행이 0.1 차이가 났다. 소수 2자리 값을 1/100 정수로 맞춘 뒤 반올림하도록 고쳐 불일치 0이 되었다.
+4. **2순위 탭 제외 조건**: 계획은 2순위가 `STATS_NOT_FOUND`일 때 탭을 뺀다. 2순위만 `STATS_NOT_READY`이거나 빌드 중 연결 실패인 경우도 같이 뺀다 (서비스 중 연결 실패는 오류를 던짐).
+5. **제목 구조**: 빌드 영역을 `h2` "포지션별 통계와 추천 빌드" 아래에 두고 카드 제목을 `h3`로 했다. 탭이 1개일 때 "탑" 제목은 제목 단계를 건너뛰지 않도록 일반 글자(`p`)로 했다.
+6. `transform.ts`의 `CHAMPION_TAGS`는 더 이상 쓰는 곳이 없지만 요청 범위 밖이라 그대로 두었다 (`TAG_LABELS`는 Hero에서 계속 사용).
+
+### 01-B9. 계약 변경 요청
+
+- **없음.** 계약 v2로 모든 화면을 만들었다. 계획서 01-5의 참고 1·2(2-4 아이템 거르기 문구, 예시의 신발)만 그대로 유효하다 (API 응답 영향 없음).
+
+### 01-B10. 남은 문제 (Review 확인 필요)
+
+1. **브라우저 확인 안 함**: 탭 클릭·화살표 이동, 룬 1/2순위 전환, 검색 입력, 콘솔·수화 경고, 360/768/1280px 가로 스크롤, 대비 측정은 HTML 수준까지만 확인했다. Review가 브라우저로 확인한다.
+2. **Lighthouse 미측정** (지시대로 Review가 career_log 11번과 같은 조건으로 측정).
+3. **정적 HTML의 첫 내용**: v1부터 있는 `loading.tsx` 때문에 정적 HTML의 `<main>`에 먼저 스켈레톤이 있고 실제 내용은 같은 HTML 뒤쪽에 숨은 블록으로 들어 있다가 스크립트로 바뀐다 (Next 스트리밍 방식). 기능 문제는 아니지만 LCP 요소·측정값에 영향이 있을 수 있어 Review가 Lighthouse 때 함께 본다.
+4. **서비스 중 API 다운 시 직전 페이지 유지**: 오류를 던지는 코드는 확인했지만(가짜 API 500), "재검증 시간이 지난 뒤에도 직전 정상 페이지가 계속 보이는지"는 `revalidate`를 줄인 복사본이 필요해 Review에 남긴다.
+5. 백엔드 없이 빌드한 페이지는 첫 재검증(최대 1시간) 전까지 "연결 실패" 안내가 보인다 (계획 01-2-5의 알려진 한계).
+
+### 01-B11. 로컬에서 실행하는 방법 (사용자 명령)
+
+```bash
+# 1) 백엔드 읽기 API (루트 .env의 DATABASE_URL 사용, 기본 포트 4000)
+cd backend && npm start
+
+# 2) 프론트 (다른 터미널). 루트 .env의 API_BASE_URL을 next.config.ts가 읽는다
+cd frontend
+npm run dev                      # 개발 모드: http://localhost:3000
+# 또는 운영 모드 (백엔드를 켠 상태에서 빌드해야 통계가 들어간다)
+npm run build && npm start       # http://localhost:3000
+```
+
+- 백엔드를 끈 채 `npm run build`해도 빌드는 성공하고, 통계 자리에 "통계 서버에 연결하지 못했습니다"가 들어간다. 통계를 보려면 백엔드를 켜고 다시 빌드한다.
+- 이전 빌드의 API 응답은 `.next/cache/fetch-cache`에 최대 1시간 남는다. 백엔드 없이 빌드하는 상황을 일부러 확인하려면 이 폴더를 지우고 빌드한다.
+
+### 01-B12. Review 수정 (2026-10-15, Review 에이전트)
+
+> 요약: Review가 실제 데이터와 브라우저에서 찾은 결함 4개를 고쳤다. 자세한 근거는 `front_review.md` "변경 01 검토" 3장.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 아이템 거르기 ④ | 건메탈 군화 `3172`(3단계 신발, 태그에 `Boots` 없음)가 핵심 아이템으로 나오던 문제. `ItemInfo.builtFromBoots`(재료에 `Boots` 아이템) 추가, 규칙 ④를 "`Boots` 태그 또는 `builtFromBoots`"로. 야스오·요네·가렌·트린다미어·아크샨 미드 5곳이 바뀜 (`types.ts`, `api.ts`, `itemFilter.ts`) | ✅ |
+| 리스트 로딩 CLS | 정적 HTML에서도 스켈레톤이 먼저 보였다가 표로 바뀌는데, 스켈레톤이 화면보다 짧아 푸터가 밀려 CLS 0.044. `champions/loading.tsx` 바깥에 `min-h-screen` → CLS 0 | ✅ |
+| 360px 티어 표 | `sm` 미만에서만 순위·티어·승률·픽률 열 폭과 칸 여백 축소, 아이콘 간격 2px 축소. 잘리는 이름 20/69 → 1/69 (`TierTable.tsx`) | ✅ |
+| [검색 지우기] 포커스 | 버튼이 사라지며 포커스가 `body`로 가던 문제. 지운 뒤 검색창으로 포커스 (`TierTable.tsx`) | ✅ |
+
+- 수정 후 `npm run lint` 0, `npx tsc --noEmit` 0, `npm run build` 성공(183페이지, 경고 0), 번들 검사 0건.
+- 남은 문제(미수정): 룬 1/2순위가 같은 조합인 챔피언 71/173명 (보조 룬 순서만 다름, 백엔드 집계 단위 — 계약 변경 후보), `CHAMPION_TAGS` 미사용 코드.
+
