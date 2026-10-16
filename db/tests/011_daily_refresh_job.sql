@@ -1,7 +1,7 @@
 -- 011: 매일 집계 예약 작업 tiergg_daily_refresh (db_spec 변경 03, 03-11). 항상 ROLLBACK. 작업을 실행하지 않는다.
 --   확장 pg_cron 있음 / cron.job에 tiergg_daily_refresh 정확히 1줄 / schedule '0 20 * * *', active
 --   command = 015 문구 / username = current_user, database = current_database()
---   anon·authenticated: cron 스키마 USAGE 없음 (실패 조건), cron.schedule·cron.unschedule에 직접 준 EXECUTE 없음 (실패 조건)
+--   anon·authenticated: cron 스키마 USAGE 없음 (실패 조건), cron 스키마의 모든 함수에 직접 준 EXECUTE 없음 (실패 조건, 변경 04 결정 04-D)
 --   PUBLIC EXECUTE(pg_cron 기본값)는 [주의]로만 남긴다 (Build 편차, 변경 03 db_build 참고)
 DO $$
 DECLARE
@@ -9,6 +9,9 @@ DECLARE
   j record;
   v_n int;
   role_name text;
+  v_fns int;
+  v_got_fn text;
+  v_public text;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
     RAISE EXCEPTION 'pg_cron 확장이 없음 (015 미적용)';
@@ -39,20 +42,24 @@ BEGIN
     IF has_schema_privilege(role_name, 'cron', 'USAGE') THEN
       RAISE EXCEPTION '% 가 cron 스키마 USAGE 권한을 가짐', role_name;
     END IF;
-    -- 함수 EXECUTE: 역할에 직접 준 권한이 있으면 실패.
+    -- 함수 EXECUTE: cron 스키마의 모든 함수 중 역할에 직접 준 권한이 있으면 실패 (변경 04에서 schedule/unschedule 2개 → 전체).
     -- pg_cron 기본값으로 PUBLIC에 EXECUTE가 있지만(확장 소속, 마이그레이션에서 바꾸지 않음 03-11 보안),
     -- cron 스키마 USAGE가 없어 실제로는 부를 수 없다. 이 경우는 [주의]로 남기고 Build 기록에 보고한다.
-    IF EXISTS (
-      SELECT 1 FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a
-      WHERE p.oid IN ('cron.schedule(text,text,text)'::regprocedure, 'cron.unschedule(bigint)'::regprocedure)
-        AND a.grantee = (SELECT oid FROM pg_roles WHERE rolname = role_name) AND a.privilege_type = 'EXECUTE'
-    ) THEN
-      RAISE EXCEPTION '% 에 cron.schedule/unschedule EXECUTE 권한이 직접 주어짐', role_name;
+    SELECT string_agg(DISTINCT p.oid::regprocedure::text, ', ') INTO v_got_fn
+    FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a
+    WHERE p.pronamespace = 'cron'::regnamespace
+      AND a.grantee = (SELECT oid FROM pg_roles WHERE rolname = role_name) AND a.privilege_type = 'EXECUTE';
+    IF v_got_fn IS NOT NULL THEN
+      RAISE EXCEPTION '% 에 cron 함수 EXECUTE 권한이 직접 주어짐: %', role_name, v_got_fn;
     END IF;
-    IF has_function_privilege(role_name, 'cron.schedule(text,text,text)', 'EXECUTE')
-       OR has_function_privilege(role_name, 'cron.unschedule(bigint)', 'EXECUTE') THEN
-      RAISE NOTICE '[주의] % : cron.schedule/unschedule EXECUTE가 PUBLIC으로 있음 (pg_cron 기본값). cron 스키마 USAGE가 없어 호출 불가', role_name;
+    SELECT string_agg(p.proname, ', ' ORDER BY p.proname) INTO v_public
+    FROM pg_proc p
+    WHERE p.pronamespace = 'cron'::regnamespace
+      AND has_function_privilege(role_name, p.oid, 'EXECUTE');
+    IF v_public IS NOT NULL THEN
+      RAISE NOTICE '[주의] % : cron 함수 EXECUTE가 PUBLIC으로 있음 (pg_cron 기본값). cron 스키마 USAGE가 없어 호출 불가: %', role_name, v_public;
     END IF;
   END LOOP;
-  RAISE NOTICE '[통과] anon·authenticated: cron 스키마 USAGE 없음, cron.schedule·cron.unschedule에 직접 준 EXECUTE 없음';
+  SELECT count(*) INTO v_fns FROM pg_proc WHERE pronamespace = 'cron'::regnamespace;
+  RAISE NOTICE '[통과] anon·authenticated: cron 스키마 USAGE 없음, cron 스키마 함수 %개 모두 직접 준 EXECUTE 없음', v_fns;
 END $$;
