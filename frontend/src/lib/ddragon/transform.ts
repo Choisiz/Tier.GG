@@ -64,6 +64,7 @@ export function toChampionSummary(
 ): ChampionSummary {
   return {
     id: raw.id,
+    key: raw.key,
     name: raw.name,
     title: raw.title,
     tags: raw.tags,

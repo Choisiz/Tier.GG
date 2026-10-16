@@ -1,0 +1,237 @@
+# DB 구현 상태 (`!db` Build)
+
+- 기준: `db/docs/db_spec.md` (현재 계획), 계약 `docs/contracts/db_contract.md` / `db_contract.dbml` **v8**
+- 대상 DB: Supabase PostgreSQL 17.11, Session pooler, 접속 계정 `postgres` (superuser 아님)
+- 마지막 반영: 변경 04 Build (2026-10-16, 마이그레이션 016 적용) + 변경 04 Review (2026-10-16, PASS with issues, 코드 수정 없음)
+- 이 문서는 **지금 구현 상태만** 둔다. 예전 시도·편차·측정 기록은 git 커밋 `87cfc78`의 `db/docs/db_build.md`에 있다.
+- 상태 표기: ✅ 완료 / ⚠️ 부분 완료 / ❌ 실패 / ⏸️ 보류
+
+## 목차
+
+- [1. 마이그레이션 실행기](#1-마이그레이션-실행기)
+- [2. 마이그레이션 파일](#2-마이그레이션-파일)
+- [3. 테이블과 제약 조건](#3-테이블과-제약-조건)
+- [4. 인덱스](#4-인덱스)
+- [5. 보안](#5-보안)
+- [6. 함수와 뷰](#6-함수와-뷰)
+- [7. 매일 자동 집계](#7-매일-자동-집계)
+- [8. 테스트](#8-테스트)
+- [9. 계약 반영](#9-계약-반영)
+- [10. 실행 명령](#10-실행-명령)
+- [11. 현재 검증 결과](#11-현재-검증-결과)
+- [12. 구현 세부 규칙](#12-구현-세부-규칙)
+- [13. 남은 문제](#13-남은-문제)
+
+---
+
+## 1. 마이그레이션 실행기
+
+> 요약: `db/scripts/`의 Node 실행기가 파일을 순서대로 적용하고 체크섬으로 적용된 파일의 수정을 막는다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 의존성 | `db/package.json`에 `pg` `^8.23.1` 하나 (`package-lock.json` 고정). `dotenv` 없이 `node --env-file=../.env` | ✅ |
+| `up` | 이름 규칙 `^\d{3}_[a-z0-9_]+\.sql$`, 이름순, 기록에 없는 파일만. 파일 1개 = 트랜잭션 1개, 실패하면 ROLLBACK 후 멈춤. 파일마다 `SET LOCAL search_path = public, pg_catalog`. advisory lock으로 동시 실행 방지 | ✅ |
+| `status` | 파일별 적용 시각, 체크섬 불일치, 기록에만 있는 파일 출력 | ✅ |
+| 체크섬 검사 | sha256. 적용된 파일이 바뀌면 아무것도 적용하지 않고 exit 1 | ✅ |
+| `fresh-check` | 임시 스키마 `migration_check`에 001부터 전부 적용(파일마다 SAVEPOINT), 항상 ROLLBACK, 끝난 뒤 스키마 잔존 확인 | ✅ |
+| `schema_migrations` | `filename` PK, `checksum`, `applied_at`. RLS 켜짐, `anon`·`authenticated` 권한 회수 | ✅ |
+| `MIGRATIONS_DIR` | 폴더를 바꿔 체크섬 검사를 복사본으로 시험 (운영에서 쓰지 않음) | ✅ |
+| 비밀값 가리기 | `scripts/lib.mjs` `secretsToHide()`: 접속 문자열 전체, 비밀번호·사용자 이름(원문과 디코딩 형태), 호스트를 `***`로. 잘못된 `%` 인코딩이 있어도 나머지는 가려짐 | ✅ |
+| `verify.mjs` | `db/tests/*.sql`을 파일마다 `BEGIN … ROLLBACK`. `TABLES` 11개(원본 3, 운영 1, 집계 7)의 전후 줄 수 비교. `--fresh`면 임시 스키마에 마이그레이션부터 적용 | ✅ |
+
+---
+
+## 2. 마이그레이션 파일
+
+> 요약: 001~016이 실제 DB에 적용되어 있고 체크섬 불일치가 없다. 다음 파일은 017이다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| `001_create_raw_tables.sql` | 원본 3개 + `collection_logs`, CHECK, Riot JSON 경로 주석 | ✅ |
+| `002_create_aggregate_tables.sql` | 패치 기준 집계 6개 (012에서 삭제됨) | ✅ |
+| `003_create_indexes.sql` | `match_players_champion_id_team_position_idx` | ✅ |
+| `004_enable_rls.sql` | RLS 켜기, 테이블·시퀀스 권한 회수 | ✅ |
+| `005_create_helper_functions.sql` | `patch_sort_key`, `tier_from_score` (+ 009에서 지운 옛 스킬 함수) | ✅ |
+| `006_create_refresh_patch_stats.sql` | 패치 기준 집계 함수 (012에서 삭제됨) | ✅ |
+| `007_create_purge_old_patches.sql` | 패치 기준 정리 함수 (012에서 삭제됨) | ✅ |
+| `008_create_champion_tier_view.sql` | 패치 기준 티어 뷰 (012에서 삭제됨) | ✅ |
+| `009_skill_order_prefix.sql` | 집계 줄이 있으면 멈추는 안전장치 → `champion_skill.skill_order` + `^[QWER]{11}$` CHECK, 스킬 집계 앞 11글자·상위 10개, 옛 스킬 함수 삭제 | ✅ |
+| `010_ranked_players_platinum.sql` | `ranked_players_tier_check`를 같은 이름으로 다시 만들어 `PLATINUM` 허용 (`NOT VALID` 없음) | ✅ |
+| `011_matches_game_start_at.sql` | 안전장치(`matches` 26줄 초과, 16.19·16.20 밖 패치, `match_players` 260줄 초과면 중단) → 테스트 26게임 삭제 → `game_start_at timestamptz NOT NULL` + `>= 2020-01-01` CHECK, 주석 | ✅ |
+| `012_window_aggregate_tables.sql` | 안전장치(`sum(patch.games) > 26`이면 중단) → 옛 뷰·함수 2개·집계 6개 DROP → `stats_window`, `stats_window_patch`, 집계 5개 CREATE → RLS → 7개 테이블 + `champion_rune_id_seq` `REVOKE` | ✅ |
+| `013_create_window_functions.sql` | `refresh_window_stats`, `purge_old_games`, 주석, `REVOKE EXECUTE … FROM PUBLIC, anon, authenticated` | ✅ |
+| `014_create_champion_tier_view.sql` | `champion CROSS JOIN stats_window` 뷰, `security_invoker`, 주석, `REVOKE ALL` | ✅ |
+| `015_schedule_daily_refresh.sql` | `CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog`, 같은 이름 작업 `unschedule` 뒤 `tiergg_daily_refresh` 등록 | ✅ |
+| `016_rune_sub_perk_sorted.sql` | `refresh_window_stats` `CREATE OR REPLACE`(013 본문에서 룬 블록만 `least`/`greatest` + `sub_perk1 <> sub_perk2`, `GROUP BY`에는 식 그대로) → 함수 주석 → `REVOKE EXECUTE` → `ANALYZE matches, match_players` → `stats_window`가 있으면 같은 창 `refresh_window_stats(days, window_end)` → CHECK `champion_rune_sub_perk_order_check` → 주석 6개(`ranked_players`, `champion_rune` 테이블·`sub_perk1`·`sub_perk2`, `match_players.sub_perk1`·`sub_perk2`). 2026-10-16 11:13 UTC 적용, 실행기 전체 약 2.8초 | ✅ |
+
+- 011·012의 삭제와 015의 지속 설정은 사용자 승인(2026-10-14) 뒤 적용했다. 016의 같은 창 재집계는 승인된 동작(결정 04-A)이고 원본은 바꾸지 않았다. 실제 DB에서 `purge_old_games`는 Build·Review가 실행한 적 없다.
+
+---
+
+## 3. 테이블과 제약 조건
+
+> 요약: 테이블 11개 + `schema_migrations`가 계약 v8과 같다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 원본 3개 + 운영 1개 | `ranked_players`, `matches`(`game_start_at` 포함), `match_players`, `collection_logs`. 컬럼 이름·순서·타입·NULL이 dbml v8과 같음 | ✅ |
+| 집계 7개 | `stats_window`(항상 0~1줄), `stats_window_patch`, `champion`, `champion_item`, `champion_rune`, `champion_spell`, `champion_skill`. 집계 5개에 `patch` 컬럼 없음 | ✅ |
+| PK / 유니크 | 모든 테이블 PK, 유니크 `champion_rune_page_key` (`champion_id`, `position`, 룬 11개) | ✅ |
+| FK와 삭제 동작 | `matches.puuid` → `ranked_players` SET NULL, `match_players.match_id` → `matches` CASCADE, 상세 4개 `(champion_id, position)` → `champion` CASCADE | ✅ |
+| CHECK | 포지션, 티어(`PLATINUM`~`CHALLENGER`)·랭크, 패치 형식, `KR_` 게임 ID, `game_start_at >= 2020-01-01`, 원본 `skill_order ~ '^[QWER]*$'`, 아이템 ≥ 0, 밴 > 0, 개수(`pick > 0`, `0 ≤ win ≤ pick`), `spell1_id < spell2_id`, `champion_rune_sub_perk_order_check`(`sub_perk1 < sub_perk2`, `convalidated = true`), 집계 `skill_order ~ '^[QWER]{11}$'`, `stats_window`(id 1, days 1~60, 시작 < 끝, games > 0), `stats_window_patch`(형식, games > 0), `collection_logs` 상태·시각·개수 | ✅ |
+| 주석 | 원본 컬럼에 Riot JSON 경로, 집계·뷰 컬럼 설명. `ranked_players` "티어당 250명", 보조 룬 정렬 문구 (016) | ✅ |
+
+---
+
+## 4. 인덱스
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 일반 인덱스 | `match_players_champion_id_team_position_idx` 1개. 나머지는 PK·유니크. `matches.game_start_at` 인덱스 없음 (결정 D21) | ✅ |
+
+---
+
+## 5. 보안
+
+> 요약: 브라우저용 역할(`anon`, `authenticated`)은 public의 어떤 객체도 읽거나 부를 수 없다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| RLS | public 테이블 12개(`schema_migrations` 포함) 켜짐, FORCE 아님, 정책 0개 | ✅ |
+| 테이블·뷰 권한 | `anon`·`authenticated` 회수. `relacl`은 `postgres`, `service_role`만 | ✅ |
+| 시퀀스 권한 | `collection_logs_id_seq`, `champion_rune_id_seq` 회수 | ✅ |
+| 함수 권한 | 4개 모두 `proacl = {postgres=X, service_role=X}` (`PUBLIC`·`anon`·`authenticated` 없음) | ✅ |
+| 뷰 | `security_invoker = true` | ✅ |
+| 주인 | 모든 객체 `postgres` | ✅ |
+| pg_cron 권한 | 확장 기본 `PUBLIC` EXECUTE(`cron` 함수 7개 중 `schedule` 2개·`unschedule` 2개·`job_cache_invalidate`)와 `cron.job` PUBLIC 읽기는 그대로 둠 (결정 사항). `anon`·`authenticated`는 `cron` 스키마 USAGE가 없어 호출·조회 모두 42501 | ✅ |
+
+---
+
+## 6. 함수와 뷰
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| `refresh_window_stats(p_days integer DEFAULT 14, p_until timestamptz DEFAULT now()) → jsonb` | 인자 검사(22023) → advisory lock → 남은 임시 테이블 정리 → 창 안 10줄 게임 → 0개면 P0002 → `DELETE … WHERE true` 3개 → `stats_window`·`stats_window_patch`·집계 5개 INSERT → jsonb 반환 (`patches`는 `patch_sort_key` 내림차순) | ✅ |
+| 집계 규칙 | 아이템 전부(한 줄 중복 1번), 룬·스펠·스킬 상위 10개(`pick DESC, win DESC, 키 ASC`), 스펠 같은 번호 줄 제외, 룬 보조 2개 `least`/`greatest` 정렬·같은 번호 줄 제외(016, 핵심 룬·파편은 정렬 안 함), 스킬 앞 11글자·11자 미만 제외, 밴은 게임당 1번(포지션 NULL 줄 포함) | ✅ |
+| `purge_old_games(p_keep_days integer DEFAULT 21) → integer` | NULL·14 미만·현재 창보다 짧으면 22023, `game_start_at < now() − p_keep_days × 24시간` 삭제(CASCADE), 지운 수 반환 | ✅ |
+| `patch_sort_key(text) → int[]` | SQL, IMMUTABLE | ✅ |
+| `tier_from_score(numeric) → smallint` | SQL, IMMUTABLE. 53.0 / 51.5 / 50.0 / 48.5, NULL → NULL | ✅ |
+| `champion_tier_view` | 컬럼 12개(`champion_id`, `position`, `pick`, `win`, `ban`, `games`, `win_rate`, `pick_rate`, `ban_rate`, `adjusted_win_rate`, `tier_score`, `tier`). 분모 `stats_window.games`, 티어는 반올림 전 점수, 50판 미만 NULL | ✅ |
+| 공통 | 모두 `SECURITY INVOKER`, `search_path=public, pg_catalog` | ✅ |
+| 016 함수 본문 | 013과 `diff`하면 룬 블록 주석 2줄 + `SELECT`의 보조 룬 2줄 + `WHERE` 1줄 + `GROUP BY` 1줄만 다름. 인자·기본값·반환·`VOLATILE`·`SECURITY INVOKER`·`search_path`·`proacl`(`postgres`, `service_role`)은 016 전과 같음. 실제 `prosrc` md5(`ad7de416...`) = 016 파일 본문 md5 | ✅ |
+
+---
+
+## 7. 매일 자동 집계
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 확장 | `pg_cron` 1.6.4, 스키마 `pg_catalog` (작업 테이블은 `cron` 스키마). `cron.timezone = GMT` | ✅ |
+| 작업 | `cron.job` 1줄: `tiergg_daily_refresh`, `0 20 * * *`(05:00 KST), `active`, `username postgres`, `database postgres` | ✅ |
+| 명령 | `SET statement_timeout = '5min'; ANALYZE matches, match_players; SELECT refresh_window_stats(14);` | ✅ |
+| 실제 실행 | 2026-10-14 20:00 UTC 성공 3.3초, 2026-10-15 20:00 UTC 성공 3.6초 (약 3,800~3,950게임, `ANALYZE` 포함) | ✅ |
+| 실패 알림 | 없음. `cron.job_run_details`와 `stats_window.aggregated_at`을 직접 봐야 함 | ⏸️ (계획 없음) |
+
+---
+
+## 8. 테스트
+
+> 요약: 11개 파일이 실제 스키마(`verify`)와 임시 스키마(`verify:fresh`)에서 모두 통과한다. 모두 롤백된다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| `001_storage_format.sql` | 실제 예시 1행, 거부 15건, 허용 값, SET NULL·CASCADE, `stats_window` 기본값. 실제 `KR_8408851980`이 있으면 `[건너뜀]` | ✅ |
+| `002_helper_functions.sql` | `patch_sort_key`, `tier_from_score` 경계 | ✅ |
+| `003_refresh_window_stats.sql` | 샘플 20게임(2021-01-10) 기대값, 멱등, P0002에 스냅숏 유지, 인자 오류 5건 | ✅ |
+| `004_champion_tier_view.sql` | 손 계산값, `pick` 49 → NULL, `stats_window` 0줄 → 뷰 0줄 | ✅ |
+| `006_security.sql` | 스키마 전체 자동 검사. 기대 개수 테이블 12, 뷰 1, 시퀀스 2, 함수 4 | ✅ |
+| `007_skill_order.sql` | 앞 11글자, 상위 10개·동률, CHECK 거부, 구조 | ✅ |
+| `008_ranked_players_tier.sql` | 허용 6, 거부 6, CHECK 정의, `PLATINUM` 표본 참조 | ✅ |
+| `009_window_boundary.sql` | 창 경계 A~H, 패치 구성, 뷰 분모, `p_days = 1` 재집계 | ✅ |
+| `010_purge_old_games.sql` | 21일 경계, CASCADE, 집계 유지, 인자 오류 3건, 두 번째 0 | ✅ |
+| `011_daily_refresh_job.sql` | 확장, 작업 1개, 일정, 명령, 계정·DB, `cron` USAGE 없음, `cron` 스키마 **모든 함수**(지금 7개) 직접 부여 없음(결정 04-D). `PUBLIC`으로 열린 함수 이름은 `[주의]` NOTICE | ✅ |
+| `012_rune_sub_perk_order.sql` | 실제 데이터(롤백, `stats_window`가 있을 때만): 같은 창 재집계 결과 ↔ 원본에서 `least`/`greatest`로 따로 계산한 상위 10개 `EXCEPT` 양방향 0줄, 1순위 = 2순위 0개, 순서만 다른 쌍 0개. 샘플 11게임: 두 순서 합침 7/3, 다른 조합 2/1, 핵심 룬 칸 바뀐 페이지 별도 1/0, 같은 보조 룬 줄 제외(`champion` pick 11), 1순위, CHECK 거부 2건·통과 1건(제약 이름 확인), 제약 정의·`convalidated`. `verify:fresh`에서는 실제 데이터 부분 `[건너뜀]` | ✅ |
+
+- 테스트 번호 005는 비어 있다 (옛 패치 정리 테스트를 지우고 010으로 대체).
+
+---
+
+## 9. 계약 반영
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| `db_contract.md` v8 | v7 내용 + "v7 → v8 변경" 표, 1장 수집 범위(티어당 250명, 4 : 4 : 2 계획 삭제, 마스터 이상 허용만, 1-2 상한 계산, 1-3 실제 규모), 2장·5장 ① 문구, ERD `sub_perk1 < sub_perk2`, 7장 룬 저장 규칙, 9-2 `champion_rune` 정렬·CHECK, 9-4 `ANALYZE` 5,000게임 근거, 10장 #2 수정·#15 추가, 11장 pg_cron 권한 문장. 티어 기준값 변경 없음 | ✅ (변경 04 반영) |
+| `db_contract.dbml` v8 | 테이블 11개, Ref 6개, TableGroup 원본 3·집계 7·운영 1. 변경 04: 머리 주석 v8, `ranked_players` note(티어당 250명), `champion_rune` note·`sub_perk1`·`sub_perk2` note(CHECK), `match_players.sub_perk1`·`2` note(누른 순서 그대로), 집계 호출 규칙 주석(`ANALYZE` 항상). 구조(컬럼·타입·키) 변경 없음. note 문자열만 바뀌어 파서로 다시 파싱하지는 않음 | ✅ |
+| `.md` ↔ `.dbml` | 컬럼·타입·NOT NULL·기본값·PK·UNIQUE가 서로, 그리고 실제 DB와 같음 | ✅ |
+| `api_contract.md` | 바꾸지 않음. 응답 모양은 같고 보조 룬 2개의 값 순서만 번호순이 됨 (결정 04-E, 프론트 전달 사항) | ✅ (해당 없음) |
+
+---
+
+## 10. 실행 명령
+
+> 요약: 모두 `db/` 폴더에서 실행한다. `.env`는 저장소 루트에 있다.
+
+| 명령 | 동작 |
+|------|------|
+| `npm install` | `pg` 설치 |
+| `npm run migrate` | 적용하지 않은 파일만 적용 |
+| `npm run migrate:status` | 적용 여부·체크섬 확인 |
+| `npm run migrate:fresh-check` | 임시 스키마에 001부터 적용해 보고 롤백 |
+| `npm run verify` | 실제 스키마에서 테스트 (항상 롤백, 전후 줄 수 비교) |
+| `npm run verify:fresh` | 임시 스키마에 마이그레이션 + 테스트 (항상 롤백). 실제 적용 전 확인용 |
+
+- 새 마이그레이션 적용 순서: `migrate:fresh-check` → `verify:fresh` → (삭제·지속 설정이면 사용자 승인 확인) → `migrate` → `verify`.
+
+---
+
+## 11. 현재 검증 결과
+
+> 요약: 변경 04 Build(2026-10-16) 결과에 변경 04 Review(2026-10-16)가 다시 잰 동시 호출·성능·예약 작업 값을 반영했다.
+
+| 항목 | 결과 |
+|------|------|
+| `migrate:status` | 001~016 적용됨 (016은 2026-10-16 11:13 UTC), 체크섬 불일치 없음. 다시 `migrate` → "적용할 파일 없음". `git status`에 001~015 변경 없음 |
+| `migrate:fresh-check` | 적용 전·후 모두 16개 파일 통과 (빈 스키마라 016 재집계 단계는 건너뜀), 임시 스키마 테이블 11·뷰 1·함수 4, `migration_check` 남지 않음 |
+| `verify` / `verify:fresh` | 11개 파일 모두 통과, 전후 줄 수 같음. 006 검사 개수 테이블 12·뷰 1·시퀀스 2·함수 4 그대로 |
+| 함수·뷰 본문 | `refresh_window_stats` 실제 md5 = 016 파일 본문. 나머지는 변경 03 Review 확인값 그대로 |
+| 016 전 → 후 (실제 DB) | 창 2026-10-01 20:00:00.173 ~ 10-15 20:00:00.173 UTC·`days` 14·`games` 3,789 그대로, `aggregated_at`만 10-15 20:00 → 10-16 11:13. `champion_rune` 3,993 → **3,943**줄. `sub_perk1 > sub_perk2` 2,064 → **0**줄. 1순위 = 2순위(정렬 후 같은 페이지) 106 → **0**개. 순서만 다른 쌍 446 → **0**개 |
+| 다른 집계 6개 | 줄 수(`champion` 606, 아이템 17,094, 스펠 1,555, 스킬 3,349, 패치 2)와 내용 md5가 016 전과 같음 |
+| 원본 | `matches` 3,975, `match_players` 39,750줄, `match_players` 내용 md5가 016 전과 같음 (원본 안 바뀜) |
+| 아트록스 TOP (8010 / 8400 / 5008·5008·5001) | 1순위 96판 47승 `[8473, 8453]` → **`(8453, 8473)` 118판 55승**. 2순위 22판 8승(1순위와 같은 페이지) → **`(8444, 8453)` 32판 19승** (계획 04-7 예상값과 같음) |
+| 제약·주석 | `champion_rune_sub_perk_order_check` = `CHECK ((sub_perk1 < sub_perk2))`, `convalidated = true`. 주석 6개와 함수 주석이 계획 04-5와 같음, "각 50명" 없음 |
+| 동시 호출 | 변경 04 Review: 실제 창으로 두 연결 호출(롤백). 두 번째 연결이 `Lock / advisory`로 기다리다 첫 연결 ROLLBACK 뒤 진행(총 3.31초) |
+| 성능 (롤백, 5,000게임) | 변경 03 Review: 집계 1.14초 (아이템 줄 1.1만). 변경 04 Review: 더 무거운 분포(아이템 줄 2.55만, 룬·스킬 각 8,500줄)에서 2.44~3.07초. 룬 블록만 같은 데이터로 비교하면 016식 167~189ms < 013식 216~248ms (실제 창 80~83ms vs 84~91ms) → 016으로 느려지지 않음. 실제 창 전체 재집계 2.28초 |
+| 실제 예약 작업 | 2026-10-14 3.3초, 2026-10-15 3.6초, 모두 성공. **016 적용 뒤 아직 실행 없음** (다음 2026-10-16 20:00 UTC) |
+| 원본 (2026-10-16) | 표본 765명 (플래티넘 250, 에메랄드 265, 다이아 250), 게임 3,975개, 참가자 39,750줄 |
+| 집계 (2026-10-16) | 창 2026-10-01 20:00 ~ 2026-10-15 20:00 UTC, 3,789게임 (16.20: 2,640 / 16.19: 1,149), `champion` 606줄 중 티어 있는 줄 187개 |
+| DB 크기 | 95MB / 500MB (2026-10-16 Review 뒤, 재집계 죽은 줄 포함. 016 전 90MB) |
+
+---
+
+## 12. 구현 세부 규칙
+
+> 요약: 계획에 없던 세부 동작 중 지금도 코드에 남아 있고 다음 작업자가 알아야 할 것이다.
+
+| # | 내용 | 이유 |
+|---|------|------|
+| 1 | 집계 함수의 인자 검사는 잠금보다 먼저 한다 | NULL 인자면 잠금 키 계산이 의미 없고, 검사는 DB를 읽지 않음 |
+| 2 | 집계 함수 시작 때 `pg_temp.tmp_games`·`tmp_base`가 있으면 지운다 | `ON COMMIT DROP`이라 같은 트랜잭션에서 두 번 부르면 "이미 있음" 오류가 나므로 |
+| 3 | 집계 `DELETE`는 `WHERE true`를 붙인다 | `safeupdate`가 켜진 연결에서도 막히지 않게 |
+| 4 | 마이그레이션 머리 주석에 "함수 본문 안의 `DELETE`는 호출될 때만 실행"을 적는다 | 지우는 SQL을 `grep`으로 검사할 때 오해하지 않게 |
+| 5 | 테스트 001은 실제 예시 게임 ID가 DB에 있으면 건너뛴다 | 키가 겹침. 그때는 `verify:fresh`로 같은 검사를 한다 |
+| 6 | 테스트 011은 `PUBLIC`으로 온 cron EXECUTE를 실패가 아니라 `[주의]` NOTICE로 남긴다 | pg_cron 기본값이고 스키마 USAGE에서 막힘. USAGE나 직접 부여가 생기면 실패 |
+| 7 | 성능 측정 스크립트는 scratchpad에만 둔다 | 저장소에 측정용 코드를 남기지 않음 |
+| 8 | 테스트 012는 실제 데이터 검사를 샘플 집계보다 **먼저** 한다 | 샘플 집계가 `stats_window`를 2021년 창으로 바꾸므로 실제 창을 먼저 읽어야 함 |
+| 9 | 016은 기존 스냅숏을 같은 창으로 재집계한 **뒤** CHECK를 건다 | 재집계 전에는 `sub_perk1 > sub_perk2`가 2,064줄이라 CHECK가 바로 실패함 |
+
+---
+
+## 13. 남은 문제
+
+> 요약: 동작을 막는 문제는 없다. 전체 목록은 [`db_overview.md`](db_overview.md) "해결되지 않은 점"이 기준이다. 아래는 Build 산출물에 직접 걸린 것만이다.
+
+| # | 내용 | 상태 |
+|---|------|------|
+| 1 | 016 이후 첫 05:00 KST 예약 작업(2026-10-16 20:00 UTC) 성공과 그 뒤 중복 0개 확인. 성능·동시 호출은 변경 04 Review에서 확인함 | ⏸️ (다음 실행 뒤 확인) |
+| 2 | 프론트 전달 사항(결정 04-E): `champion_rune` 보조 룬 2개 값이 번호순이 됨. 화면 순서는 Data Dragon 줄 순서로 | ⏸️ (메인 에이전트) |

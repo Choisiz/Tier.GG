@@ -1,149 +1,243 @@
-# 프론트엔드 구현 기록 — 01 챔피언 화면
+# 프론트엔드 구현 상태 — Tier.GG 챔피언 화면
 
-> 작성: Build 에이전트 / 기준 문서: `front_spec.md` (승인됨, 결정 사항 10개 모두 ★추천안)
-> 작성일: 2026-10-12 / 확인 시점 Data Dragon 최신 버전 `16.20.1`, 챔피언 173개
+> 기준: `front_spec.md` (현재 계획), `docs/contracts/api_contract.md` v2. 코드 상태: 변경 01 Review 수정 반영 후 (2026-10-15).
+> 이 문서는 **지금 구현 상태**만 적는다. 이전 시도와 과정 기록은 git 커밋 `87cfc78`에 있다.
+> 상태 표기: ✅ 완료 / ⚠️ 부분 완료 / ❌ 실패 / ⏸️ 보류
+
+## 목차
+
+- [1. 기술 구성](#1-기술-구성)
+- [2. 라우트](#2-라우트)
+- [3. 백엔드 API 모듈](#3-백엔드-api-모듈)
+- [4. Data Dragon 모듈](#4-data-dragon-모듈)
+- [5. 화면용 매핑](#5-화면용-매핑)
+- [6. 공통 레이아웃과 환경 변수](#6-공통-레이아웃과-환경-변수)
+- [7. 챔피언 티어 리스트](#7-챔피언-티어-리스트)
+- [8. 챔피언 상세](#8-챔피언-상세)
+- [9. 반응형과 접근성](#9-반응형과-접근성)
+- [10. 계획과 다르게 구현한 점](#10-계획과-다르게-구현한-점)
+- [11. 최신 검증 결과](#11-최신-검증-결과)
+- [12. 실행 방법](#12-실행-방법)
+- [13. 남은 문제](#13-남은-문제)
 
 ---
 
-## 1. 초기 세팅
+## 1. 기술 구성
 
-> **쉬운 요약**: create-next-app으로 프로젝트를 만들고, 계획서의 캐싱 방식에 맞게 설정을 손봤다. 추가 의존성은 없다.
+> **쉬운 요약**: create-next-app 16.4 기본 구성 그대로이고 추가 의존성은 없다.
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
-| 프로젝트 생성 | `npx create-next-app@latest frontend --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm --turbopack --no-react-compiler --yes`. `frontend/docs/`는 그대로 보존됨 | ✅ |
-| 버전 | `next` 16.4.0, `react`/`react-dom` 19.3.0, `tailwindcss` 4, Node v24.15.0 | ✅ |
-| 의존성 | create-next-app 기본 구성 그대로. 추가 의존성 없음 | ✅ |
-| `next.config.ts` | `images.remotePatterns`에 `https://ddragon.leagueoflegends.com/cdn/**` 추가. 템플릿 기본값 `cacheComponents: true`, `partialPrefetching: true`는 제거 (아래 "계획과 다른 점" 1 참고) | ✅ |
-| `globals.css` | 다크 색상 토큰(CSS 변수 + `@theme inline`): 배경 `#0b1020`, 표면 `#141b2f`/`#1d2540`, 테두리 `#2a3456`, 텍스트 `#e7eaf3`, 보조 텍스트 `#a4adc6`, 포인트(골드) `#e3b456`. `color-scheme: dark`, 공통 `focus-visible` 링 | ✅ |
-| `layout.tsx` | `<html lang="ko">`, title 템플릿 `%s \| Tier.GG`, 시스템 한글 글꼴 스택 (템플릿의 Geist 구글 폰트 제거) | ✅ |
-| 샘플 정리 | 템플릿 `page.tsx` 샘플 콘텐츠, `public/*.svg` 5개 삭제 (`public/`은 비어서 제거됨). `favicon.ico`, `README.md`, `AGENTS.md`(create-next-app 생성물)는 유지 | ✅ |
+| 버전 | `next` 16.4.0, `react`/`react-dom` 19.3.0, `tailwindcss` 4(`@tailwindcss/turbopack`), Node v24.15.0 | ✅ |
+| 의존성 | dependencies는 `next`, `react`, `react-dom`만. `server-only`는 Next 내장 처리라 설치 안 함 | ✅ |
+| `next.config.ts` | 이미지 `remotePatterns` `https://ddragon.leagueoflegends.com/cdn/**`, Tailwind `turbopack.rules`, 루트 `.env`에서 `API_BASE_URL`만 읽기. `cacheComponents`·`partialPrefetching` 없음 | ✅ |
+| `globals.css` | 다크 색상 토큰(CSS 변수 + `@theme inline`): 배경 `#0b1020`, 표면 `#141b2f`/`#1d2540`, 테두리 `#2a3456`, 글자 `#e7eaf3`, 보조 `#a4adc6`, 골드 `#e3b456`. `color-scheme: dark`, 공통 `focus-visible` 링 | ✅ |
+| `layout.tsx` | `<html lang="ko">`, 제목 템플릿 `%s \| Tier.GG`, 시스템 한글 글꼴, 본문 건너뛰기 링크 | ✅ (기본 `description`이 옛 문구, 13장) |
+| 템플릿 정리 | 샘플 콘텐츠·`public/*.svg` 삭제. `favicon.ico`, `README.md`, `AGENTS.md` 유지 | ✅ |
 
-## 2. Data Dragon 모듈 (`src/lib/ddragon/`)
+## 2. 라우트
 
-> **쉬운 요약**: Data Dragon 호출, 타입, 이미지 URL, 가공 로직을 한 폴더에 모았다.
+> **쉬운 요약**: 탑은 `/champions`, 나머지 4개는 `/champions/lane/{포지션}`, 상세는 `/champions/{영문 id}`. 모두 미리 만든 정적 페이지이고 1시간마다 갱신한다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| `/` | `app/page.tsx` `redirect('/champions')` → 307 | ✅ |
+| `/champions` | `TierListPage(TOP)`, SSG + `revalidate = 3600` (○) | ✅ |
+| `/champions/lane/[position]` | `generateStaticParams`(top 포함 5개) + `dynamicParams = false` + `revalidate = 3600`. `top`이면 `permanentRedirect("/champions")` → 빌드 때 `top.meta`에 308 저장 | ✅ |
+| 잘못된 lane 조각 | `/lane/TOP`, `/lane/Jungle`, `/lane/mid`, `/champions/lane` → 404 | ✅ |
+| `/champions/[championId]` | `generateStaticParams` 173개 SSG + `revalidate = 3600`, `dynamicParams` 기본값(true) | ✅ |
+| 없는 챔피언 | 목록에 id가 없으면 `notFound()` → `[championId]/not-found.tsx` | ✅ |
+| `generateMetadata` | "아트록스 - 다르킨의 검 \| Tier.GG". Data Dragon 실패 시 try/catch로 "챔피언 \| Tier.GG" | ✅ |
+| 전역 404 / 오류 | `app/not-found.tsx`(홈 링크), `app/error.tsx`·`champions/error.tsx`(`retry()` 다시 시도 + 목록 링크) | ✅ |
+| 소문자 상세 주소 (macOS 로컬) | `next start`에서 `/champions/garen` 요청 시 404 결과가 `Garen.html`을 덮어쓴다. 사용자 결정으로 코드 수정 없이 보류 (13장) | ⏸️ |
+
+## 3. 백엔드 API 모듈
+
+> **쉬운 요약**: `src/lib/api/` 6개 파일 모두 첫 줄이 `import "server-only"`다. 오류를 화면이 쓰는 몇 가지 상태로 바꾼다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| `config.ts` | `getApiBaseUrl()` (끝 `/` 제거, 값 없으면 `null` — 기본값 없음 + 서버 로그 1줄), `API_REVALIDATE_SECONDS = 3600`, `API_TIMEOUT_MS = 10000` | ✅ |
+| `types.ts` | 계약 v2 그대로: `Position`, `Tier`(1~5 \| null), `WindowPatch`, `StatsWindow`, `MetaResponse`, `TierRow`, `TierListResponse`, `PositionSummary`, `StatsSummary`, `ItemBuild`, `RuneBuild`, `SpellBuild`, `SkillBuild`, `ChampionStatsResponse`, `ApiErrorBody` | ✅ |
+| `client.ts` | `fetchApi<T>()`: `fetch(url, { next: { revalidate: 3600 }, signal: AbortSignal.timeout(10000) })`. 결과 `ok` / `not_ready` / `not_found` / `invalid`(로그에 `code`) / `unavailable`. 분기는 상태 + `error.code`로만. 로그에 기본 URL 없음 | ✅ |
+| `api.ts` | `getMeta()`, `getTierList(position)`, `getChampionStats(key, position?)` → `StatsState`. `requireStats()`: 빌드 중이 아닐 때 `unavailable`이면 오류를 던짐 | ✅ |
+| `positions.ts` | `POSITIONS`, 한글 이름(탑·정글·미드·원딜·서폿), 소문자 URL 조각 ↔ API 값, `tierListHref()` | ✅ |
+| `buildPhase.ts` | `process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD` (`next/constants`). 정적 생성 작업 프로세스에서도 값이 보이는 것을 확인함 (백엔드 끈 빌드 성공) | ✅ |
+
+## 4. Data Dragon 모듈
+
+> **쉬운 요약**: `src/lib/ddragon/`에 호출·타입·이미지 주소·가공·아이템 규칙·파편 표를 모았다.
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
 | `constants.ts` | `DDRAGON_BASE_URL`, `LOCALE = "ko_KR"`, `REVALIDATE_SECONDS = 3600` | ✅ |
-| `types.ts` | 계획서 6-2 원본 타입 + 6-3 화면용 타입 (`any` 미사용) | ✅ |
-| `images.ts` | 스퀘어/스플래시/로딩/스킬/패시브 URL 함수. 스킬·패시브·아이콘은 `image.full` 사용 | ✅ |
-| `transform.ts` | 태그 한글 매핑, 가나다순 정렬(`localeCompare('ko')`), HTML 제거(`<br>`→줄바꿈, 태그 제거, 공백 정리, 기본 HTML 엔티티 6종 복원), 크로마(`parentSkin`) 제외 + `num` 오름차순, `default`→`기본` | ✅ |
-| `api.ts` | `getLatestVersion()`(revalidate 3600), `getChampionList()`, `getChampionDetail(id)`(목록에 없으면 `null`, 버전 포함 URL은 `force-cache`). `res.ok`가 아니면 throw | ✅ |
+| `types.ts` | 챔피언 원본·화면용 타입(`ChampionSummary.key` 포함), `DDragonItem`, `DDragonSummonerSpell`, `DDragonRuneTree`, `ItemInfo`(`builtFromBoots` 포함), `IconInfo`, `RuneTreeInfo`. 헷갈리는 필드(`title`, `key`, `tags`, `lore`, 스킨 `id`/`num`)에 주석. `any` 없음 | ✅ |
+| `api.ts` | `getLatestVersion()`(revalidate 3600), `getChampionList()`, `getChampionDetail(id)`(목록에 없으면 `null`), `getChampionKeyMap()`, `getItems(itemIds, patches)`(최신 먼저, 못 찾은 것만 창 안 다른 패치 `{patch}.1`), `getSummonerSpells()`, `getRuneTrees()`. 버전 포함 주소는 `force-cache`. 가공 결과는 버전별 1번, 실패하면 지우고 재시도. `res.ok` 아니면 throw | ✅ |
+| `images.ts` | 스퀘어·스플래시·로딩·`skillIconUrl`·패시브·`itemIconUrl`·`summonerSpellIconUrl`·`runeIconUrl`(`/cdn/img/{icon}`)·`statShardIconUrl`. 스킬은 `image.full` 사용 | ✅ |
+| `transform.ts` | 태그 한글 매핑(`TAG_LABELS`), HTML 제거(`<br>`→줄바꿈, 태그 제거, 공백 정리, 엔티티 6종 복원), 크로마 제외 + `num` 오름차순, `default`→"기본", `Object.hasOwn` + id 일치 확인 | ✅ (`CHAMPION_TAGS` 미사용 상수 남음, 13장) |
+| `itemFilter.ts` | ① Data Dragon에 없음 ② `Consumable`/`Trinket` ③ `from` 없고 `gold.total < 1000` → 제외, ④ `Boots` 태그 **또는 `builtFromBoots`** → 신발, ⑤ `into` 있음 → 제외, ⑥ 나머지 → 핵심. `CORE_ITEM_COUNT = 3`, `BOOTS_MIN_PICK_RATE = 5` | ✅ |
+| `statShards.ts` | 공격(5008·5005·5007) / 유연(5008·5010·5001) / 방어(5011·5013·5001), 이름·아이콘 파일 | ✅ |
 
-## 3. 공통 레이아웃
+## 5. 화면용 매핑
 
-| 기능 | 구현 내용 | 상태 |
-|------|-----------|------|
-| 헤더 | sticky, 높이 56px(`h-14`), 로고(`/` 링크), 메뉴 배열 기반 내비("챔피언") | ✅ |
-| 현재 메뉴 표시 | `NavLink`(client)가 `usePathname`으로 하위 경로까지 판별, 강조 + `aria-current="page"` | ✅ |
-| 본문 | `main#main-content`, `max-w-6xl`, 좌우 padding. "본문으로 건너뛰기" 링크(포커스 시에만 노출) | ✅ |
-| 푸터 | 현재 패치 버전(`getLatestVersion()`), "데이터: Riot Data Dragon", 라이엇 법적 고지문 | ✅ |
-| `/` 리다이렉트 | `redirect('/champions')` (307 확인) | ✅ |
-| 전역 404 / 오류 | `app/not-found.tsx`(홈 링크), `app/error.tsx`(다시 시도 + 목록 링크) | ✅ |
-
-## 4. 챔피언 리스트 (`/champions`)
+> **쉬운 요약**: `src/lib/view/`가 API 숫자 ID에 이름·아이콘을 붙이고, 숫자를 서버에서 글자로 만들어 클라이언트에 넘긴다.
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
-| 렌더링 | Server `page.tsx` + `revalidate = 3600` → 빌드 결과 `○ /champions` (1h) | ✅ |
-| 아이콘 그리드 | `ChampionCard`(카드 전체 `<Link>`), 4/6/8/10열(기본/sm/md/lg), `next/image` + `sizes` + 정사각 고정 비율 | ✅ |
-| 정렬 | 한글 가나다순 (첫 항목: 가렌, 갈리오, 갱플랭크…) | ✅ |
-| 검색 | 한글 이름·영문 id 부분 일치, 대소문자·공백 무시, 즉시 필터. `<label>`(sr-only) 연결 | ✅ |
-| 역할군 필터 | 전체 + 6개 태그 단일 선택 토글, `<button aria-pressed>`. 모바일 가로 스크롤 한 줄, sm 이상 줄바꿈 | ✅ |
-| 결과 개수 | `챔피언 (n)`, 개수 부분 `aria-live="polite"` | ✅ |
-| 결과 없음 | "'{검색어}'에 해당하는 챔피언이 없습니다"(검색어 없으면 "조건에 해당하는 챔피언이 없습니다") + [필터 초기화] | ✅ |
-| 로딩 / 오류 | `champions/loading.tsx`(검색창·필터·아이콘 스켈레톤), `champions/error.tsx`(다시 시도 + 목록 링크) | ✅ |
+| `format.ts` | `formatPercent`(1/100 정수로 맞춘 뒤 소수 1자리 사사오입), `formatCount`(천 단위 쉼표), `formatKst`(`Asia/Seoul` "10월 15일 03:52"), `formatPatchMix`(1개 "패치 26.20", 2개 이상 "26.20 67% / 26.19 33%"), `toWindowInfoView` | ✅ |
+| `tierList.ts` | API `rank` 순서 그대로 표 행으로. 다른 주 포지션 이름. Data Dragon에 없는 `championId`는 "챔피언 #950"(링크·아이콘 없음) + 서버 경고 | ✅ |
+| `builds.ts` | 룬: 핵심 4줄 / 보조 3줄(핵심 룬 줄 제외) / 파편 3줄, `selected`, "알 수 없는 룬 #id"·"알 수 없는 파편", sr 요약. 주문 이름·아이콘. 스킬 Q/W/E/R 줄 머리 + 11칸. 아이템 핵심 ≤3 + 신발(5% 이상, API 순서 첫 번째) | ✅ |
 
-## 5. 챔피언 상세 (`/champions/[championId]`)
+## 6. 공통 레이아웃과 환경 변수
+
+> **쉬운 요약**: 헤더·푸터·기간 줄·안내 상자를 공통으로 쓰고, API 주소는 루트 `.env`에서 하나만 읽는다.
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
-| 렌더링 | `generateStaticParams`로 173개 SSG(●) + `revalidate = 3600`, `dynamicParams` 기본값(true) | ✅ |
-| 없는 챔피언 | 목록에 id가 없으면 `notFound()` → `[championId]/not-found.tsx` ("챔피언을 찾을 수 없습니다" + 목록 링크), `/champions/Foo` 404 확인 | ✅ |
-| 메타데이터 | `generateMetadata`: "아트록스 - 다르킨의 검 \| Tier.GG" 확인 | ✅ |
-| Hero | 기본 스킨 스플래시(`priority`, 장식용 `alt=""`), 아이콘, `h1` 이름, 칭호, 역할군 배지(한글), 난이도 막대 10칸 + `(n/10)`. 모바일은 스플래시 위·정보 아래, md 이상은 배경 위 오버레이 | ✅ |
-| 목록 링크 | 상단 "← 챔피언 목록" | ✅ |
-| 스킬 | 패시브 + Q/W/E/R, 아이콘(`image.full`)·키 라벨·이름(h3)·재사용 대기시간(`cooldownBurn`, 패시브 제외)·설명(`description`, HTML 제거, `whitespace-pre-line`). `dangerouslySetInnerHTML` 미사용 | ✅ |
-| 스토리 | `lore` 텍스트 섹션 | ✅ |
-| 미표시 항목 | `stats`, `allytips/enemytips`, `recommended` 표시 안 함 (결정 5-A) | ✅ |
-| 로딩 | `[championId]/loading.tsx` (Hero + 스킬 5줄 스켈레톤) | ✅ |
+| `Header` / `NavLink` | sticky 56px, 로고, 메뉴 "챔피언". `NavLink`(client)가 `usePathname`으로 하위 경로까지 강조 + `aria-current="page"` | ✅ |
+| `Footer` | `/meta`의 `patches[0].displayName` → "패치 26.20 · 데이터: Riot Data Dragon" + 고지문. 실패 시 "패치 정보 없음" (오류 안 던짐) | ✅ |
+| `WindowInfo` | 기간 줄 (좁은 화면 줄바꿈), `isStale`이면 `role="status"` 노란 상자 | ✅ |
+| `TierBadge` | 1~5티어(글자 + 색, 글자색 `zinc-950`) / `null` → 회색 "표본 부족" + `title`·sr 설명(`rules.minTierPick`, 없으면 50) | ✅ (주석 "7:1 이상"이 부정확, 13장) |
+| `StatsNotice` | 집계 전 / 통계 없음 / 연결 실패(`role="status"`) / 빈 목록 문구 | ✅ |
+| 환경 변수 | `next.config.ts`가 `../.env`가 있으면 `node:fs` + `util.parseEnv`로 읽어 **`API_BASE_URL`만** `process.env`에 넣음. 이미 값이 있으면 덮어쓰지 않음. `env` 옵션·`NEXT_PUBLIC_` 없음 | ✅ |
+| `.env.example` | "백엔드 API 서버" 묶음 아래 `API_BASE_URL=` + 주석 2줄 (값 없음) | ✅ |
 
-## 6. 스킨 리스트 (상세 안 섹션)
+## 7. 챔피언 티어 리스트
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
-| 대상 | `parentSkin` 없는 스킨만 (아트록스 13개 확인), 첫 스킨 "기본" | ✅ |
-| 미리보기 | 상단 16:9 스플래시 + 스킨 이름(`figcaption`, `aria-live="polite"`), 기본 선택 `num 0` | ✅ |
-| 그리드 | 로딩 이미지(308:560 고정 비율) + 이름, 3/4/5/6열, `<button aria-pressed>` + 선택 시 골드 테두리 | ✅ |
-| 선택 | 클릭·Enter·Space(네이티브 button)로 미리보기 교체 (브라우저에서 "정의의 아트록스" 선택 확인) | ✅ |
-| 이미지 실패 | `onError` 시 회색 플레이스홀더 + 이름 (고정 비율 유지) | ✅ |
+| `TierListPage` (server) | 한 포지션의 데이터 호출 + 상태 분기 + 제목("탑 챔피언 티어") | ✅ |
+| `PositionNav` (server) | `<nav aria-label="포지션">` + `Link` 5개, 현재 탭 `aria-current="page"` + 강조, 모바일은 탭 줄만 가로 스크롤 | ✅ |
+| `TierTable` (client) | 검색(한글·영문 부분 일치, `rank` 유지, 결과 수 `aria-live`), `<table>` + `caption`(sr-only) + `th scope="col"`. 열 #·챔피언·티어·승률·픽률 / `sm` 밴률·게임 / `md` "미드 겸용". 이름 링크 1개 + `after:inset-0`로 행 전체 클릭 | ✅ |
+| 모바일 열 폭 | `sm` 미만에서만 순위·티어·승률·픽률 열 폭과 칸 여백 축소, 아이콘 간격 2px 축소. 360px에서 잘리는 이름 1/69(아우렐리온 솔) | ✅ |
+| [검색 지우기] | 결과 없음 문구 + 버튼. 누른 뒤 포커스를 검색창으로 옮김 | ✅ |
+| 상태 | 빈 목록 / 집계 전 / 빌드 중 연결 실패 안내, 서비스 중 연결 실패는 오류(직전 페이지 유지 또는 `champions/error.tsx`) | ✅ |
+| LCP | 첫 10행 아이콘 `loading="eager"`, 첫 1개 `fetchPriority="high"` | ✅ |
+| `champions/loading.tsx` | 제목·기간 줄·탭 5개·검색·10행 스켈레톤. 바깥 `min-h-screen`으로 CLS 0 (lane 경로에도 적용) | ✅ |
 
-## 7. 반응형·접근성
+## 8. 챔피언 상세
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
-| 반응형 | 계획서 8장 표대로 열 수 지정. 360px에서 `/champions`(4열), `/champions/MonkeyKing` 가로 스크롤 없음 확인, 1024px 상세 가로 스크롤 없음 확인 | ✅ |
-| 이미지 | 전부 `next/image` + `sizes` + 고정 비율 컨테이너, Hero 스플래시만 `priority` | ✅ |
-| alt | 아이콘=챔피언 이름, 스킬=스킬 이름, 스킨=스킨 이름, Hero 배경=`alt=""`. 카드 링크·스킨 버튼은 이름 중복 낭독 방지를 위해 `aria-label`=이름 | ✅ |
-| 키보드 | 모든 상호작용 요소가 네이티브 `a`/`button`/`input`, 공통 `focus-visible` 골드 링 | ✅ |
-| 제목 구조 | 페이지당 `h1` 1개, 섹션 `h2`, 스킬명 `h3` | ✅ |
-| 콘솔 | 리스트·상세(Aatrox, MonkeyKing) 브라우저 확인 시 콘솔 로그/에러 없음, 깨진 이미지 0개 | ✅ |
+| 통계 호출 | `position` 없이 1번 → `positions[]`. 2순위가 있으면 `?position=…` 1번 더. 2순위가 `STATS_NOT_FOUND`·집계 전·빌드 중 연결 실패면 그 탭만 뺀다. 두 응답 `aggregatedAt`이 다르면 서버 경고 + 1순위 기간 표시 | ✅ |
+| `ChampionHero` | 기본 스킨 스플래시(`fetchPriority="high"` + `loading="eager"`, `alt=""`), 아이콘, `h1`, 칭호, 역할군 배지, 난이도 10칸 + `(n/10)`. 모바일 세로, md 이상 오버레이 | ✅ |
+| "← 목록" | 1순위 포지션 탭 주소 + "정글 티어 목록" (통계 없으면 `/champions`, "탑 티어 목록") | ✅ |
+| `PositionTabs` (client) | `role="tablist"/"tab"/"tabpanel"`, `aria-selected`, `aria-controls`, `aria-labelledby`, 로빙 `tabIndex`, ←/→·Home/End(끝에서 처음으로 순환), 숨은 패널 `hidden`. 두 패널 모두 정적 HTML. 탭 1개면 "탑" 글자(`p`)만 | ✅ |
+| 탭 글자 | "정글 · 2티어 · 86%", `null`이면 "탑 · 표본 부족 · 11%" | ✅ |
+| `PositionStatsPanel` | 요약 줄(배지·승률·픽률·밴률·게임, `null`이면 "표본 부족 (50게임 미만)" + "표본이 적어 참고용입니다."), `lg` 이상 2열, 빈 영역 "표본이 부족해 추천이 없습니다" | ✅ |
+| `RunePage` (client) | 1순위 전체 페이지(핵심 룬 줄 크게), 안 고른 룬 흐리게 + `alt=""` + `aria-hidden`, 고른 룬만 `alt`. 2개면 "1순위/2순위" 버튼(`aria-pressed`, 사용률·승률), sr 요약 "핵심 룬(정밀): …" | ✅ (1·2순위가 같은 조합인 챔피언이 많음, 13장) |
+| `SummonerSpells` | 상위 2조합, 아이콘 2개 + "점멸 + 점화" + 사용률·승률·게임 | ✅ |
+| `SkillOrder` | `<table>` + `caption` "스킬 찍는 순서 1~11레벨", 줄 머리 `th scope="row"`(아이콘 + 글자 + sr 이름), 칸에 글자, 22px(`sm` 이상 28px). 2순위 한 줄 + 사용률·승률 | ✅ |
+| `CoreItems` | 핵심 3개 + "신발" 1개(5% 미만 숨김), "게임이 끝날 때 가지고 있던 아이템 기준 · 구매 순서 아님" | ✅ |
+| 통계 없음 상태 | `STATS_NOT_FOUND` "최근 14일 통계가 없습니다.", 집계 전 문구, 빌드 중 연결 실패 문구. Hero·스킬·스킨·스토리는 정상 | ✅ |
+| `ChampionAbilities` | 패시브 + Q/W/E/R, 아이콘(`image.full`)·키·이름(`h3`)·재사용 대기시간(패시브 제외)·설명(`description`, HTML 제거, `whitespace-pre-line`). `dangerouslySetInnerHTML` 없음 | ✅ |
+| `SkinGallery` (client) | `parentSkin` 없는 스킨만(아트록스 13개), 첫 스킨 "기본". 상단 16:9 미리보기 + `figcaption`(`aria-live`), 로딩 이미지 격자 3/4/5/6열, `<button aria-pressed>` + 골드 테두리, `onError` 회색 칸 | ✅ (미리보기 `alt`·`figcaption` 이름 중복, 13장) |
+| `ChampionLore` | `lore` 텍스트 | ✅ |
+| 미표시 | `stats`, `allytips/enemytips`, `recommended` 표시 안 함 | ✅ |
+| 제목 구조 | `h1` 이름 → `h2` "포지션별 통계와 추천 빌드" → 카드 `h3` → `h2` 스킬·스킨·스토리 | ✅ |
+| `[championId]/loading.tsx` | Hero·통계 제목·기간 줄·탭 2개·요약 줄·빌드 카드 4개·스킬 스켈레톤 | ✅ |
 
----
+## 9. 반응형과 접근성
 
-## 8. 자체 검증 결과
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 반응형 | 360 / 768 / 1280px 가로 스크롤 없음. 표 5 / 8 / 8열, 상세 빌드 1 / 1 / 2열, 360px 스킬 격자 294px = 카드 안쪽 폭 | ✅ |
+| 이미지 | 전부 `next/image` + `sizes` + 고정 비율 칸. `priority` 사용 0건 | ✅ |
+| alt | 아이콘·스킬·스킨·아이템·주문·룬 = 이름, 장식·안 고른 룬 = `alt=""`. 누락 0 | ✅ |
+| 키보드 | 네이티브 `a`/`button`/`input`, 상세 탭 화살표 이동, 금색 2px `focus-visible` 링 | ✅ |
+| 대비 | 1~5티어 배지 6.89 / 8.37 / 12.64 / 11.18 / 9.13, "표본 부족" 6.74, 지연 안내 13.7·12.07, 보조 글자 8.45, 현재 탭 9.54 (모두 4.5:1 이상) | ✅ |
+| 랜드마크 | `header`·`main`(1개)·`footer`·`nav`, 페이지당 `h1` 1개 | ✅ |
+
+## 10. 계획과 다르게 구현한 점
+
+> **쉬운 요약**: 아래는 계획 문구와 다르지만 승인된 현재 구현이다. 다음 작업에서 "고칠 것"으로 오해하지 않도록 남긴다.
+
+1. **lane 경로가 5개로 보인다.** top 308을 `redirects()`가 아닌 페이지의 `permanentRedirect`로 해서, 빌드 표에 `● /champions/lane/top`이 함께 나온다 (HTML 대신 308 저장).
+2. **API 없는 빌드 경고가 7줄이다.** 정적 생성 작업 프로세스(7개)마다 첫 실패 1줄. 합계를 모을 방법이 없다.
+3. **2순위 탭 제외 조건이 넓다.** `STATS_NOT_FOUND`뿐 아니라 2순위만 집계 전이거나 빌드 중 연결 실패여도 뺀다.
+4. **탭 1개일 때 "탑" 제목은 `p`다.** 제목 단계를 건너뛰지 않기 위해서다.
+5. **Tailwind 연동은 `@tailwindcss/turbopack`**, error 컴포넌트 prop은 `retry` (Next 16.4 템플릿·API 기준).
+6. **푸터만 실패해도 페이지는 정상이다.** 루트 레이아웃이라 error 경계 밖이므로 "패치 정보 없음"을 쓴다.
+
+## 11. 최신 검증 결과
+
+> **쉬운 요약**: 린트·타입·빌드 통과. 백엔드를 켠 빌드와 끈 빌드 모두 성공했다. 리스트 전 행과 상세 173명이 API와 맞았다. (2026-10-15, Build 확인 + Review 수정 후 재확인)
+
+### 명령
 
 | 명령 / 확인 | 결과 |
 |-------------|------|
 | `npm run lint` | ✅ 오류 0, 경고 0 |
-| `npx tsc --noEmit` | ✅ 오류 0 (`PageProps`/`LayoutProps` 전역 타입 생성을 위해 먼저 `npx next typegen` 실행 — `next build`/`next dev`도 자동 생성) |
-| `npm run build` | ✅ 성공. `○ /`, `○ /champions`, `● /champions/[championId]` 173개(Garen, Galio, Gangplank +170), 모두 Revalidate 1h. 총 178 페이지 생성 |
-| `next start` + curl | `/` → 307(`/champions`), `/champions` 200(챔피언 링크 173개), `/champions/Aatrox` 200, `/champions/MonkeyKing` 200(스킬 이미지 `MonkeyKingDoubleAttack.png` 등 `image.full` 사용), `/champions/Foo` 404, `/nope` 404 |
-| 상세 HTML | 탭 제목 "아트록스 - 다르킨의 검 \| Tier.GG", `{{` 0건, 이스케이프된 HTML 태그 0건, 푸터 "패치 16.20.1", 스킨 버튼 13개(`aria-pressed="true"` 1개) |
-| 브라우저 | 검색 "AATROX" → `챔피언 (1)` 아트록스, "zzzz" → 결과 없음 문구 + 초기화 버튼, 스킨 클릭 시 미리보기·`aria-pressed` 변경 |
-| 서버 | 확인 후 `next start` 종료 (실행 중인 서버 없음) |
+| `npx next typegen && npx tsc --noEmit` | ✅ 오류 0, `any` 0건 |
+| `npm run build` (백엔드 켬) | ✅ 183페이지. `○ /champions`, `● /champions/lane/[position]` 5개(top은 308), `● /champions/[championId]` 173개, 모두 Revalidate 1h. `[api]`·`[view]`·`[stats]` 경고 0줄 |
+| `npm run build` (백엔드 끔, `.next/cache/fetch-cache` 비움) | ✅ 성공, 같은 페이지 수. 경고 `[api] 통계 서버에 연결하지 못했습니다 (/meta, 연결 실패(TypeError)) …` 7줄 |
+| 백엔드 끈 빌드 HTML | `/champions`, `/lane/jungle`: 탭 5개 + "통계 서버에 연결하지 못했습니다." + 푸터 "패치 정보 없음". `/champions/Aatrox`, `/MonkeyKing`: Hero·스킬(P/Q/W/E/R)·스킨(13개/10개)·스토리 + 같은 안내 |
+| 코드 위치 | `lib/api/` 밖 `fetch(` 0건, `lib/ddragon/` 밖 Data Dragon 주소 0건, `lib/api/*.ts` 6개 모두 `server-only` |
+| 브라우저 번들 `.next/static` | `localhost:4000`·`/api/v1`·`NEXT_PUBLIC_`·`API_BASE_URL` 0건 (Review 수정 후 빌드에서도 0건) |
+| 의존성 | `git diff -- package.json package-lock.json` 0줄 |
+| 저장소 `.next` | Review가 백엔드를 켠 상태로 마지막 빌드 (3,949게임 스냅숏) |
 
----
+### 데이터 비교 (백엔드 켬 + `next start`, HTML ↔ API)
 
-## 9. 계획과 다른 점 / 남은 문제
+| 확인 | 결과 |
+|------|------|
+| 리스트 5개 탭 (3,952게임 스냅숏) | 탑 69 · 정글 53 · 미드 63 · 원딜 26 · 서폿 51 = **262행, 순위·이름·티어·승률·픽률·밴률·게임 불일치 0** |
+| 리스트 (Review 마지막 빌드, 3,949게임 스냅숏) | **261행 불일치 0** |
+| 티어 / 표본 부족 (3,952 기준) | 탑 47/22 · 정글 41/12 · 미드 42/21 · 원딜 24/2 · 서폿 32/19. `null`은 모두 맨 뒤 |
+| 기간 줄 / 푸터 | "최근 14일 · 3,952게임 · 26.20 67% / 26.19 33% · 10월 15일 03:52 집계" (KST), "패치 26.20", 화면에 `16.20` 0건 |
+| 주소 | `/lane/top` 308 → `/champions`, `/lane/TOP`·`/lane/Jungle`·`/lane/mid`·`/champions/lane` 404, 그 뒤에도 정상 페이지 그대로 |
+| 상세 173명 | 모두 200, 탭 수가 API `positions[]`와 같음, 핵심 아이템 3개 미만 0명, "알 수 없는 룬·주문·파편" 0건 |
+| 아트록스 (탑) | 2티어 290게임. 룬 정복자·승전보·전설: 가속·최후의 저항 + 뼈 방패·소생. 핵심 쇼진의 창·월식·갈라진 하늘 + 판금 장화(70.3%). 롱소드·도란·물약·제어 와드 없음. 스킬 `QEWQQRQEQER` |
+| 오공 (정글 + 탑) | "정글 · 2티어 · 86%" / "탑 · 표본 부족 · 11%", 탭별 빌드 다름, "← 정글 티어 목록" |
+| 징크스 (원딜) | 신발 칸 숨김 (신발 사용률 0.16%) |
+| 야스오 미드 (건메탈 군화 수정 후) | 불멸의 철갑궁·몰락한 왕의 검·무한의 대검 + 신발 건메탈 군화. 영향 5곳(야스오·요네·가렌·트린다미어·아크샨 미드) HTML 확인 |
+| 이미지 | Data Dragon 이미지 주소 334개(스플래시·로딩 제외) 모두 200. 아트록스 66개·카밀 105개 이미지 깨짐 0 |
+| 텍스트 | 상세 173개 HTML에 `{{` 0건, 이스케이프된 HTML 태그 0건 |
 
-1. **`cacheComponents` 비활성화 (설정 차이)**: create-next-app 16.4 템플릿은 `cacheComponents: true`, `partialPrefetching: true`를 기본으로 넣는다. 이 모드에서는 계획서 4장의 `export const revalidate`, `dynamicParams`를 쓸 수 없고(문서상 미지원), 스트리밍 때문에 없는 챔피언이 404 대신 200이 될 수 있다. 계획서 캐싱 설계를 그대로 따르기 위해 두 옵션을 제거했다. 의존성 변화는 없다.
-2. **Tailwind 연동 패키지 이름**: 계획서 2장 표에는 `@tailwindcss/postcss`로 적혀 있으나 현재 템플릿 기본값은 `@tailwindcss/turbopack`(+ `next.config.ts`의 `turbopack.rules`)이다. 템플릿 기본 그대로 사용했다(추가 의존성 아님).
-3. **error.tsx의 `retry`**: Next 16.4의 error 컴포넌트 prop 이름이 `reset`이 아닌 `retry`라서 `retry()`로 구현했다. 동작(다시 시도)은 계획과 같다.
-4. **푸터 버전 조회 실패 처리**: 푸터는 루트 레이아웃에 있어 `app/error.tsx`가 감싸지 못한다. 그래서 푸터만 실패 시 "패치 정보 없음"으로 표시하고 페이지는 정상 렌더링한다. 페이지 본문의 실패는 계획대로 error.tsx로 간다.
-5. **⏸️ [알려진 문제] 대소문자 다른 URL로 인한 정적 캐시 덮어쓰기 (macOS 로컬 한정, 보류)**: `next start` 상태에서 `/champions/garen`(소문자)을 요청하면 `notFound()` 결과가 ISR 캐시 `.next/server/app/champions/garen.html`로 저장되는데, macOS 기본 파일시스템(대소문자 구분 안 함)에서는 이것이 `Garen.html`을 덮어써 이후 `/champions/Garen`도 404가 된다. 리눅스 등 대소문자를 구분하는 환경(일반적인 배포 환경)에서는 발생하지 않는다. 다시 `npm run build` 하면 복구된다. 해결하려면 계획 변경이 필요하다 — 예: (a) `dynamicParams = false`(새 챔피언은 재빌드 필요), (b) 대소문자 무시 매칭 후 정식 id로 리다이렉트, (c) Proxy에서 사전 차단. **Review 시 macOS에서 소문자 URL을 확인한 뒤에는 재빌드 후 다른 항목을 확인할 것.**
-6. `npm install` 시 `npm audit`가 high 5건을 보고했다(템플릿 기본 의존성). 계획 범위 밖이라 조치하지 않았다.
+### 상태 (scratchpad 가짜 API + `API_BASE_URL`만 바꾼 실행, 프로젝트·DB 변경 없음)
 
-> **결정 (2026-10-12, 사용자)**: 5번은 코드 수정 없이 **알려진 문제**로 기록만 한다. 개발 모드(`npm run dev`)와 대소문자를 구분하는 배포 환경에는 영향이 없다. 소문자 URL 지원이 필요해지면 별도 기능(Proxy에서 정식 id로 리다이렉트)으로 계획·승인 후 추가한다.
+| 상황 | 결과 |
+|------|------|
+| 집계 전 / 빈 목록 + `isStale` + 패치 1개 | 집계 전 문구 / "패치 26.20" + 지연 안내 + 빈 목록 문구 |
+| 아트록스 `STATS_NOT_FOUND` / 쓰레쉬 집계 전 | 각 문구, Hero·스킬·스킨·스토리 정상 |
+| 징크스 표본 부족 + 알 수 없는 ID + 빈 빌드 | "표본 부족 (50게임 미만)", "알 수 없는 룬 #1"·"알 수 없는 파편", 빈 영역 3개 문구, 서버 경고 1줄 |
+| 서비스 중 500 | error 경계 화면 |
+| 서비스 중 백엔드 다운 (재검증 20초 복사본) | 25·30·55초 뒤에도 직전 페이지 유지(`STALE`→`HIT`), 처음 만드는 페이지는 HTTP 500 + `champions/error.tsx` |
 
----
+### 성능 (Review 측정, 조건은 `front_review.md` 4장)
 
-## 10. 추가 수정 — 스킬/스펠 이름 정리 (2026-10-12, 사용자 승인)
+| 페이지 | 성능 | LCP | CLS | 접근성 |
+|--------|------|-----|-----|--------|
+| `/champions` | 96 | 2.77s | 0 | 100 |
+| `/champions/Aatrox` | 95 | 2.98s | 0 | 100 |
 
-> **쉬운 요약**: 챔피언 스킬(Q/W/E/R)을 코드에서 `spell`로 부르던 이름을 `skill`로 바꿨다. 소환사 주문(스펠)과 헷갈리지 않게 하기 위함이며 동작은 그대로다.
+## 12. 실행 방법
 
-| 기능 | 구현 내용 | 상태 |
-|------|-----------|------|
-| 타입 이름 | `types.ts`: `DDragonSpell` → `DDragonChampionSkill`. 원본 필드 `spells`는 Data Dragon 이름이라 유지하고 "챔피언 스킬" 주석 추가 | ✅ |
-| 이미지 함수 | `images.ts`: `spellIconUrl()` → `skillIconUrl()`. 소환사 주문과 같은 `img/spell/` 폴더를 쓴다는 주석 추가 | ✅ |
-| 가공 로직 | `transform.ts`: `SPELL_KEYS` → `SKILL_KEYS`, 변수 `spells`/`spell` → `skills`/`skill` | ✅ |
-| 검증 | `npm run lint` 오류 0, `npx tsc --noEmit` 오류 0, `npm run build` 성공(챔피언 173개 SSG). 빌드된 Aatrox·MonkeyKing 페이지의 스킬 아이콘 URL 4개씩 정상 확인 | ✅ |
+```bash
+# 1) 백엔드 읽기 API (루트 .env의 DATABASE_URL 사용, 포트 4000)
+npm --prefix backend start
 
-- 이후 소환사 주문을 추가할 때는 `DDragonSummonerSpell`, `summonerSpellIconUrl()`처럼 `summoner`를 붙여 구분한다.
+# 2) 프론트 (다른 터미널). 루트 .env의 API_BASE_URL을 next.config.ts가 읽는다
+cd frontend
+npm run dev                            # 개발 모드: http://localhost:3000
+npm run build && npm start             # 운영 모드: 백엔드를 켠 상태에서 빌드해야 통계가 들어간다
+npm run lint                           # 린트
+npx next typegen && npx tsc --noEmit   # 타입 검사
+```
 
----
+- 백엔드를 끈 채 빌드해도 성공하고 통계 자리에 "통계 서버에 연결하지 못했습니다"가 들어간다. 통계를 보려면 백엔드를 켜고 다시 빌드한다.
+- 이전 빌드의 API 응답은 `.next/cache/fetch-cache`에 최대 1시간 남는다. API 없는 빌드를 일부러 확인하려면 이 폴더를 지우고 빌드한다.
+- macOS에서 소문자 상세 주소(`/champions/garen`)를 열어 본 뒤에는 다시 빌드한다 (13장).
 
-## 11. 추가 수정 — lib/ddragon 주석 보강 (2026-10-12, 사용자 승인 A안)
+## 13. 남은 문제
 
-> **쉬운 요약**: `src/lib/ddragon/`의 타입과 함수에 빠진 한국어 주석을 달았다. 이름 변경은 하지 않았고 동작도 그대로다.
+> 자세한 목록은 `front_overview.md` "해결되지 않은 점"에 있다. 구현 상태와 직접 관련된 것만 적는다.
 
-| 기능 | 구현 내용 | 상태 |
-|------|-----------|------|
-| `types.ts` | 원본·화면용 타입 전체에 한 줄 설명 추가. 헷갈리기 쉬운 필드에 주의 주석: `title`(칭호, 페이지 제목 아님), `key`(숫자 ID, 매치 championId 대응), `tags`(역할군, 포지션 아님), `lore`(스토리), 스킨 `id`/`num` 규칙 | ✅ |
-| `api.ts` | `fetchJson`, `getRawChampionList` 주석 추가 | ✅ |
-| `transform.ts` | `CHAMPION_TAGS`, `SKILL_KEYS`, `HTML_ENTITIES`, `toChampionSummary`, `toChampionDetail` 주석 추가 | ✅ |
-| `constants.ts`, `images.ts` | 기존 주석 충분, 변경 없음 | ✅ |
-| 검증 | `npm run lint` 오류 0, `npx tsc --noEmit` 오류 0, `npm run build` 성공(178페이지) | ✅ |
-
-- 검토했지만 보류한 이름 변경(사용자 결정): `ChampionAbility`/`AbilityKey`/`abilities` ↔ `skill` 용어 혼용, `IMMUTABLE` → `CACHE_FOREVER`.
+| 항목 | 내용 | 상태 |
+|------|------|------|
+| 소문자 상세 주소 | macOS 로컬 `next start`에서 정적 페이지 덮어쓰기. 사용자 결정으로 보류 | ⏸️ |
+| 룬 1·2순위 중복 | 71/173명이 같은 조합(보조 룬 순서만 다름). 백엔드 집계 쪽에서 고칠 일 | ⏸️ |
+| `CHAMPION_TAGS` | `transform.ts`에 쓰지 않는 상수가 남음 | ⚠️ |
+| `TierBadge` 주석 | "7:1 이상"이지만 1티어는 6.89:1 | ⚠️ |
+| `layout.tsx` description | "챔피언 정보와 스킨"만 말하는 옛 문구 | ⚠️ |
+| `npm audit` | high 5건 (`eslint-config-next` → `fast-glob` 등 개발 의존성, 2026-10-16 확인). 조치하지 않음 | ⏸️ |

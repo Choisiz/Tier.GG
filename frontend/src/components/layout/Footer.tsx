@@ -1,8 +1,13 @@
-import { getLatestVersion } from "@/lib/ddragon/api";
+import { getMeta } from "@/lib/api/api";
 
+/**
+ * 공개 패치 이름 (`/meta`의 최신 패치 `displayName`, 변경 01 D5).
+ * 푸터는 루트 레이아웃이라 error.tsx가 감싸지 못하므로 실패해도 던지지 않는다.
+ */
 async function PatchVersion() {
-  const version = await getLatestVersion().catch(() => null);
-  return <>{version ? `패치 ${version}` : "패치 정보 없음"}</>;
+  const meta = await getMeta();
+  const latest = meta.status === "ok" ? meta.data.window.patches[0] : undefined;
+  return <>{latest ? `패치 ${latest.displayName}` : "패치 정보 없음"}</>;
 }
 
 export default function Footer() {
