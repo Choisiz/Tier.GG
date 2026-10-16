@@ -65,6 +65,7 @@
 
 - 별도 지침 파일은 만들지 않는다. 승인된 계획 문서(`front_spec.md` 등)를 작업 기준으로 삼는다.
 - 계획 문서가 아직 없는 Plan 단계에서는 작업 내용과 범위를 프롬프트로 전달한다.
+- Plan 에이전트는 시작할 때 해당 영역의 현재 상태 문서(`*_overview.md`)를 먼저 읽는다. 과정 기록(spec·build·review)은 필요한 부분만 찾아 읽는다.
 - 서브에이전트는 지정된 범위만 수정한다.
 - 범위 밖 수정이 필요하면 메인 에이전트에게 보고한다.
 
@@ -103,6 +104,7 @@
 | 계획      | `db/docs/db_spec.md`                                               |
 | 구현 기록 | `db/docs/db_build.md`                                              |
 | 검토 기록 | `db/docs/db_review.md`                                             |
+| 현재 상태 | `db/docs/db_overview.md`                                           |
 
 ### 단계별 서브에이전트
 
@@ -132,6 +134,7 @@
   - 샘플 데이터를 넣고 집계 SQL 함수를 실행했을 때 결과가 맞는지 (확인 후 샘플 데이터 정리)
   - 마이그레이션을 처음부터 다시 적용해도 오류가 없는지
 - `db_review.md`에 결과를 기록하고, 검토 후 `docs/career_log.md`에 판단 기록을 추가한다.
+- 검토가 끝나면 현재 상태 문서(`db/docs/db_overview.md`)를 지금 상태에 맞게 **덮어써서** 갱신한다. 과정 기록과 달리 이전 내용을 남기지 않는다. 문서 마지막의 "해결되지 않은 점"은 번호를 붙여 쉽고 간결하게 쓴다.
 
 ## 9. 백엔드 작업 흐름
 
@@ -145,6 +148,7 @@
 | 계획          | `backend/docs/back_spec.md`      |
 | 구현 기록     | `backend/docs/back_build.md`     |
 | 검토 기록     | `backend/docs/back_review.md`    |
+| 현재 상태     | `backend/docs/back_overview.md`  |
 
 ### 단계별 서브에이전트
 
@@ -175,6 +179,7 @@
   - 키 만료, rate limit 초과, 잘못된 파라미터 등 오류 처리
   - 코드 오류와 유지보수상 문제, 타입 검사, 린트, 빌드
 - `back_review.md`에 결과를 기록하고, 검토 후 `docs/career_log.md`에 판단 기록을 추가한다.
+- 검토가 끝나면 현재 상태 문서(`backend/docs/back_overview.md`)를 지금 상태에 맞게 **덮어써서** 갱신한다. 과정 기록과 달리 이전 내용을 남기지 않는다. 문서 마지막의 "해결되지 않은 점"은 번호를 붙여 쉽고 간결하게 쓴다.
 
 ## 10. 프론트엔드 작업 흐름
 
@@ -186,6 +191,7 @@
 | 계획      | `frontend/docs/front_spec.md`   |
 | 구현 기록 | `frontend/docs/front_build.md`  |
 | 검토 기록 | `frontend/docs/front_review.md` |
+| 현재 상태 | `frontend/docs/front_overview.md` |
 
 ### 단계별 서브에이전트
 
@@ -221,6 +227,7 @@
 - `front_review.md`에 결과를 기록한다.
 - 수정한 기능은 `front_build.md`에도 반영한다.
 - 검토가 완료되면 `docs/career_log.md`에 이번 작업의 판단 기록을 추가한다. (11장 참고)
+- 검토가 끝나면 현재 상태 문서(`frontend/docs/front_overview.md`)를 지금 상태에 맞게 **덮어써서** 갱신한다. 과정 기록과 달리 이전 내용을 남기지 않는다. 문서 마지막의 "해결되지 않은 점"은 번호를 붙여 쉽고 간결하게 쓴다.
 - Review 에이전트는 다음을 확인한다.
   - 승인된 요구사항과 완료 기준 충족 여부
   - 코드 오류와 유지보수상 문제
