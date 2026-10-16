@@ -1,12 +1,15 @@
 import Image from "next/image";
+import Tooltip from "@/components/common/Tooltip";
 import type { CoreItemsView, ItemView } from "@/lib/view/builds";
 
 function ItemRow({ item }: { item: ItemView }) {
   return (
     <li className="flex items-center gap-3">
-      <span className="relative block size-9 shrink-0 overflow-hidden rounded-md bg-surface-2">
-        <Image src={item.iconUrl} alt={item.name} fill sizes="36px" className="object-cover" />
-      </span>
+      <Tooltip content={item.description}>
+        <span className="relative block size-9 shrink-0 overflow-hidden rounded-md bg-surface-2">
+          <Image src={item.iconUrl} alt={item.name} fill sizes="36px" className="object-cover" />
+        </span>
+      </Tooltip>
       <span className="min-w-0 text-sm">
         <span className="block truncate font-semibold">{item.name}</span>
         <span className="text-xs text-muted">

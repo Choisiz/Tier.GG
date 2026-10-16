@@ -84,15 +84,16 @@ export default function PositionStatsPanel({
           <BuildCard title="스킬 순서" note="1~11레벨" empty={view.skills.builds.length === 0}>
             <SkillOrder set={view.skills} />
           </BuildCard>
-          <BuildCard
-            title="많이 완성한 아이템"
-            note="게임이 끝날 때 가지고 있던 아이템 기준 · 구매 순서 아님"
-            empty={view.items.core.length === 0 && !view.items.boots}
-          >
-            <CoreItems items={view.items} />
-          </BuildCard>
         </div>
       </div>
+
+      <BuildCard
+        title="많이 완성한 아이템"
+        note="게임이 끝날 때 가지고 있던 아이템 기준 · 구매 순서 아님"
+        empty={view.items.core.length === 0 && !view.items.boots}
+      >
+        <CoreItems items={view.items} />
+      </BuildCard>
     </div>
   );
 }

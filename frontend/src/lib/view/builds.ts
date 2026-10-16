@@ -35,6 +35,8 @@ export type RuneCellView = {
   name: string;
   /** 못 찾은 룬은 없음 (회색 칸) */
   iconUrl?: string;
+  /** 짧은 설명 (툴팁용). 없으면 툴팁을 달지 않는다 */
+  description?: string;
   selected: boolean;
 };
 
@@ -125,7 +127,7 @@ export function toRunePage(build: RuneBuild, trees: RuneTreeInfo[]): RunePageVie
 /* ───────── 소환사 주문 ───────── */
 
 export type SpellComboView = BuildRateView & {
-  spells: { id: number; name: string; iconUrl?: string }[];
+  spells: { id: number; name: string; iconUrl?: string; description?: string }[];
 };
 
 export function toSpellCombo(build: SpellBuild, spells: Map<string, IconInfo>): SpellComboView {
@@ -133,7 +135,12 @@ export function toSpellCombo(build: SpellBuild, spells: Map<string, IconInfo>): 
     ...toRates(build),
     spells: build.spellIds.map((id) => {
       const info = spells.get(String(id));
-      return { id, name: info?.name ?? `알 수 없는 주문 #${id}`, iconUrl: info?.iconUrl };
+      return {
+        id,
+        name: info?.name ?? `알 수 없는 주문 #${id}`,
+        iconUrl: info?.iconUrl,
+        description: info?.description,
+      };
     }),
   };
 }
@@ -150,8 +157,8 @@ export type SkillOrderView = BuildRateView & {
 };
 
 export type SkillOrderSet = {
-  /** Q/W/E/R 줄 머리 (스킬 이름·아이콘) */
-  heads: { key: SkillKey; name?: string; iconUrl?: string }[];
+  /** Q/W/E/R 줄 머리 (스킬 이름·아이콘·설명) */
+  heads: { key: SkillKey; name?: string; iconUrl?: string; description?: string }[];
   builds: SkillOrderView[];
 };
 
@@ -159,7 +166,12 @@ export function toSkillOrders(builds: SkillBuild[], abilities: ChampionAbility[]
   return {
     heads: SKILL_KEYS.map((key) => {
       const ability = abilities.find((a) => a.key === key);
-      return { key, name: ability?.name, iconUrl: ability?.iconUrl };
+      return {
+        key,
+        name: ability?.name,
+        iconUrl: ability?.iconUrl,
+        description: ability?.description,
+      };
     }),
     builds: builds.map((build) => ({
       ...toRates(build),
@@ -176,6 +188,7 @@ export type ItemView = BuildRateView & {
   id: number;
   name: string;
   iconUrl: string;
+  description?: string;
 };
 
 export type CoreItemsView = {
@@ -204,7 +217,13 @@ export function toCoreItems(
       continue;
     }
     const category = categorizeItem(info);
-    const view: ItemView = { ...toRates(build), id: build.itemId, name: info.name, iconUrl: info.iconUrl };
+    const view: ItemView = {
+      ...toRates(build),
+      id: build.itemId,
+      name: info.name,
+      iconUrl: info.iconUrl,
+      description: info.description,
+    };
     if (category === "core" && core.length < CORE_ITEM_COUNT) {
       core.push(view);
     } else if (category === "boots" && !boots && build.pickRate >= BOOTS_MIN_PICK_RATE) {

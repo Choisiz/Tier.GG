@@ -8,7 +8,6 @@ import PositionStatsPanel, {
   type PositionPanelView,
 } from "@/components/champions/PositionStatsPanel";
 import PositionTabs from "@/components/champions/PositionTabs";
-import SkinGallery from "@/components/champions/SkinGallery";
 import StatsNotice from "@/components/stats/StatsNotice";
 import WindowInfo from "@/components/stats/WindowInfo";
 import { getChampionStats, getMeta, requireStats } from "@/lib/api/api";
@@ -21,7 +20,6 @@ import {
   getRuneTrees,
   getSummonerSpells,
 } from "@/lib/ddragon/api";
-import { championSplashUrl } from "@/lib/ddragon/images";
 import type { ChampionDetail } from "@/lib/ddragon/types";
 import { toCoreItems, toRunePage, toSkillOrders, toSpellCombo } from "@/lib/view/builds";
 import { formatCount, formatPercent, toWindowInfoView } from "@/lib/view/format";
@@ -151,7 +149,6 @@ export default async function ChampionDetailPage({
   );
 
   const backPosition = primary?.position ?? "TOP";
-  const defaultSkinNum = champion.skins[0]?.num ?? 0;
 
   return (
     <div className="space-y-10">
@@ -162,10 +159,7 @@ export default async function ChampionDetailPage({
         >
           <span aria-hidden="true">←</span> {POSITION_LABELS[backPosition]} 티어 목록
         </Link>
-        <ChampionHero
-          champion={champion}
-          splashUrl={championSplashUrl(champion.id, defaultSkinNum)}
-        />
+        <ChampionHero champion={champion} />
       </div>
 
       <section aria-labelledby="stats-heading" className="space-y-4">
@@ -183,7 +177,6 @@ export default async function ChampionDetailPage({
       </section>
 
       <ChampionAbilities abilities={champion.abilities} />
-      <SkinGallery skins={champion.skins} />
       <ChampionLore lore={champion.lore} />
     </div>
   );

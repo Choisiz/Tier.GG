@@ -1,9 +1,10 @@
 import Image from "next/image";
+import Tooltip from "@/components/common/Tooltip";
 import type { SkillOrderSet } from "@/lib/view/builds";
 
 const LEVELS = Array.from({ length: 11 }, (_, i) => i + 1);
 
-/** 스킬 순서 1~11레벨 격자 (1순위) + 2순위 한 줄 */
+/** 스킬 순서 1~11레벨 격자 (1순위, 레벨 11행 × Q/W/E/R 4열) + 2순위 한 줄 */
 export default function SkillOrder({ set }: { set: SkillOrderSet }) {
   const [first, second] = set.builds;
   if (!first) return null;
@@ -17,40 +18,42 @@ export default function SkillOrder({ set }: { set: SkillOrderSet }) {
         <caption className="sr-only">스킬 찍는 순서 1~11레벨</caption>
         <thead>
           <tr>
-            <th scope="col" className="sr-only">
-              스킬
+            <th scope="col" className="w-8 font-normal text-muted">
+              레벨
             </th>
-            {LEVELS.map((level) => (
-              <th key={level} scope="col" className="w-[22px] font-normal text-muted sm:w-7">
-                {level}
+            {set.heads.map((head) => (
+              <th key={head.key} scope="col" className="pb-1 text-center font-normal">
+                <Tooltip content={head.description}>
+                  <span className="flex flex-col items-center gap-1">
+                    {head.iconUrl ? (
+                      <Image
+                        src={head.iconUrl}
+                        alt=""
+                        width={20}
+                        height={20}
+                        className="size-5 rounded-sm"
+                      />
+                    ) : null}
+                    <span className="font-bold text-accent">{head.key}</span>
+                    {head.name ? <span className="sr-only">{head.name}</span> : null}
+                  </span>
+                </Tooltip>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {set.heads.map((head) => (
-            <tr key={head.key}>
-              <th scope="row" className="pr-1 text-left">
-                <span className="flex items-center gap-1">
-                  {head.iconUrl ? (
-                    <Image
-                      src={head.iconUrl}
-                      alt=""
-                      width={20}
-                      height={20}
-                      className="size-5 rounded-sm"
-                    />
-                  ) : null}
-                  <span className="font-bold text-accent">{head.key}</span>
-                  {head.name ? <span className="sr-only">{head.name}</span> : null}
-                </span>
+          {LEVELS.map((level) => (
+            <tr key={level}>
+              <th scope="row" className="h-7 w-8 text-center font-normal text-muted sm:h-8">
+                {level}
               </th>
-              {LEVELS.map((level) => {
+              {set.heads.map((head) => {
                 const chosen = first.order[level - 1] === head.key;
                 return (
                   <td
-                    key={level}
-                    className={`h-[22px] w-[22px] rounded-sm text-center font-bold sm:h-7 sm:w-7 ${
+                    key={head.key}
+                    className={`h-7 w-7 rounded-sm text-center font-bold sm:h-8 sm:w-8 ${
                       chosen ? "bg-accent text-accent-foreground" : "bg-surface-2"
                     }`}
                   >
