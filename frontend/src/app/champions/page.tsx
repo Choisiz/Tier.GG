@@ -1,16 +1,15 @@
 import type { Metadata } from "next";
-import ChampionBrowser from "@/components/champions/ChampionBrowser";
-import { getChampionList } from "@/lib/ddragon/api";
+import TierListPage from "@/components/champions/TierListPage";
 
-// SSG + ISR: 1시간마다 새 패치 여부 확인 (REVALIDATE_SECONDS와 같은 값)
+// SSG + ISR: 1시간마다 다시 만든다 (계약 4장 권장 revalidate와 같은 값)
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "챔피언",
-  description: "리그 오브 레전드 전체 챔피언 목록. 이름 검색과 역할군 필터를 지원합니다.",
+  title: "탑 챔피언 티어",
+  description: "최근 14일 기준 탑 챔피언 티어, 승률, 픽률, 밴률. 포지션별로 볼 수 있습니다.",
 };
 
-export default async function ChampionsPage() {
-  const champions = await getChampionList();
-  return <ChampionBrowser champions={champions} />;
+/** /champions = 탑 탭 (변경 01 D1) */
+export default function ChampionsPage() {
+  return <TierListPage position="TOP" />;
 }
