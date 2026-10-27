@@ -38,6 +38,11 @@ export function summonerSpellIconUrl(version: string, imageFull: string): string
   return `${DDRAGON_BASE_URL}/cdn/${version}/img/spell/${imageFull}`;
 }
 
+/** 소환사 프로필 아이콘: /cdn/{version}/img/profileicon/{id}.png (변경 06) */
+export function profileIconUrl(version: string, profileIconId: number): string {
+  return `${DDRAGON_BASE_URL}/cdn/${version}/img/profileicon/${profileIconId}.png`;
+}
+
 /** 룬·룬 트리 아이콘: /cdn/img/{icon} (버전 없음) */
 export function runeIconUrl(icon: string): string {
   return `${DDRAGON_BASE_URL}/cdn/img/${icon}`;

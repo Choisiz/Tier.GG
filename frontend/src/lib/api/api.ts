@@ -5,6 +5,7 @@ import type {
   ChampionStatsResponse,
   MetaResponse,
   Position,
+  SummonerResponse,
   TierListResponse,
 } from "./types";
 
@@ -62,4 +63,44 @@ export async function getChampionStats(
       `/champions/${encodeURIComponent(championKey)}${query}`,
     ),
   );
+}
+
+/**
+ * 전적 검색 화면이 쓰는 상태 (변경 06, 계약 2-5). 집계 창이 없어 `StatsState`와 분리한다.
+ * `invalid`는 계약상 `region != kr`·riotId 형식 오류인데, 라우트가 `region`을 미리 막고
+ * riotId는 백엔드가 검사하므로 화면에서는 `not_found`와 같게 취급한다 (4장 상태 처리).
+ */
+export type SummonerState =
+  | { status: "ok"; data: SummonerResponse }
+  | { status: "not_found" }
+  | { status: "invalid" }
+  | { status: "riot_unavailable" }
+  | { status: "riot_key_expired" }
+  | { status: "unavailable" };
+
+/**
+ * GET /summoners/:region/:riotId. 요청마다 새로 부른다 (`cache: "no-store"`, D36).
+ * @param riotId `gameName-tagLine` (이미 하이픈으로 합친 값)
+ */
+export async function getSummoner(
+  region: string,
+  riotId: string,
+): Promise<SummonerState> {
+  const result = await fetchApi<SummonerResponse>(
+    `/summoners/${encodeURIComponent(region)}/${encodeURIComponent(riotId)}`,
+    { cache: "no-store" },
+  );
+  if (result.ok) return { status: "ok", data: result.data };
+  switch (result.kind) {
+    case "not_found":
+      return { status: "not_found" };
+    case "invalid":
+      return { status: "invalid" };
+    case "riot_unavailable":
+      return { status: "riot_unavailable" };
+    case "riot_key_expired":
+      return { status: "riot_key_expired" };
+    default:
+      return { status: "unavailable" };
+  }
 }

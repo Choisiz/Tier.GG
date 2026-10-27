@@ -1,141 +1,95 @@
-# 프론트엔드 검토 기록 — 변경 04 (룬·스킬 레이아웃 축 전환)
+# 프론트엔드 검토 — 변경 06 (전적 검색 MVP)
 
-> 이 문서는 **가장 최근 검토**만 둔다. 변경 01~03 검토 원문은 git 기록에 있고(`front_build.md`가 가리키는 커밋), 아직 남은 문제는 `front_overview.md` "해결되지 않은 점"에 있다.
-> 작성: Review 에이전트 (Build와 별도) / 검토일: 2026-10-17
-> 기준: `front_spec.md`(변경 04, D21~D23, 10장 완료 기준), `front_build.md`, `docs/contracts/api_contract.md` v2
-> 검토 환경: 실제 백엔드(이미 떠 있던 `backend` 4000) + 운영 빌드(`npm run build`, 백엔드 켬/끔 모두) + Lighthouse용 `next start`(포트 3001, 측정 후 종료) + `npm run dev`(포트 3000, 이미 떠 있던 프로세스), 내장 브라우저. 저장소의 `backend/`·`db/`·계약 문서는 건드리지 않았다.
+> 검토 대상: `front_spec.md` 5-7·11장(D28~D38), `front_build.md` 14장(변경 06). 커밋 전 작업 트리를 `git diff`/`git status`로 확인. 백엔드·DB·계약 문서는 이번 변경 범위 밖이며 수정되지 않았음을 확인했다.
+> 검증 방식: 3장 "Review 적용 기준"에 따라 — 린트·타입·빌드는 Build 결과를 신뢰하되 1회 재실행으로 숫자만 재확인했고, 독립 검토는 diff 코드 리딩과 실제 브라우저+API 호출(운영 빌드 포함)에 집중했다.
 
 ## 목차
 
-- [0. 결론](#0-결론)
-- [1. 항목별 결과](#1-항목별-결과)
-- [2. 발견한 문제](#2-발견한-문제)
-- [3. 브라우저 확인](#3-브라우저-확인)
-- [4. Lighthouse 측정](#4-lighthouse-측정)
-- [5. 명령 검증](#5-명령-검증)
-- [6. 범위 확인](#6-범위-확인)
-- [7. 수정한 파일](#7-수정한-파일)
+- [1. 판정](#1-판정)
+- [2. 완료 기준 체크리스트](#2-완료-기준-체크리스트)
+- [3. D37·D38 타당성 판단](#3-d37d38-타당성-판단)
+- [4. 코드 리딩](#4-코드-리딩)
+- [5. 실제 브라우저·API 검증](#5-실제-브라우저api-검증)
+- [6. 회귀·보안·범위 확인](#6-회귀보안범위-확인)
+- [7. 재실행한 명령](#7-재실행한-명령)
+- [8. 발견한 문제](#8-발견한-문제)
 
 ---
 
-## 0. 결론
+## 1. 판정
 
-**PASS.** 완료 기준(10장) 전 항목이 코드·브라우저 동작과 일치했다. 룬 가로 3단(`lg` 이상, `grid-cols-[2fr_1.5fr_1fr]`), 스킬 표 축 전환(Q/W/E/R 4행 × 레벨 11열, `skillOrder`와 정확히 일치), 스킬 표 전체 폭 분리(D23 정정 반영), 360/768/1280px 반응형(가로 스크롤 0), 모든 아이콘 툴팁(호버·포커스·탭), `th scope="row"/"col"` 관계, 린트·타입·빌드(183페이지, 백엔드 켬/끔 모두, 경고 0/7줄), Lighthouse 성능·접근성까지 전부 확인했다. 설계를 바꿔야 할 결함은 없었고, 작게 고친 것도 없다.
+**PASS with issues** (낮은 심각도 2건, 코드 수정 없음 — 둘 다 설계 변경이 아니라 "보고"로 남김).
 
-Build가 보고한 "다른 세션과 충돌한 HMR 경고"는 이번 검토에서 재현 대상이 아니었다(이번에도 같은 `next dev` 프로세스를 그대로 썼고 콘솔 오류 확인은 운영 빌드로 별도 진행했다). 운영 빌드(`npm run build`)가 경고 0줄로 통과하므로 실제 동작에는 영향이 없다는 Build의 판단에 동의한다.
+완료 기준(front_spec.md 10장 "전적 검색" 절) 전 항목 충족. D37·D38 둘 다 운영 빌드로 직접 재현해 타당함을 확인했다. 기능 결함 0건, 기존 통계 화면 회귀 0건, 새 런타임 의존성 0건, 계약·백엔드·DB 미수정.
 
-## 1. 항목별 결과
+## 2. 완료 기준 체크리스트
 
-| 확인 항목 | 결과 |
-|---|---|
-| 검증 명령(lint/typegen·tsc/build 켬·끔/의존성/`fetch` 위치/번들) | ✅ 5장 |
-| 공통 레이아웃(헤더·푸터, `/` 307) | ✅ 변경 없음, 기존 동작 유지 |
-| 리스트(탑 탭·행 수·검색·행 클릭) | ✅ 변경 파일 없음, 기존 동작 유지 |
-| `/champions/Aatrox` 기본 정보·탭 제목 | ✅ 3장 |
-| 포지션 탭(수·순서·`aria-selected`) | ✅ 카밀(탑 1티어+서폿 5티어)로 전환 확인, `PositionTabs` 자체는 미수정 |
-| `lg` 이상: 룬(좌)+주문(우) 2단 → 스킬 표 전체 폭 1행 → 아이템 전체 폭(D23 정정) | ✅ 1280px 스크린샷·DOM 구조로 확인 |
-| 룬 가로 3단(`lg` 이상, 핵심\|보조\|파편), 파편 칸이 좁아도 잘림·줄바꿈 없음(D21) | ✅ 아트록스·카밀(두 포지션) 3개 챔피언 확인, `getBoundingClientRect`로 각 행 3칸 정렬 확인 |
-| 핵심 트리 아래 "사용 …% · 승률 …% · …게임"이 가로 배치에서도 핵심 트리 칸 안(D17 유지) | ✅ 1280px에서 핵심 트리 칸 내부에 위치 |
-| 스킬 표 Q/W/E/R(4행) × 레벨(11열) 축 전환, `skillOrder`와 일치 | ✅ 아래 3-2 참고, API 값과 셀 단위로 직접 대조 |
-| `sticky left-0`가 실제 스크롤 시 고정, z-index·배경 투명 문제 없음 | ✅ 360px에서 `overflow-x-auto` 래퍼의 `scrollWidth === clientWidth`(294px, 실제 스크롤 없음), 코드상 `bg-surface` 배경 포함 확인 |
-| 소환사 주문 2조합 | ✅ 변경 없음 |
-| 아이템 필터(시작템·소모품·장신구 제외, 신발 분리, 5% 미만 숨김) | ✅ 변경 없음, 아트록스·카밀 확인 |
-| 패시브+Q/W/E/R 5개, HTML·`{{}}` 없음 | ✅ 변경 없음 |
-| 룬·스킬·소환사 주문·아이템 툴팁(호버/포커스/탭) | ✅ 아래 3-3 참고 |
-| 360/768/1280px 가로 스크롤 없음, 스킬 표가 360px에 들어감 | ✅ 아래 3-4 참고 |
-| `th scope="row"`(Q/W/E/R)/`"col"`(레벨), caption 유지 | ✅ 아래 3-5 참고 |
-| 로딩·빈 결과·오류 상태 | ✅ 아래 3-6 참고 |
-| 타입 검사·린트·빌드 | ✅ 5장 |
-| 범위(3개 파일 외 수정 없음, 의존성·계약·백엔드·DB 미수정) | ✅ 6장 |
-| Lighthouse 재측정 | ✅ 4장 |
+| 항목 | 결과 |
+|------|------|
+| 헤더 검색창 `너희는개다#KR1` → `/summoners/kr/너희는개다-KR1` → 프로필·랭크·매치 20건 | ✅ 브라우저로 직접 확인(5장) |
+| 랭크 없음(`leagues: []`)·매치 없음(`matches: []`) 문구 | ✅ `RankList.tsx`·`MatchList.tsx` 코드 확인(Build가 가짜 응답으로 실측, 13장에 기록된 대로 테스트 계정은 랭크 2개뿐이라 실측 불가 — 타당한 제약) |
+| `이상한이름#0000` → 404 + 검색창 재포커스 | ✅ 브라우저로 직접 확인 |
+| `region=na` → 404 | ✅ `page.tsx`가 호출 전에 `notFound()`로 막음(코드 확인) + curl로 백엔드 쪽도 400 확인 |
+| `RIOT_UNAVAILABLE`(502)·`RIOT_KEY_EXPIRED`(503) 화면 | ✅ 운영 빌드(`next start`) + 가짜 백엔드로 502 직접 재현(5장), 503은 코드 리딩으로 분기 확인 |
+| 아이템 빈 칸(`itemId: 0`)·참가자 10명·키스톤+트리 아이콘 | ✅ `toSlotView`/`toParticipantView`/`toKeystoneMap` 코드 확인 + 실제 매치 데이터로 화면 확인 |
+| 360/768/1024px 가로 스크롤 없음, 키보드 검색·탐색, 대비 4.5:1 | ✅ 360px·1024px 직접 측정(5장), 대비 수치 재계산(6장) |
+| 린트·타입·빌드 통과, 새 의존성 없음, 기존 `fetchApi` 캐시 동작 회귀 없음 | ✅ 재실행 확인(7장) |
 
-## 2. 발견한 문제
+## 3. D37·D38 타당성 판단
 
-없음. 설계를 바꿔야 할 결함, 작은 범위의 버그 모두 발견되지 않았다.
+### D37 — Riot 502/503·연결 실패를 `error.tsx`가 아닌 `page.tsx`가 직접 그림
 
-**짚어둘 점(결함 아님, 참고용)**:
-- `[championId]/loading.tsx`(로딩 스켈레톤)는 변경 04 이전 구조(오른쪽 칸에 주문+스킬 스켈레톤 2개가 세로로 쌓인 모양)를 그대로 쓴다. 실제 레이아웃은 주문만 우측에 남고 스킬은 전체 폭으로 빠졌지만, 스켈레톤은 손대지 않아 로딩 중 잠깐 다른 비율로 보인다. 완료 기준에 "로딩 스켈레톤이 실제 레이아웃과 같은 비율이어야 한다"는 항목은 없고, 스켈레톤이 사라지는 즉시 실제 레이아웃으로 교체되어 레이아웃이 깨지거나 콘텐츠가 밀리는 문제(CLS)는 없으므로 설계를 바꿀 결함으로 보지 않았다. 다음 번 로딩 스켈레톤을 손볼 때 함께 맞추면 된다.
+Build의 주장(운영 빌드에서 Next가 서버 컴포넌트 오류의 `message`를 클라이언트로 보내지 않는다)을 직접 재현했다. `frontend/src/app/summoners/[region]/[riotId]/page.tsx`는 `getSummoner()`의 `SummonerState.status`를 보고 `riot_unavailable`/`riot_key_expired`/`unavailable`일 때 `SummonerStatus` 컴포넌트를 바로 반환한다(오류를 던지지 않음, `error.tsx`로 넘어가지 않음). 가짜 502 백엔드를 세워 `npm run build && npm start`(운영 빌드)로 직접 호출하자 "라이엇 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요." 문구가 HTTP 200으로 정상 렌더링됐다. `error.tsx`를 거치지 않으므로 message 은닉 문제 자체가 발생하지 않는 설계이고, 실제로 그렇게 동작함을 확인했다. **타당함.**
 
-## 3. 브라우저 확인
+### D38 — `params.riotId` 자동 디코딩 안 됨, `decodeURIComponent` 추가
 
-### 3-1. 룬 가로 3단 (1280px)
+`SummonerSearchForm.tsx`가 `encodeURIComponent({gameName}-{tagLine})`로 한 번만 인코딩해 `router.push`하고, `page.tsx`가 `decodeRiotId()`(`decodeURIComponent`, 실패 시 원문 유지)로 한 번만 디코딩한다 — 인코딩·디코딩이 1:1로 대응해 이중 인코딩/디코딩이 없다. 운영 빌드로 `너희는개다#KR1` 검색을 처음부터 끝까지 실행해 프로필·랭크·매치가 정상 로드됨을 확인했다(5장). 하이픈(`-`)은 `encodeURIComponent`가 이스케이프하지 않는 문자라 경로 조각으로서의 "마지막 `-`에서 자른다"는 백엔드 규칙과도 어긋나지 않는다. **타당함.**
 
-- 아트록스(탑, 정밀|결의|능력치 파편): 핵심 트리 4줄(키스톤 크게) 아래 "사용 42.8% · 승률 46.6% · 118게임"이 핵심 트리 칸 **안**에 있고, 보조 트리 3줄, 능력치 파편 3줄 모두 한 화면에 가로로 나란히 보임. 글자 잘림·겹침 없음.
-- 카밀(탑, 결의|영감|능력치 파편), 카밀(서폿, 지배|결의|능력치 파편): 두 번째 포지션 탭으로 전환해도 같은 구조로 정상 렌더링. `getBoundingClientRect()`로 직접 확인한 결과 각 트리의 모든 룬 행이 겹침·줄바꿈 없이 가로 1줄에 배치됨 (예: 카밀 서폿 "지배" 키스톤 행 3칸이 각각 x=105/153/201, 너비 40px로 균등 배치).
-- 1024px 경계(=`PositionStatsPanel`의 `lg:grid-cols-2`와 `RunePage`의 `lg:grid-cols-[2fr_1.5fr_1fr]`가 동시에 트리거되는 지점)에서도 파편 칸(1fr, 실측 약 148px)에 라벨(공격/유연/방어, 각 2자)+아이콘 3개가 여유 있게 들어감. 사전 계산상 좁아 보일 걱정이 있었으나 실측으로는 문제없음(수치: `PositionStatsPanel` grid 폭 510px → `RunePage` grid 193/145/148px 3분할, 1280px 뷰포트 기준).
+## 4. 코드 리딩
 
-### 3-2. 스킬 표 축 전환 — `skillOrder`와 셀 단위 대조
+- **`lib/api/client.ts`**: `fetchApi<T>(path, options?)`로 시그니처가 확장됐다. `options?.cache === "no-store"`가 아닌 모든 경우(옵션 생략 포함) `{ next: { revalidate: API_REVALIDATE_SECONDS }, signal: ... }`로 — 변경 전 코드와 정확히 동일한 객체를 만든다. 기존 호출부(`getMeta`/`getTierList`/`getChampionStats`)는 전부 `fetchApi(path)` 형태로 두 번째 인자를 넘기지 않으므로 분기상 100% 기존 경로를 탄다. `classifyError`에 `SUMMONER_NOT_FOUND`(404→`not_found`, 기존 `STATS_NOT_FOUND`와 같은 kind로 묶임— 화면에서 재분기하므로 문제 없음), `RIOT_UNAVAILABLE`(502)·`RIOT_KEY_EXPIRED`(503)만 새로 추가. 기존 `ApiFailureKind` 분기(`not_ready`/`not_found`/`invalid`/`unavailable`)를 쓰는 기존 화면 코드는 신규 kind(`riot_unavailable`/`riot_key_expired`)를 모르면 `default` 분기(대개 `unavailable`류 처리)로 떨어지므로 하위 호환에 문제없다.
+- **`lib/view/summoner.ts`**: 큐 한글화(`QUEUE_LABELS`)는 모르는 큐를 원문 그대로 반환해 정보 손실이 없다(D33). 티어 글자(`tierLabel`)는 마스터 이상에서 랭크(단계) 생략을 정확히 처리(`RANKLESS_TIERS`). 키스톤 평탄화(`toKeystoneMap`)는 트리의 0번 줄(핵심 룬 줄)만 모아 핵심 룬 id → 정보+소속 트리 매핑을 만드는데, 룬 id 충돌(다른 트리에 같은 id가 있을 가능성)은 룬 시스템상 id가 전역 고유라 문제되지 않는다. `toSlotView`가 `itemId === 0`일 때 `null`을 반환해 "빈 칸"을 표현하고, `ItemSlot`(`MatchRow.tsx`)이 `null`이면 `aria-hidden` 빈 칸을 렌더링 — 완료 기준의 "빈 아이템 칸" 요구와 일치.
+- **`lib/view/format.ts`**: `formatRelativeKo`는 `Date.now()` 기준이라 `force-dynamic` 라우트에서만 쓰는 게 맞고(주석에도 명시) 실제로 `lib/view/summoner.ts`(동적 라우트 전용)에서만 호출된다. `formatKda`가 "4.00"처럼 소수 2자리를 주는데, 계획 문서의 와이어프레임 예시 텍스트는 "(4.0)"(1자리)였다 — 완료 기준에 소수 자릿수 규정은 없어 기준 위반은 아니지만 사소한 표기 불일치로 8장에 기록.
+- **`SummonerSearchForm.tsx`**: `parseRiotIdInput`이 `lastIndexOf("#")` 기준으로 자르고 `tagLine`을 `^[0-9A-Za-z]{2,5}$`로 검사 — 계약 2-5의 `tagLine` 형식과 동일. 형식 오류 시 `router.push`를 호출하지 않아 서버 요청이 발생하지 않음(완료 기준 충족). `aria-describedby`/`role="alert"` 연결 정상.
+- **라우트**: `region !== "kr"`이면 API를 부르기 전에 `notFound()` — 계약의 400 INVALID_PARAMETER를 프론트가 미리 막는 설계(D29)로 일관됨. `riotId` 파싱은 백엔드와 동일하게 "마지막 `-`에서 자른다"는 규칙을 공유하고, 프론트는 직접 자르지 않고 그대로 넘기기만 해 규칙 불일치 위험이 없다(실제 분리는 백엔드가 수행).
 
-아트록스 1순위 `skillOrder = "QEWQQRQEQER"` (레벨 1~11):
+## 5. 실제 브라우저·API 검증
 
-| 레벨 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| 글자 | Q | E | W | Q | Q | R | Q | E | Q | E | R |
+로컬 `backend-api`(포트 4000, `npm --prefix backend start`)와 `next dev`(포트 3000, 이미 떠 있던 세션 서버에 접속)로 확인.
 
-화면 확인 결과: Q행 강조 열 = {1,4,5,7,9}, W행 강조 열 = {3}, E행 강조 열 = {2,8,10}, R행 강조 열 = {6,11} — API 값과 정확히 일치. 2순위("QWEQQRQEQER")의 한 줄 요약도 `Q W E Q Q R Q E Q E R`로 일치.
+- 헤더 검색창에 `너희는개다#KR1` 입력 → `/summoners/kr/너희는개다-KR1` 이동 → 프로필(아이콘·"너희는개다 #KR1"·레벨 629), 랭크 카드(자유랭크 실버2 52LP 31승40패 43.7%, 솔로/듀오 실버1 6LP 130승136패 48.9%), 매치 다건(아이템·소환사 주문·키스톤·팀/상대팀 아이콘) 확인 — 실제 API 응답(curl)과 화면이 일치.
+- `이상한이름#0000` 검색 → "소환사를 찾을 수 없습니다" + "이름#태그를 확인해 주세요." 확인, `document.activeElement.id === "riotid-search"`로 포커스 복귀 확인.
+- `region=na`(`na/foo-bar`) → 404 확인.
+- 헤더 검색창에 형식 오류(`형식오류`, `#` 없음) 입력 후 Enter → 페이지 이동 없이 "이름#태그 형식으로 입력해 주세요" 인라인 오류 확인.
+- 1024px(`lg` 경계): `grid-cols-[280px_1fr]` 2단(좌 랭크, 우 매치)과 `scrollWidth === clientWidth`(1024) 확인.
+- 360px: `scrollWidth === clientWidth`(360), 1열(프로필→랭크→매치) 확인, 가로 스크롤 없음.
+- 운영 빌드(`npm run build && PORT=3006 npm start`, 격리 포트) 재현: `너희는개다#KR1` 검색이 끝까지 정상 동작(D38 검증).
+- 운영 빌드 + 가짜 502 백엔드(`API_BASE_URL` override, 격리 포트 3007): "라이엇 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요." HTTP 200 정상 렌더링(D37 검증).
+- 콘솔 오류 0건(`read_console_messages onlyErrors`, 전적 검색·챔피언 목록·상세 페이지 모두).
 
-### 3-3. 툴팁
+## 6. 회귀·보안·범위 확인
 
-- 스킬 표 행 머리(Q) 호버: "아트록스가 대검을 내리쳐 물리 피해를 줍니다…" 설명 패널이 뜸 (`aria-describedby` 연결 확인).
-- 룬 아이콘(정복자) 호버: "적 챔피언을 기본 공격하면 공격 속도가 최대 6회 중첩…" 설명 패널이 뜸.
-- 두 경우 모두 `role="tooltip"`이고, `Tooltip.tsx` 자체는 변경 04에서 손대지 않아 변경 03 Review가 고친 모바일 첫 탭 버그 수정이 그대로 유효함(재확인 완료, 아래 3-4).
+- **기존 통계 화면 회귀**: `/champions`, `/champions/Aatrox`를 `next dev`에서 직접 열어 정상 렌더링·콘솔 오류 0건 확인. `fetchApi` 호출부(`getMeta`/`getTierList`/`getChampionStats`)는 옵션을 넘기지 않아 분기상 변경 전과 동일 코드 경로(4장 참고).
+- **보안**: `src/lib/api/config.ts`는 `API_BASE_URL`만 읽는다(기존 그대로). `RIOT_API_KEY`·`DATABASE_URL`은 프론트 프로세스에 들어오지 않음(`next.config.ts` 미수정, 이번 변경에서 읽는 변수 추가 없음). `grep -rl "RIOT_API_KEY\|localhost:4000\|/api/v1" .next/static` 0건.
+- **범위**: `git status --short docs/ backend/ db/` 0건 — 계약 문서·백엔드·DB 미수정.
+- **새 런타임 의존성**: `git diff -- frontend/package.json frontend/package-lock.json` 0줄.
+- **`mockup-summoner-search.html` 삭제**: 작업 트리에 없음(확인됨) — 삭제 완료.
+- **대비 재계산**: `--win`(`#5a9bff`)·`--lose`(`#f16565`)를 배경(`#0b1020`)·표면(`#141b2f`)에 대해 WCAG 공식으로 재계산 — 배경 6.82/6.12, 표면 6.16/5.53으로 Build 보고 수치와 정확히 일치, 모두 4.5:1 이상.
 
-### 3-4. 반응형
-
-- **1280px**: 룬 좌(가로 3단)+주문 우 2단 → 스킬 표 전체 폭 1행(11열 모두 보임, 가로 스크롤 없음) → 아이템 전체 폭. `document.documentElement.scrollWidth === clientWidth`.
-- **768px**: 룬 세로 1단, 스킬 표 1열 유지. `scrollWidth === clientWidth === 768`, 가로 스크롤 없음.
-- **360px**: 룬 세로 1단(정밀→결의→능력치 파편, 잘림 없음), 스킬 표가 `overflow-x-auto` 래퍼 안에서도 `scrollWidth === clientWidth === 294`로 실제로는 스크롤이 발생하지 않음(셀 크기 그대로 11열이 들어감). `document.documentElement.scrollWidth === clientWidth === 360`, 페이지 가로 스크롤 없음.
-- 모바일(360px, 터치 에뮬레이션) 탭 토글: 스킬 표 행 머리 탭 시 첫 탭에서 바로 열림, 재탭 닫힘, 바깥 탭 닫힘 — 변경 03의 `Tooltip.tsx` 수정이 레이아웃 변경과 무관하게 그대로 동작.
-
-### 3-5. 접근성 구조 (DOM 직접 확인)
-
-```
-rowHeads (tbody th scope): ["row","row","row","row"]   // Q, W, E, R
-colHeads (thead th scope): ["col" × 12]                 // 레벨 + 1~11
-caption: "스킬 찍는 순서 1~11레벨"
-```
-
-행 머리(Q/W/E/R) 각각이 그 행 전체(11개 레벨 칸)를 대표하는 `scope="row"`로 바뀐 것이 축 전환과 올바르게 대응한다. 열 머리(레벨 1~11)는 `scope="col"`.
-
-### 3-6. 로딩·빈 결과·오류
-
-- 로딩 스켈레톤: 개발 모드에서 느린 네트워크 에뮬레이션 없이도 `loading.tsx` 구조 확인(2장 참고, 참고용 메모 1건).
-- 빈 결과: 변경 04에서 손대지 않은 `BuildCard`의 `empty` 분기("표본이 부족해 추천이 없습니다")가 스킬 카드에도 그대로 적용됨을 코드로 확인(`PositionStatsPanel.tsx` 85행 `empty={view.skills.builds.length === 0}`).
-- 오류: Data Dragon 실패·API 연결 실패 경로는 변경 04 파일과 무관(미수정), 변경 01~03 Review에서 이미 확인된 동작 유지.
-
-## 4. Lighthouse 측정
-
-조건: Lighthouse 13.5.0(scratchpad에 설치), 모바일, 시뮬레이션 제한(`--throttling-method=simulate`), `next build` + `next start`(로컬, 포트 3001), 백엔드 켬, 이미지 캐시 1회 실행으로 데운 뒤 3회 중앙값. 비교 기준값은 변경 03 Review(front_overview.md 11장).
-
-| 페이지 | 성능 | LCP | CLS | 접근성 | 비교(변경 03) |
-|--------|------|-----|-----|--------|------|
-| `/champions` | 96 | 2.78s | 0 | 100 | 96 · 2.78s · 0 · 100 (변동 없음) |
-| `/champions/Aatrox` | 94 | 3.16s | 0 | 100 | 94 · 3.15s · 0 · 100 (±0.01s, 오차 범위) |
-
-3회 원값: `/champions` 성능 [95, 96, 96] · LCP [2.91, 2.77, 2.78]s / `/champions/Aatrox` 성능 [93, 94, 94] · LCP [3.16, 3.16, 3.15]s. 변경 04는 레이아웃(CSS grid 배치)만 바꾸고 이미지·DOM 노드 수·JS 번들을 바꾸지 않아 성능 수치가 그대로인 것은 예상대로다.
-
-측정 후 `next start`(포트 3001) 프로세스는 종료했고, 저장소 `.next`는 백엔드를 켠 상태의 `npm run build`로 다시 만들어 Build가 남긴 상태(3,789게임 스냅숏)로 복원했다.
-
-## 5. 명령 검증
+## 7. 재실행한 명령
 
 | 명령 | 결과 |
 |------|------|
-| `npm run lint` | ✅ 오류·경고 0 |
-| `npx next typegen && npx tsc --noEmit` | ✅ 오류 0 |
-| `npm run build` (백엔드 켬) | ✅ 183페이지, `[api]`·`[view]`·`[stats]` 경고 0줄 |
-| `npm run build` (백엔드 끔: `API_BASE_URL`을 연결 불가 주소로 지정 + `fetch-cache` 비움) | ✅ 183페이지 성공, 경고 7줄(`[api] 통계 서버에 연결하지 못했습니다 …`), `/champions.html`에 "통계 서버에 연결하지 못했습니다", `/champions/Aatrox.html`에 Hero·스킬 정상 포함 확인 |
-| `fetch(`·백엔드 주소 위치 | ✅ `lib/api/`에만 있음(변경 04에서 건드리지 않음) |
-| `dangerouslySetInnerHTML` | ✅ 0건 |
-| 브라우저 번들(`.next/static`) 민감 문자열 | ✅ `localhost:4000`·`/api/v1`·`NEXT_PUBLIC_`·`API_BASE_URL` 0건 |
-| `package.json`/`package-lock.json` 변경 | ✅ 0줄 (`git diff --stat` 확인) |
+| `npm run lint` | ✅ 오류·경고 0 (Build 보고와 일치) |
+| `npx next typegen && npx tsc --noEmit` | ✅ 오류 0. `any` 0건(관련 신규 파일 grep으로 재확인) |
+| `npm run build` (백엔드 켬) | ✅ 183정적 페이지 + `ƒ /summoners/[region]/[riotId]` 1개. 보안 업그레이드 안내가 1회차에 멈췄고 재시도로 통과 — Build 보고와 동일한 동작(13장 참고, 조치 안 함) |
+| `PORT=3006 npm start`(운영) | ✅ `너희는개다#KR1` 정상 응답 |
 
-## 6. 범위 확인
+## 8. 발견한 문제
 
-- `git status`/`git diff --stat` 확인 결과 수정된 파일은 계획대로 `frontend/src/components/champions/{PositionStatsPanel,RunePage,SkillOrder}.tsx` 3개와 문서 `frontend/docs/{front_build.md,front_spec.md}` 뿐이다.
-- `docs/contracts/*`, `backend/`, `db/` 변경 없음.
-- `front_spec.md`의 `## 이번 변경 (승인 대기)` 임시 절이 본문(5-4/5-5/9장/11장 D21~D23)에 합쳐지고 삭제되어 있음을 diff로 확인.
-- Review 단계에서 코드를 고치지 않았으므로 `front_build.md` 추가 반영 없음.
+코드 결함은 없어 수정한 파일은 없다. 아래 2건은 설계 변경이 필요 없는 수준이라 직접 고치지 않고 기록만 남긴다(메인 에이전트 보고용).
 
-## 7. 수정한 파일
+1. **(낮음, 정리 필요)** 작업 트리에 `frontend/mockup-current.html`(371줄, 챔피언 상세 페이지 레이아웃 정적 목업)이 커밋되지 않은 채 남아 있다. 이번 변경 06(전적 검색) 범위와 무관한 내용(소환사 검색이 아니라 챔피언 상세 Hero/스킬 레이아웃)이고 `front_build.md` 14장에도 언급이 없다 — 다른 작업(아마 세션 시작 전 "레이아웃 변경 시 HTML 목업" 규칙 도입과 관련된 별도 작업)이 남긴 임시 파일로 보인다. 저장소에 남겨둘 파일이 아니므로 메인 에이전트가 용도를 확인해 정리(삭제 또는 올바른 변경 번호로 커밋)하는 것이 좋다.
+2. **(낮음, 문서 정합성)** `front_build.md` 8장("챔피언 상세")이 `ChampionHero`의 h1 이동·칭호 삭제, `PositionTabs`의 탭 1개 시 `sr-only` 처리, `PositionStatsPanel`의 카드 재구성(`text-accent`, `h3 sr-only`, 스킬 순서 좌측 카드로 합침), `ChampionAbilities`의 세로 카드 배치, `ChampionLore`의 제목 위치를 모두 "변경 06"으로 표기한다. 그런데 이 내용은 오늘 작업 트리의 diff에 없고(`git status`에 해당 컴포넌트 파일 변경 없음), 실제로는 커밋 `8771301`("변경 05" 커밋 메시지)에 이미 포함돼 있다(직접 diff로 확인). 즉 해당 UI 변경은 변경 06의 산출물이 아니라 이전에 이미 커밋된 것이며, `front_build.md`의 "변경 06" 라벨은 부정확하다(이 문구는 이번 세션 diff에 포함되지 않은, 이미 HEAD에 있던 문장이라 이번 Build가 새로 쓴 것은 아니다 — 이전 세션에서 변경 05 커밋과 변경 06 작업이 뒤섞여 기록된 것으로 보인다). 기능에는 영향이 없지만, 다음에 "변경 06이 챔피언 상세도 건드렸다"고 오해할 수 있어 메인 에이전트가 변경 번호 라벨을 바로잡는 것을 권장한다.
 
-없음 (발견한 결함이 없어 Review 단계에서 코드를 고치지 않았다).
+둘 다 전적 검색 기능 자체의 동작·완료 기준과는 무관해 PASS 판정에는 영향을 주지 않는다.

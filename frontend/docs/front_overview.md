@@ -1,7 +1,7 @@
 # 프론트엔드 현재 상태 — Tier.GG
 
 > 이 문서는 프론트엔드의 **지금 모습**만 적는다. 현재 계획은 `front_spec.md`, 구현 상태는 `front_build.md`, 최근 검토는 `front_review.md`에 있다. 그 이전 과정 기록은 git 커밋 `87cfc78`에 있다.
-> 기준: 변경 04 Review 반영 후 코드 (2026-10-17 확인). 이후 Review 에이전트가 이 문서를 최신 상태로 덮어쓰고 변경 이력에 1줄을 더한다.
+> 기준: 변경 06(전적 검색 MVP) Review 반영 후 코드 (2026-10-27 확인). 이후 Review 에이전트가 이 문서를 최신 상태로 덮어쓰고 변경 이력에 1줄을 더한다.
 
 ## 목차
 
@@ -26,17 +26,18 @@
 
 - **티어 표**: 탑·정글·미드·원딜·서폿 5개 탭. 티어, 승률, 픽률, 밴률, 게임 수를 보여준다.
 - **챔피언 상세**: 주 포지션 1~2개 탭. 탭마다 추천 룬(사용률·승률 포함), 소환사 주문, 스킬 순서, 핵심 아이템을 보여준다. 모든 아이콘에 호버·포커스·탭 툴팁이 있다. 스킨은 Hero 스플래시에서 화살표로 전환(순환)하고, 아래에 스킬 설명, 스토리가 있다.
-- **통계 기준**: 최근 14일 게임. 백엔드가 매일 05:00(KST)에 다시 집계한다.
-- 로그인, 전적 검색, AI 피드백은 아직 없다.
+- **전적 검색**(변경 06): 헤더 검색창에 "이름#태그"를 입력하면 `/summoners/kr/{riotId}`로 이동해 프로필, 랭크(솔로/자유), 최근 매치 20건(챔피언·KDA·CS·아이템·소환사 주문·키스톤·같은 팀/상대팀)을 보여준다. 집계 창 없이 요청마다 Riot 값을 그 자리에서 받아온다(`force-dynamic`).
+- **통계 기준**: 티어 표·챔피언 상세는 최근 14일 게임. 백엔드가 매일 05:00(KST)에 다시 집계한다. 전적 검색은 집계와 무관하게 실시간이다.
+- 로그인, AI 피드백은 아직 없다.
 
 | 항목 | 값 |
 |------|-----|
 | 스택 | Next.js 16.4 (App Router, Turbopack), React 19.3, TypeScript, Tailwind CSS 4 |
 | 추가 런타임 의존성 | 없음 (`next`, `react`, `react-dom`만) |
 | 테마 | 다크 고정, 한국어(`lang="ko"`, Data Dragon `ko_KR`) |
-| 빌드 페이지 수 | 183개 (상세 173개 + 리스트 5개 + `/`·404 등) |
+| 빌드 페이지 수 | 183개 정적(상세 173개 + 리스트 5개 + `/`·404 등) + 동적 라우트 1개(`/summoners/[region]/[riotId]`) |
 | 챔피언 수 | 173명 (Data Dragon `16.20.1` 기준) |
-| 클라이언트 컴포넌트 | `TierTable`, `PositionTabs`, `RunePage`, `ChampionHero`, `HeroSkinSwitcher`, `Tooltip`(공용), `NavLink`, `error.tsx` 2개 |
+| 클라이언트 컴포넌트 | `TierTable`, `PositionTabs`, `RunePage`, `ChampionHero`, `HeroSkinSwitcher`, `Tooltip`(공용), `NavLink`, `SummonerSearchForm`, `RetryButton`, `error.tsx` 3개, `not-found.tsx`(전적 검색) |
 
 ---
 
@@ -53,6 +54,9 @@
 | `/champions/lane/TOP`, `/lane/Jungle`, `/lane/mid`, `/champions/lane` | 404 | 정확한 소문자 5개만 허용 (`dynamicParams = false`) |
 | `/champions/[championId]` | 200 | 상세. 영문 id를 쓴다 (예: `Aatrox`, `MonkeyKing`). 제목 "아트록스 - 다르킨의 검 \| Tier.GG" |
 | `/champions/Foo` (없는 챔피언) | 404 | "챔피언을 찾을 수 없습니다" + [챔피언 목록으로] |
+| `/summoners/kr/{riotId}` (변경 06) | 200 (동적 SSR) | 전적 검색 결과. `{riotId}`는 `gameName-tagLine`(URL 인코딩) |
+| `/summoners/{region}/…` (`region != kr`) | 404 | 계약상 `kr`만 지원, 프론트가 호출 전에 막음 |
+| 존재하지 않는 소환사 | 404 | "소환사를 찾을 수 없습니다" + 헤더 검색창 재포커스 |
 | 그 밖의 주소 (`/nope`) | 404 | "페이지를 찾을 수 없습니다" + [홈으로] |
 
 ### 티어 표 화면
@@ -86,6 +90,19 @@
 | 레이아웃 | `lg`(1024px) 이상: 룬(좌, 가로 3단)+소환사 주문(우) 2열, 그 아래 스킬 순서가 전체 폭 1행(11열이라 2열 절반 폭에 들어가지 않음), 그 아래 "많이 완성한 아이템"이 전체 폭으로 따로. `lg` 미만은 룬(세로 1단)→주문→스킬(가로 스크롤 가능)→아이템 1열 |
 | 아래 영역 | 스킬 설명(P/Q/W/E/R), 스토리. 스킨은 별도 섹션 없음(Hero로 통합) |
 
+### 전적 검색 화면 (변경 06)
+
+요약: 헤더 검색창 → 프로필 → 랭크(좌)+매치 20건(우) 순서다. 집계 창이 없어 기간 줄도 없다.
+
+| 요소 | 내용 |
+|------|------|
+| 헤더 검색창 | 모든 페이지 상단, "이름#태그" 입력 → `#`를 `-`로 바꿔 `/summoners/kr/{riotId}`로 이동. 형식 오류는 서버 요청 없이 입력창 아래 안내 |
+| 프로필 헤더 | 소환사 아이콘, 이름#태그, 레벨. 재검색 폼은 없음(헤더 검색창과 중복이라 제외) |
+| 랭크(좌, `lg` 이상 세로 고정 폭 280px) | 큐별 카드(솔로/듀오, 자유랭크만 한글화, 그 외 원문): 티어+단계 글자, LP, 승-패, 승률. 랭크 없으면 "랭크 정보가 없습니다" |
+| 매치 목록(우) | 최근 20건. 챔피언 아이콘+포지션, 승/패(색+글자), 상대 시각, 게임 길이, K/D/A+KDA, CS+분당 CS, 아이템 6칸+장신구(빈 칸 포함), 소환사 주문 2개, 키스톤 룬+소속 트리 아이콘, 같은 팀/상대팀 챔피언 아이콘(이름 없음) |
+| 레이아웃 | `lg`(1024px) 이상 `grid-cols-[280px_1fr]`(좌 랭크, 우 매치), 미만은 1열(프로필→랭크→매치) |
+| 오류 | 소환사 없음(404) → 전용 안내+검색창 재포커스. Riot 502/503·백엔드 연결 실패 → `page.tsx`가 직접 안내 문구(+502·연결 실패만 [다시 시도]) |
+
 ---
 
 ## 3. 데이터 출처
@@ -105,9 +122,10 @@
 |------|------|
 | 주소 | 환경 변수 `API_BASE_URL` (예: `http://localhost:4000/api/v1`). 값이 없으면 "연결 실패"로 처리한다 (localhost로 조용히 붙지 않음) |
 | 값 읽기 | `next.config.ts`가 루트 `.env`에서 **`API_BASE_URL`만** 읽어 넣는다. DB·Riot 키는 프론트 프로세스에 들어가지 않는다. `NEXT_PUBLIC_`과 `env` 옵션은 쓰지 않는다 |
-| 쓰는 엔드포인트 | `GET /meta` (기간·표본 기준·푸터 패치), `GET /champions?position=` (티어 표), `GET /champions/:key[?position=]` (상세) |
+| 쓰는 엔드포인트 | `GET /meta` (기간·표본 기준·푸터 패치), `GET /champions?position=` (티어 표), `GET /champions/:key[?position=]` (상세), `GET /summoners/:region/:riotId`(전적 검색, 변경 06) |
 | 시간 제한 | 10초 (`API_TIMEOUT_MS`) |
-| 오류 분기 | HTTP 상태 + `error.code`로만 나눈다 (`lib/api/client.ts`) |
+| 오류 분기 | HTTP 상태 + `error.code`로만 나눈다 (`lib/api/client.ts`). 전적 검색 전용 `RIOT_UNAVAILABLE`(502)·`RIOT_KEY_EXPIRED`(503)도 같은 방식으로 분기(변경 06) |
+| 캐시 옵션 | `fetchApi(path, options?)` — `options.cache: "no-store"`를 주면 캐시 없이 매번 새로 부른다(전적 검색 전용). 생략하면 기존처럼 `revalidate: 3600`(변경 06, D36) |
 
 ### ID → 이름 매핑
 
@@ -136,6 +154,7 @@
 | `/champions` | SSG + `revalidate = 3600` | 탑 1번 + `/meta` |
 | `/champions/lane/[position]` | 5개 미리 생성(top은 308로 저장) + `dynamicParams = false` + `revalidate = 3600` | 포지션마다 1번 |
 | `/champions/[championId]` | 173개 SSG + `revalidate = 3600`, `dynamicParams` 기본값(true) | 챔피언마다 1~2번 (2순위 포지션이 있으면 2번) |
+| `/summoners/[region]/[riotId]` (변경 06) | 동적 SSR `dynamic = "force-dynamic"`, `cache: "no-store"` | 요청마다 1번 (집계 창이 없어 ISR·SSG 대상이 아님) |
 | 푸터 | 각 페이지와 함께 렌더 | `/meta` (데이터 캐시로 공유) |
 
 | 캐시 | 설정 |
@@ -185,6 +204,23 @@
 
 - 표본 부족 기준(50게임)은 `/meta`의 `rules.minTierPick`에서 받는다. 못 받으면 50을 쓴다.
 
+### 전적 검색 화면 상태 (변경 06)
+
+| 상황 | 화면 |
+|------|------|
+| 로딩 | 프로필·랭크·매치 스켈레톤 |
+| 소환사 없음 (404) / `region != kr` | "소환사를 찾을 수 없습니다" + "이름#태그를 확인해 주세요." + 헤더 검색창 재포커스 |
+| Riot 502(`RIOT_UNAVAILABLE`) | `page.tsx`가 직접 "라이엇 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요." + [다시 시도] |
+| Riot 503(`RIOT_KEY_EXPIRED`) | `page.tsx`가 직접 "지금은 전적을 불러올 수 없습니다. 잠시 후 다시 시도해 주세요." (버튼 없음) |
+| 백엔드 연결 실패 | `page.tsx`가 직접 "서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요." + [다시 시도] |
+| 랭크 없음 | "랭크 정보가 없습니다" |
+| 매치 없음 | "최근 플레이한 게임이 없습니다" |
+| 매치 일부 항목 ID 못 찾음 | 그 칸만 빈 칸/"알 수 없는 …", 페이지는 정상 |
+| 형식 오류 입력 | 서버 요청 없이 입력창 아래 "이름#태그 형식으로 입력해 주세요" |
+| Data Dragon 실패 등 예상 밖 오류 | `error.tsx`(client) "전적을 불러오지 못했습니다" + [다시 시도] + [챔피언 목록으로] |
+
+- Riot 502/503·백엔드 연결 실패는 오류를 던지지 않고 `page.tsx`가 직접 그린다 — 운영 빌드에서 Next가 서버 컴포넌트가 던진 오류의 `message`를 클라이언트로 보내지 않기 때문(Review가 직접 재현해 확인, `front_review.md` 3장).
+
 ---
 
 ## 6. 주요 규칙
@@ -230,16 +266,17 @@ frontend/
 ├─ next.config.ts          루트 .env에서 API_BASE_URL만 읽기, 이미지 허용 주소, Tailwind 로더
 ├─ package.json            dev / build / start / lint
 └─ src/
-   ├─ app/                 라우트
+   ├─ app/                 라우트 (summoners/[region]/[riotId] 포함, 변경 06)
    ├─ components/
-   │  ├─ layout/           헤더·푸터·메뉴
+   │  ├─ layout/           헤더(전적 검색창 포함)·푸터·메뉴
    │  ├─ champions/        티어 표·상세 화면 조각
+   │  ├─ summoners/        전적 검색 화면 조각 (변경 06)
    │  ├─ stats/            통계 공통 조각 (기간 줄, 배지, 안내)
    │  └─ common/           공용 조각 (Tooltip)
    └─ lib/
       ├─ api/              백엔드 호출 (server-only)
       ├─ ddragon/          Data Dragon 호출과 가공
-      └─ view/             API + Data Dragon → 화면용 데이터
+      └─ view/             API + Data Dragon → 화면용 데이터 (summoner.ts 포함, 변경 06)
 ```
 
 ### `src/app/`
@@ -254,12 +291,15 @@ frontend/
 | `champions/loading.tsx` / `error.tsx` | 티어 표 스켈레톤 / 오류 화면 |
 | `champions/[championId]/page.tsx` | 상세. 1·2순위 통계 호출, 패널 데이터 만들기, 메타데이터 |
 | `champions/[championId]/loading.tsx` / `not-found.tsx` | 상세 스켈레톤 / 챔피언 404 |
+| `summoners/[region]/[riotId]/page.tsx` (변경 06) | 전적 검색. `dynamic = "force-dynamic"`, `region` 검사, `riotId` 디코딩, 상태별 분기, Data Dragon 병렬 호출 |
+| `summoners/[region]/[riotId]/loading.tsx` / `not-found.tsx` / `error.tsx` (변경 06) | 스켈레톤 / 소환사 404(검색창 재포커스) / 예상 밖 오류 안전망 |
 
 ### `src/components/`
 
 | 파일 | 역할 |
 |------|------|
-| `layout/Header.tsx`, `NavLink.tsx` | 로고 + "챔피언" 메뉴, 현재 경로 강조 |
+| `layout/Header.tsx`, `NavLink.tsx` | 로고 + "챔피언" 메뉴 + 전적 검색창(변경 06), 현재 경로 강조 |
+| `layout/SummonerSearchForm.tsx` (변경 06) | 헤더 전역 "이름#태그" 검색 폼 (client) |
 | `layout/Footer.tsx` | 공개 패치 이름 + 고지문 |
 | `champions/TierListPage.tsx` | 티어 표 페이지 한 개 (데이터 호출 + 상태 분기) |
 | `champions/PositionNav.tsx` | 포지션 탭 링크 5개 |
@@ -274,7 +314,11 @@ frontend/
 | `champions/CoreItems.tsx` | 핵심 아이템 3개 + 신발 (아이콘에 `Tooltip`) |
 | `champions/ChampionAbilities.tsx` | 패시브·스킬 설명 |
 | `champions/ChampionLore.tsx` | 스토리 |
-| `common/Tooltip.tsx` | 호버·포커스·탭 공용 설명 툴팁 (client, `role="tooltip"` + `aria-describedby`) |
+| `summoners/ProfileHeader.tsx` (변경 06) | 프로필 아이콘·이름#태그·레벨. 재검색 폼 없음 |
+| `summoners/RankList.tsx` (변경 06) | 랭크 카드 세로 목록 / 랭크 없음 안내 |
+| `summoners/MatchList.tsx`, `MatchRow.tsx` (변경 06) | 매치 20건 목록 / 매치 1건(챔피언·시간·KDA·CS·주문·키스톤·아이템·참가자) |
+| `summoners/SummonerStatus.tsx`, `RetryButton.tsx` (변경 06) | Riot 502/503·백엔드 연결 실패 안내(server) + [다시 시도](client) |
+| `common/Tooltip.tsx` | 호버·포커스·탭 공용 설명 툴팁 (client, `role="tooltip"` + `aria-describedby`). 전적 검색의 아이템·주문·룬 아이콘도 재사용(변경 06) |
 | `stats/WindowInfo.tsx` | 기간 줄 + 지연 안내 |
 | `stats/TierBadge.tsx` | 1~5티어 / 표본 부족 배지 |
 | `stats/StatsNotice.tsx` | 집계 전·통계 없음·연결 실패·빈 목록 안내 |
@@ -284,20 +328,21 @@ frontend/
 | 파일 | 역할 |
 |------|------|
 | `api/config.ts` | 기본 URL, 재검증 3600초, 시간 제한 10초 |
-| `api/client.ts` | `fetchApi()`: 호출하고 결과를 `not_ready`·`not_found`·`invalid`·`unavailable`로 분류. 로그에 기본 URL을 남기지 않음 |
-| `api/api.ts` | `getMeta`, `getTierList`, `getChampionStats`, `requireStats`(서비스 중 연결 실패면 오류) |
-| `api/types.ts` | 계약 v2 응답 타입 |
+| `api/client.ts` | `fetchApi(path, options?)`: 호출하고 결과를 `not_ready`·`not_found`·`invalid`·`unavailable`·`riot_unavailable`·`riot_key_expired`(변경 06)로 분류. `options.cache: "no-store"`로 캐시 생략 가능(변경 06, D36). 로그에 기본 URL을 남기지 않음 |
+| `api/api.ts` | `getMeta`, `getTierList`, `getChampionStats`, `requireStats`(서비스 중 연결 실패면 오류), `getSummoner`(변경 06, `SummonerState`) |
+| `api/types.ts` | 계약 v3 응답 타입 (전적 검색 타입 포함, 변경 06) |
 | `api/positions.ts` | 포지션 순서·한글 이름·URL 조각, `tierListHref()` |
 | `api/buildPhase.ts` | `next build` 중인지 판단 |
 | `ddragon/api.ts` | 버전, 챔피언 목록·상세, key 표, 아이템·주문·룬 표 |
 | `ddragon/transform.ts` | 원본 → 화면용 챔피언 데이터 (HTML 제거, 크로마 제외) |
-| `ddragon/images.ts` | 이미지 주소 만들기 |
+| `ddragon/images.ts` | 이미지 주소 만들기. `profileIconUrl` 추가(변경 06) |
 | `ddragon/itemFilter.ts` | 아이템 거르기 규칙 (6장) |
 | `ddragon/statShards.ts` | 능력치 파편 표 |
 | `ddragon/constants.ts`, `types.ts` | 기본 주소·로케일, 타입 |
-| `view/format.ts` | 퍼센트·쉼표·KST·패치 구성 글자 |
+| `view/format.ts` | 퍼센트·쉼표·KST·패치 구성 글자. 상대 시각·경과 시간·KDA·분당 CS 추가(변경 06) |
 | `view/tierList.ts` | API 행 → 표 행 |
 | `view/builds.ts` | 룬·주문·스킬·아이템 → 화면용 데이터 |
+| `view/summoner.ts` (변경 06) | 전적 검색 응답 + Data Dragon → 화면용 모델 (큐 한글화, 티어 글자, 키스톤 평탄화, 매치 변환) |
 
 ---
 
@@ -313,15 +358,17 @@ frontend/
 | 표 | `caption`(sr-only), `th scope` |
 | 이미지 | `alt` 누락 0. 고르지 않은 룬과 장식 이미지는 `alt=""` |
 | 티어 | 색만이 아니라 글자("1티어")가 항상 함께 보인다 |
-| 대비 | 측정값 최소 6.74:1 (기준 4.5:1). 1~5티어 배지 6.89 / 8.37 / 12.64 / 11.18 / 9.13 |
-| 제목 구조 | 리스트 `h1` 1개. 상세 `h1` → `h2` → `h3` (건너뛰지 않음) |
+| 대비 | 측정값 최소 6.74:1 (기준 4.5:1). 1~5티어 배지 6.89 / 8.37 / 12.64 / 11.18 / 9.13. 승/패 의미색(`--win`/`--lose`, 변경 06) 배경 6.82/6.12, 표면 6.16/5.53 |
+| 제목 구조 | 리스트 `h1` 1개. 상세 `h1` → `h2` → `h3` (건너뛰지 않음). 전적 검색 `h1`(이름#태그) → `h2`(매치 목록) |
+| 전적 검색 (변경 06) | 헤더 검색창 키보드 제출 가능, 형식 오류 `role="alert"`, 404 시 검색창 재포커스, 매치 목록 `<ol aria-label="최근 매치 목록">`, 빈 아이템 칸 `aria-hidden` |
 
 ### 반응형
 
 | 폭 | 모습 |
 |----|------|
-| 360px | 표 5열, 포지션 탭은 가로 스크롤, 상세 빌드 1열(룬 세로 1단, 스킬 표 가로 스크롤 없이 들어감) |
-| 768px | 표 8열, 상세 빌드 1열 |
+| 360px | 표 5열, 포지션 탭은 가로 스크롤, 상세 빌드 1열(룬 세로 1단, 스킬 표 가로 스크롤 없이 들어감), 전적 검색 1열(헤더 검색창도 줄어듦) |
+| 768px | 표 8열, 상세 빌드 1열, 전적 검색 1열 |
+| 1024px | 전적 검색 `grid-cols-[280px_1fr]` 2단(좌 랭크, 우 매치) 전환 |
 | 1280px | 표 8열, 상세: 룬(좌, 가로 3단)+주문(우) 2단 → 스킬 표 전체 폭 → 아이템 전체 폭 |
 
 ### 성능
@@ -389,6 +436,8 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 | 02 | 2026-10-17 | 룬 sr-only 요약(`chosenNames`)을 API `perks` 순서 대신 트리 줄 순서로 재정렬(`!db` 변경 04로 `subPerks` 순서가 바뀌어도 화면 격자와 항상 같게), 안 쓰는 `CHAMPION_TAGS` 삭제, `TierBadge` 대비 주석 실측값(6.89:1)로 수정, `layout.tsx` 기본 description 갱신 | 접근성 스크린리더 요약과 시각 정보(강조된 룬)를 항상 같은 순서로 맞추기 위해, 나머지는 이전 검토에서 남은 사소한 정리 | PASS. 발견한 문제 없음, 수정한 파일 없음. 린트·타입·빌드(183페이지) 통과, 대비 실측값이 새 주석과 일치, sr-only 요약이 실제 강조 순서와 일치 |
 | 03 | 2026-10-17 | 상세 페이지 재설계(op.gg 스타일): 스킨 갤러리를 삭제하고 Hero 스플래시 자체를 화살표 전환 스킨 미리보기로 바꿈(`HeroSkinSwitcher` 신규, `ChampionHero`가 client로 전환), 룬 페이지를 가로 2단에서 세로 1단(핵심→사용률·승률→보조→파편)으로 재배치, 룬·스킬·소환사 주문·아이템 아이콘에 공용 호버·포커스·탭 툴팁 추가(`Tooltip` 신규), 스킬 격자를 레벨×Q/W/E/R 축 전환, 레이아웃을 룬 좌/주문·스킬 우 2단 + 아이템 전체 폭 분리로 변경 | 참고 사이트(op.gg)에 가까운 레이아웃으로 정보 밀도를 높이고, 룬·아이템 등 긴 이름을 아이콘만으로 보여줘도 설명을 바로 확인할 수 있게 하기 위해 | PASS with issues. 모바일 탭 첫 번째 터치에서 툴팁이 안 열리는 결함 1건 발견·수정(`Tooltip.tsx`, `onFocus`+`onClick` 경합). 린트·타입·빌드(183페이지, 백엔드 켬/끔 모두) 통과. Lighthouse `/champions` 96·2.78s·0(변동 거의 없음), `/champions/Aatrox` 94·3.15s·0(LCP +0.17s, D14 트레이드오프), 접근성 100 유지 |
 | 04 | 2026-10-17 | 룬·스킬 레이아웃 축 전환: 룬 페이지를 `lg`(1024px) 이상에서 핵심\|보조\|파편 가로 3단(`grid-cols-[2fr_1.5fr_1fr]`)으로 배치(그 미만은 변경 03의 세로 1단 유지, D21), 스킬 표를 레벨×Q/W/E/R에서 Q/W/E/R(4행)×레벨(11열)로 축 전환하고 좁은 화면에서 `overflow-x-auto` + 행 머리 `sticky`로 고정(D22), `PositionStatsPanel`의 `lg` 이상 그리드를 "룬 좌+주문·스킬 우 2단"에서 "룬(좌)+주문(우) 2단 → 스킬 표 전체 폭 1행 → 아이템 전체 폭"으로 재구성(D23, 사용자가 전체 폭으로 빼야 하는 건 룬이 아니라 11열로 넓어진 스킬 표라고 교정) | 룬 3블록을 세로로만 쌓으면 화면이 길어져 정보를 한눈에 보기 어렵고, 스킬 표가 레벨×스킬 축이면 "이 레벨에 뭘 찍었는지"보다 "이 스킬을 언제 찍었는지"가 와닿지 않는다는 사용자 피드백으로 축을 바꿨다. 축 전환 결과 스킬 표가 11열로 넓어져 기존 2단 레이아웃의 절반 폭에 들어가지 않아 전체 폭으로 뺐다 | PASS. 완료 기준 전 항목 충족, 발견한 결함 없음(수정한 파일 없음). `skillOrder` "QEWQQRQEQER"와 스킬 표 강조 칸을 레벨별로 직접 대조해 일치 확인, 룬 가로 3단이 아트록스·카밀(2개 포지션)에서 잘림·줄바꿈 없이 렌더링됨을 `getBoundingClientRect`로 확인. 린트·타입·빌드(183페이지, 백엔드 켬/끔 모두, 경고 0/7줄) 통과. Lighthouse `/champions` 96·2.78s·0, `/champions/Aatrox` 94·3.16s·0(변경 03 대비 변동 없음, CSS만 바뀐 변경이라 예상대로), 접근성 100 유지 |
+| 05 | 2026-10-17 | 아이템 전체 폭 카드를 없애고 소환사 주문 카드 안에 "소환사 주문"/"많이 완성한 아이템" 두 섹션으로 합침, `SkillOrder`를 Q/W/E/R×레벨 표에서 op.gg 스타일 가로 스킬 트랙(레벨 1~11, 칸마다 그 레벨 아이콘+레벨 숫자)으로 교체(2순위 한 줄 표기는 화면에서만 생략) | 레벨별로 "이 스킬을 언제 찍었는지"가 더 직관적인 가로 트랙이 표보다 op.gg에 가깝고, 아이템 카드가 비어 보이던 문제도 주문 카드로 합쳐 해소하기 위해 | 3장 기준(작은 CSS·레이아웃 변경)에 따라 Build 자체 검증으로 진행, 별도 Review 생략. 린트·타입·빌드(183페이지) 통과, `skillOrder` 레벨별 1:1 대조 확인, 360/768/1280px 확인(`front_build.md` 11장) |
+| 06 | 2026-10-27 | 전적 검색 MVP 신설: 헤더 전역 검색창("이름#태그") → `/summoners/kr/{riotId}` 동적 SSR(`force-dynamic`)로 프로필·랭크(솔로/자유)·최근 매치 20건(챔피언·KDA·CS·아이템·소환사 주문·키스톤+소속 트리·같은 팀/상대팀) 표시. `fetchApi`에 `cache: "no-store"` 옵션 추가(D36), 승/패 의미색(`--win`/`--lose`) 신설(D35) | 전적 검색이라는 새 화면을 추가해 로그인·AI 피드백 전 단계의 핵심 기능을 넓히기 위해. 집계 창이 없는 실시간 데이터라 기존 SSG+ISR 통계 화면과 렌더링 전략을 분리했다 | PASS with issues(낮음 2건, 코드 수정 없음). 완료 기준 전 항목 충족. D37(Riot 502/503을 `error.tsx` 대신 `page.tsx`가 직접 그림)·D38(`params.riotId` 수동 디코딩)을 운영 빌드로 직접 재현해 타당함을 확인. 린트·타입·빌드(183정적+동적 1개) 통과, 새 런타임 의존성 0, 기존 `fetchApi` 호출 캐시 동작 회귀 없음, 대비 수치(배경 6.82/6.12, 표면 6.16/5.53) 재계산 일치. 낮은 심각도 발견: 범위 밖 `mockup-current.html` 미정리, `front_build.md`가 이전에 이미 커밋된 챔피언 상세 UI 변경을 "변경 06"으로 잘못 표기(`front_review.md` 8장) |
 
 ---
 
@@ -407,3 +456,7 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 9. **오류 화면 두 개가 같은 코드다.** `app/error.tsx`와 `app/champions/error.tsx`의 내용이 같아 문구를 바꿀 때 두 곳을 고쳐야 한다. 정리 시 공통 컴포넌트로 묶을 수 있다.
 10. **`npm audit`가 high 5건을 보고한다.** `eslint-config-next` → `fast-glob` 등 개발용 의존성에서 나온다 (2026-10-16 확인). 템플릿 기본 의존성이라 조치하지 않았다. 의존성을 올릴 때 함께 본다.
 11. **상세 로딩 스켈레톤이 변경 04 레이아웃과 다른 비율이다.** `[championId]/loading.tsx`의 오른쪽 칸은 변경 03 이전처럼 주문+스킬 스켈레톤이 세로로 쌓인 모양이다. 실제로는 주문만 우측에 남고 스킬은 전체 폭으로 빠졌지만, 스켈레톤은 손대지 않았다. 로딩이 끝나면 바로 실제 레이아웃으로 바뀌어 CLS나 깨짐은 없다. 다음에 로딩 스켈레톤을 손볼 때 같이 맞춘다.
+12. **(변경 06) 전적 검색 "랭크 없음" 상태를 실제 계정으로 확인하지 못했다.** 테스트 계정(`너희는개다#KR1`)이 항상 랭크 2개를 갖고 있어, `leagues: []` 화면은 가짜 응답 서버로만 확인했다(Build·Review 공통). 기능은 코드로 정상 분기됨을 확인했으나 실제 Riot 데이터로 재확인은 못 했다.
+13. **(변경 06, 범위 밖) `frontend/mockup-current.html`이 커밋되지 않은 채 남아 있다.** 챔피언 상세 레이아웃의 정적 목업(371줄)으로 이번 전적 검색 변경과 무관한 내용이다. 다른 작업이 남긴 임시 파일로 보이며, 메인 에이전트가 용도를 확인해 정리해야 한다 (`front_review.md` 8장).
+14. **(변경 06, 문서 정정 필요) `front_build.md` 8장이 챔피언 상세 컴포넌트(`ChampionHero`·`PositionTabs`·`PositionStatsPanel`·`ChampionAbilities`·`ChampionLore`) 변경 일부를 "변경 06"으로 표기하지만, 실제로는 커밋 `8771301`(변경 05 커밋)에 이미 포함된 코드다.** 오늘 작업 트리 diff에는 해당 파일 변경이 없다. 기능에는 영향 없지만 변경 번호 라벨이 부정확해 다음에 "변경 06이 챔피언 상세도 건드렸다"고 오해할 수 있다. 메인 에이전트가 라벨을 바로잡는 것을 권장한다 (`front_review.md` 8장).
+15. **Next.js 보안 업그레이드 안내 (참고, 범위 밖).** `npm run build`가 "Your version of Next.js is affected by a known security vulnerability"로 한 번 멈추고 `next upgrade --agent=security`를 제안한다(재시도하면 경고만 남기고 빌드는 통과). 이번 변경 범위(새 의존성 금지, Next.js 버전 변경 없음)에서 처리할 일이 아니라 조치하지 않았다 — 메인 에이전트가 사용자와 별도로 업그레이드 여부를 논의하기로 함.

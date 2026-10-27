@@ -1,7 +1,7 @@
 # 프론트엔드 계획서 — Tier.GG 챔피언 화면
 
-> 상태: **현재 계획 (승인됨)**. v1(2026-10-12), 변경 01(2026-10-15), 변경 02·03·04·05(2026-10-17)를 합친 지금 사이트의 계획이다.
-> 기준 문서: `docs/contracts/api_contract.md` v2, `api.md`(Data Dragon), `CLAUDE.md` 6장(영역 문서 관리)·10장(프론트 흐름)
+> 상태: **현재 계획 (승인됨)**. v1(2026-10-12), 변경 01(2026-10-15), 변경 02·03·04·05(2026-10-17), 변경 06(2026-10-27)을 합친 지금 사이트의 계획이다.
+> 기준 문서: `docs/contracts/api_contract.md` v3, `api.md`(Data Dragon), `CLAUDE.md` 6장(영역 문서 관리)·10장(프론트 흐름)
 > 이전 계획 원문은 git 커밋 `87cfc78`에 있다. 새 변경은 이 문서 맨 아래 `## 이번 변경 (승인 대기)`에 임시로 적고, Build가 본문에 합친다.
 
 ## 목차
@@ -17,6 +17,7 @@
   - [5-4. 챔피언 상세](#5-4-챔피언-상세)
   - [5-5. 추천 빌드](#5-5-추천-빌드)
   - [5-6. 스킬 설명, 스킨, 스토리](#5-6-스킬-설명-스킨-스토리)
+  - [5-7. 전적 검색](#5-7-전적-검색)
 - [6. 데이터](#6-데이터)
 - [7. 상태 처리](#7-상태-처리)
 - [8. 환경 변수](#8-환경-변수)
@@ -33,15 +34,17 @@
 > **쉬운 요약**: 포지션별 챔피언 티어 표와 챔피언 상세(추천 빌드 + 스킬·스킨·스토리)를 만든다. 통계는 백엔드 API, 이름과 이미지는 Data Dragon에서 가져온다.
 
 ### 하는 것
-- 공통 레이아웃: 헤더(로고, 내비게이션), 본문, 푸터(공개 패치 이름, 라이엇 고지문)
+- 공통 레이아웃: 헤더(로고, 내비게이션, 전적 검색창), 본문, 푸터(공개 패치 이름, 라이엇 고지문)
 - 챔피언 티어 리스트: 포지션 탭 5개(탑·정글·미드·원딜·서폿), 티어 순 표, 이름 검색
 - 챔피언 상세: Hero(이름·칭호·역할군·난이도), 주 포지션 탭, 통계 요약, 추천 빌드(룬·소환사 주문·스킬 순서·아이템), 스킬 설명, 스킨, 스토리
-- 모든 통계 화면에 "최근 14일 · 게임 수 · 패치 구성 · 집계 시각 · 지연 여부" 표시
-- 로딩 / 빈 결과 / 통계 없음 / 집계 전 / API 연결 실패 / 없는 챔피언 상태 처리
+- 전적 검색(변경 06): "이름#태그" 검색 → 프로필·랭크·최근 매치 20건 (5-7)
+- 모든 통계 화면에 "최근 14일 · 게임 수 · 패치 구성 · 집계 시각 · 지연 여부" 표시 (전적 검색은 `window`가 없어 예외, 5-7)
+- 로딩 / 빈 결과 / 통계 없음 / 집계 전 / API 연결 실패 / 없는 챔피언 / 소환사 없음 / Riot 연결 실패 상태 처리
 - 모바일·데스크톱 반응형, 기본 접근성
 
 ### 하지 않는 것
-- 소환사(전적) 검색, 로그인, AI 피드백
+- 로그인, AI 피드백
+- 전적 검색의 챔피언별 통계·플레이스타일·숙련도 탭, 과거 매치 더보기, 매치 상세(타임라인·스킬 순서) (다음 단계)
 - 라이트 테마와 테마 토글 (다크 고정)
 - 다국어 전환 (`ko_KR` 고정)
 - 크로마 스킨 표시 (Data Dragon에 이미지가 없음)
@@ -94,8 +97,19 @@ frontend/
     │           ├── page.tsx              # 상세 (generateStaticParams, 1·2순위 통계)
     │           ├── loading.tsx           # 상세 스켈레톤
     │           └── not-found.tsx         # 없는 챔피언 안내
+    │   └── summoners/[region]/[riotId]/  # 전적 검색 (변경 06, force-dynamic)
+    │       ├── page.tsx                  # 프로필 + 랭크 + 매치 20건
+    │       ├── loading.tsx               # 스켈레톤
+    │       ├── not-found.tsx             # 소환사 없음/region 오류 (client, 검색창 재포커스)
+    │       └── error.tsx                 # 예상 밖 오류만 (client). Riot 502/503은 page.tsx가 직접 그림
     ├── components/
-    │   ├── layout/                       # Header, NavLink(client), Footer
+    │   ├── layout/                       # Header, NavLink(client), SummonerSearchForm(client, 변경 06), Footer
+    │   ├── summoners/                    # 전적 검색 화면 조각 (변경 06)
+    │   │   ├── ProfileHeader.tsx          # (server) 프로필 헤더 (재검색 폼 없음)
+    │   │   ├── RankList.tsx               # (server) 랭크 카드 세로 목록 / 랭크 없음
+    │   │   ├── MatchList.tsx, MatchRow.tsx # (server) 매치 20건 / 매치 1건
+    │   │   ├── SummonerStatus.tsx         # (server) Riot 연결 실패 등 안내
+    │   │   └── RetryButton.tsx            # (client) [다시 시도] 새로고침
     │   ├── stats/                        # WindowInfo, TierBadge, StatsNotice
     │   ├── champions/
     │       ├── TierListPage.tsx          # (server) 한 포지션 리스트 화면 조립
@@ -114,25 +128,26 @@ frontend/
     └── lib/
         ├── api/                          # 백엔드 API, 모든 파일 첫 줄 import "server-only"
         │   ├── config.ts                 # API_BASE_URL, 재검증 3600초, 시간 제한 10초
-        │   ├── types.ts                  # 계약 v2 응답·오류 타입
-        │   ├── client.ts                 # fetchApi<T>() → { ok, data } | { ok:false, kind }
-        │   ├── api.ts                    # getMeta, getTierList, getChampionStats, requireStats
+        │   ├── types.ts                  # 계약 v3 응답·오류 타입 (2-5 전적 검색 타입 포함, 변경 06)
+        │   ├── client.ts                 # fetchApi<T>(path, options?) → { ok, data } | { ok:false, kind }. options.cache: "no-store" (변경 06, D36)
+        │   ├── api.ts                    # getMeta, getTierList, getChampionStats, requireStats, getSummoner(변경 06)
         │   ├── positions.ts              # 포지션 순서, 한글 이름, URL 조각 ↔ API 값
         │   └── buildPhase.ts             # next build 중인지 판단
         ├── ddragon/
-        │   ├── constants.ts, types.ts, images.ts
+        │   ├── constants.ts, types.ts, images.ts            # images.ts에 profileIconUrl 추가(변경 06)
         │   ├── api.ts                    # 버전, 챔피언 목록·상세, key 표, 아이템·주문·룬 표
         │   ├── transform.ts              # 원본 → 화면용 챔피언 데이터
         │   ├── itemFilter.ts             # 아이템 거르기 규칙 (5-5)
         │   └── statShards.ts             # 능력치 파편 표
         └── view/
-            ├── format.ts                 # 퍼센트, 쉼표, KST 날짜, 패치 구성 글자
+            ├── format.ts                 # 퍼센트, 쉼표, KST 날짜, 패치 구성 글자, 상대 시각·경과 시간·KDA·분당 CS(변경 06)
             ├── tierList.ts               # API 행 → 표 행
-            └── builds.ts                 # 룬·주문·스킬·아이템 → 화면용 모델
+            ├── builds.ts                 # 룬·주문·스킬·아이템 → 화면용 모델
+            └── summoner.ts               # (변경 06) 전적 검색 응답 + Data Dragon → 화면용 모델 (랭크·매치·키스톤 평탄화)
 ```
 
 - 백엔드 호출(`fetch`)은 `lib/api/` 밖에 두지 않는다. Data Dragon 호출은 `lib/ddragon/` 밖에 두지 않는다.
-- 클라이언트 컴포넌트는 `TierTable`, `PositionTabs`, `RunePage`, `ChampionHero`, `HeroSkinSwitcher`, `Tooltip`, `NavLink`, `error.tsx` 2개다. 클라이언트로는 화면용 가공 데이터만 넘긴다 (원본 `item.json` 약 733KB를 넘기지 않는다).
+- 클라이언트 컴포넌트는 `TierTable`, `PositionTabs`, `RunePage`, `ChampionHero`, `HeroSkinSwitcher`, `Tooltip`, `NavLink`, `SummonerSearchForm`, `RetryButton`, `error.tsx` 3개, `summoners/.../not-found.tsx`다. 클라이언트로는 화면용 가공 데이터만 넘긴다 (원본 `item.json` 약 733KB를 넘기지 않는다).
 
 ---
 
@@ -146,6 +161,7 @@ frontend/
 | `/champions` (탑) | SSG + `revalidate = 3600` (○) | `/champions?position=TOP` 1번 + `/meta` |
 | `/champions/lane/[position]` | `generateStaticParams`(top 포함 5개) + `dynamicParams = false` + `revalidate = 3600` (●) | 포지션마다 1번 |
 | `/champions/[championId]` | 전 챔피언(현재 173개) SSG + `revalidate = 3600`, `dynamicParams` 기본값(true) | 챔피언마다 1~2번 (지금 173 + 89 = 262번) |
+| `/summoners/[region]/[riotId]` (변경 06) | 동적 SSR `dynamic = "force-dynamic"`, `fetchApi`에 `cache: "no-store"` | 요청마다 1번 (`window` 없음, 5-7) |
 | 푸터 | 각 페이지와 함께 렌더 | `/meta` (데이터 캐시로 공유) |
 
 ### 포지션 URL
@@ -169,10 +185,17 @@ frontend/
 - 메타데이터: `generateMetadata`로 "{한글 이름} - {칭호}". Data Dragon 실패 시 try/catch로 "챔피언"을 준다.
 - 상세 포지션 탭은 URL을 바꾸지 않는다. 두 포지션 내용을 모두 정적 HTML에 넣고 클라이언트에서 보이기만 바꾼다.
 
+### 전적 검색 URL (변경 06)
+- `/summoners/[region]/[riotId]`. `riotId` 세그먼트는 `gameName-tagLine`을 URL 인코딩해 그대로 쓴다(계약처럼 마지막 `-`에서 자름).
+- `region`은 `kr`만 유효, 그 외는 `notFound()` (계약이 `kr` 외엔 400이라 프론트가 미리 막는다).
+- **동적 라우트 `params`는 URL 인코딩된 그대로 온다 (디코딩되지 않음, Next 16.4 확인).** `page.tsx`가 `decodeURIComponent`로 직접 디코딩한 뒤 백엔드를 부른다 (디코딩 실패하면 원문 그대로 사용).
+- 헤더 전역 검색창(`SummonerSearchForm`, D28)이 "이름#태그" 입력을 받아 제출 시 `#`→`-`로 바꾸고 `router.push`로 이동한다. 형식이 잘못되면(= `#` 없음, 태그 형식 오류) 요청을 보내지 않고 입력창 아래 안내만 보여준다.
+
 ### 캐시
 | 대상 | 설정 |
 |------|------|
-| 백엔드 API | `fetch(url, { next: { revalidate: 3600 } })` (계약 4장 권장값, 백엔드 `max-age=600`보다 길다) |
+| 백엔드 API (통계 3개) | `fetch(url, { next: { revalidate: 3600 } })` (계약 4장 권장값, 백엔드 `max-age=600`보다 길다) |
+| 백엔드 API (전적 검색, 변경 06) | `fetch(url, { cache: "no-store" })` — 집계 창이 없는 실시간 값이라 캐시하지 않는다 (계약 2-5) |
 | Data Dragon `versions.json` | `revalidate: 3600` (새 패치 감지) |
 | 버전 포함 주소 (`champion.json`, `champion/{id}.json`, `item.json`, `summoner.json`, `runesReforged.json`) | `cache: 'force-cache'` (버전별로 내용 불변). 가장 큰 `item.json` 약 733KB로 데이터 캐시 한도 2MB 이내 |
 | 이미지 | `next/image` 최적화 |
@@ -335,6 +358,45 @@ Data Dragon에 파편 정보가 없어 프론트가 표로 갖는다.
   - 스킨이 1개뿐이면 화살표를 숨기고 이름만 보인다 (실제로는 모든 챔피언이 2개 이상).
 - **스토리**: `lore` 텍스트.
 
+### 5-7. 전적 검색 (변경 06)
+
+> **쉬운 요약**: 헤더 검색창에 "이름#태그"를 입력하면 `/summoners/kr/{riotId}`로 이동해 프로필·랭크·최근 매치 20건을 보여준다. 통계 화면과 달리 `window`가 없고 매번 그 자리에서 Riot 값을 받아온다.
+
+```
+[헤더: 로고] [챔피언] [🔍 이름#태그 검색      ]
+┌ 프로필 헤더 ─────────────────────────────┐
+│ [아이콘] 너희는개다 #KR1 · 레벨 312        │
+└──────────────────────────────────┘
+┌ 랭크(좌, 세로) ┐┌ 최근 매치 20건(우) ──────────────────────┐
+│ [솔로/듀오]    ││ [챔피언] 승 · 12분 전 · 28:45 · 7/3/5(4.0) · CS 182(6.4) │
+│ [자유랭크]     ││  [아이템×6][장신구] [주문×2][룬1개] [팀5][상대5]     │
+│               ││ … (19건 더)                                 │
+└───────────────┘└──────────────────────────────────────────┘
+```
+
+- `lg`(1024px) 이상: `grid-cols-[280px_1fr]` 2단(좌: 랭크 카드 세로, 우: 매치 목록만). `lg` 미만: 랭크 카드 → 매치 목록 순 1열.
+- **프로필 헤더에는 재검색 폼을 두지 않는다.** 헤더 전역 검색창(D28)과 기능이 겹쳐 뺐다(2026-10-27 사용자 교정).
+
+| 영역 | 보여줄 것 | Data Dragon 매핑 |
+|------|-----------|-------------------|
+| 프로필 헤더 | `profileIconId` 아이콘, `gameName`+`#`+`tagLine`, `summonerLevel`. 재검색 폼 없음 | `profileicon/{profileIconId}.png` (`profileIconUrl(version, id)`) |
+| 랭크 카드(좌, 세로) | `leagues[]` 각 항목: 큐 한글 이름(D33), 티어+단계("에메랄드 2", D34: 글자만), LP, 승-패, 승률(프론트 계산) | 없음 (글자만) |
+| 랭크 없음(언랭크) | "랭크 정보가 없습니다" 카드 1개 | — |
+| 매치 행(우) | 챔피언 아이콘(+포지션 라벨), 승/패 색(D35), 상대 시각("12분 전"), 게임 길이, K/D/A + KDA 비율, CS + 분당 CS, 아이템 6칸+장신구, 소환사 주문 2개, 키스톤 룬 아이콘 1개+소속 트리 아이콘(D32), 같은 팀/상대팀 챔피언 아이콘 각 5개(이름 없음, D31) | `championIconUrl`, `itemIconUrl`(`itemId: 0`은 빈 칸), `summonerSpellIconUrl`, 키스톤은 `getRuneTrees()`를 평탄화해 `id`로 찾음(보조 트리·파편 없음) |
+| 매치 빈 결과 | "최근 플레이한 게임이 없습니다" | — |
+| 공용 툴팁 | 아이템·주문·룬 아이콘에 기존 `common/Tooltip.tsx` 재사용 | — |
+
+#### API가 안 주는 것 (이번 범위에서 제외, UI에서 생략)
+
+- 래더 랭킹, 배너·칭호, 시즌별 랭크 이력, 플레이스타일(다음 단계)
+- **큐 라벨**(랭크/일반/칼바람 등 큐 종류 이름 — `individualPosition`만 있어 포지션은 보여도 큐 이름은 못 보여준다)
+- 아이템 구매 순서·타임스탬프, D/F 소환사 주문 위치, 룬 보조 트리·파편(키스톤 1개만)
+- 같은 팀/상대팀 소환사 이름 (puuid만), 타임라인·스킬 순서·매치 상세
+
+#### 결정 사항 (D28~D36, 11장에도 기록)
+
+- D28 검색 UI는 헤더 전역 검색창. D29 라우트는 `/summoners/[region]/[riotId]`(계약과 1:1). D30 매치 아이템은 거르지 않고 6칸+장신구 그대로. D31 같은 팀/상대팀은 챔피언 아이콘만(이름 없음). D32 키스톤은 룬 아이콘 + 소속 트리 아이콘을 겹쳐 보여준다. D33 큐는 알려진 2종만 한글화, 나머지는 원문 그대로. D34 랭크 엠블럼은 글자 배지만(이미지 없음). D35 승/패 의미색 신설(`--win`/`--lose`). D36 `fetchApi`에 캐시 옵션 파라미터를 추가해 기존 함수를 확장.
+
 ---
 
 ## 6. 데이터
@@ -352,6 +414,7 @@ Data Dragon에 파편 정보가 없어 프론트가 표로 갖는다.
 | 스퀘어 / 스킬 / 패시브 / 아이템 / 주문 이미지 | `/cdn/{v}/img/champion|spell|passive|item|spell/…` | next/image |
 | 스플래시 / 로딩 | `/cdn/img/champion/splash|loading/{id}_{num}.jpg` (버전 없음) | next/image |
 | 룬 / 파편 이미지 | `/cdn/img/{icon}`, `/cdn/img/perk-images/StatMods/…` (버전 없음) | next/image |
+| 프로필 아이콘 (변경 06) | `/cdn/{v}/img/profileicon/{profileIconId}.png` | next/image |
 
 - 기본 URL `https://ddragon.leagueoflegends.com`, 로케일 `ko_KR`.
 - 이름·이미지는 **최신 Data Dragon 버전**을 쓴다. 아이템을 못 찾을 때만 `window.patches`의 다른 패치 `{patch}.1`이 `versions.json`에 있는지 보고 한 번 더 찾는다 (계약 5장). `displayName`(26.20)으로 Data Dragon을 찾지 않는다.
@@ -361,19 +424,23 @@ Data Dragon에 파편 정보가 없어 프론트가 표로 갖는다.
 
 ### 6-2. 백엔드 API 클라이언트 (`lib/api/`)
 
-- 쓰는 엔드포인트: `GET /meta`, `GET /champions?position=`, `GET /champions/:key[?position=]` (계약 v2).
-- `types.ts`는 계약 v2 그대로다. 계약에 없는 필드는 쓰지 않고, 모르는 필드는 무시한다. `tier`는 `1|2|3|4|5|null`.
+- 쓰는 엔드포인트: `GET /meta`, `GET /champions?position=`, `GET /champions/:key[?position=]`, `GET /summoners/:region/:riotId`(변경 06) (계약 v3).
+- `types.ts`는 계약 그대로다. 계약에 없는 필드는 쓰지 않고, 모르는 필드는 무시한다. `tier`는 `1|2|3|4|5|null`.
+- `fetchApi<T>(path, options?)`: `options.cache`가 `"no-store"`면 캐시하지 않고 매번 새로 부른다(D36). 생략하면 기존 그대로 `revalidate: 3600`.
 - `fetchApi` 결과 분류 (시간 제한 10초)
 
 | `kind` | 언제 | 화면 |
 |--------|------|------|
 | `ok` | 2xx | 정상 |
 | `not_ready` | 503 `STATS_NOT_READY` | 집계 전 안내 (정상 상태로 캐시) |
-| `not_found` | 404 `STATS_NOT_FOUND` | 상세 "통계 없음" / 2순위 탭 제외 |
+| `not_found` | 404 `STATS_NOT_FOUND` / `SUMMONER_NOT_FOUND`(변경 06) | 상세 "통계 없음" / 2순위 탭 제외 / 소환사 404 |
 | `unavailable` | 연결 실패, 시간 초과, 503 `DB_UNAVAILABLE`, 500, JSON 아님, `API_BASE_URL` 없음 | 7장 "API가 응답하지 않을 때" |
 | `invalid` | 400 `INVALID_PARAMETER`, 404 `NOT_FOUND` | 프론트 버그로 보고 `unavailable`과 같게 처리 + 서버 로그에 `code` |
+| `riot_unavailable` (변경 06) | 502 `RIOT_UNAVAILABLE` | 5-7 상태 처리 |
+| `riot_key_expired` (변경 06) | 503 `RIOT_KEY_EXPIRED` | 5-7 상태 처리 |
 
 - 분기는 HTTP 상태와 `error.code`로만 한다 (`message`는 바뀔 수 있다). 로그에는 경로·상태·`code`만 남기고 기본 URL은 남기지 않는다.
+- `api.ts`의 `getSummoner(region, riotId)`는 `StatsState`가 아니라 별도 `SummonerState`를 쓴다 — 전적 검색은 `window`가 없어 `requireStats`(빌드 중 판단) 로직이 맞지 않는다.
 
 ### 6-3. 화면용 매핑 (`lib/view/`, `lib/ddragon/transform.ts`)
 
@@ -384,6 +451,13 @@ Data Dragon에 파편 정보가 없어 프론트가 표로 갖는다.
   - `formatCount` 천 단위 쉼표, `formatKst(iso) → "10월 15일 03:52"`, `formatPatchMix(patches)`.
 - `transform.ts`: 태그 한글 매핑(`Fighter 전사 / Tank 탱커 / Mage 마법사 / Assassin 암살자 / Marksman 원거리 / Support 서포터`, Hero 배지용), HTML 제거, 크로마 제외, `default` → "기본". `Object.hasOwn` + `id` 일치로 `__proto__` 같은 키와 대소문자 다른 id를 거른다.
 - 이름 규칙: 챔피언 Q/W/E/R은 코드에서 `skill`, 소환사 주문은 `summonerSpell`로 부른다 (Data Dragon 원본 필드 `spells`는 그대로).
+
+### 6-4. 전적 검색 매핑 (`lib/view/summoner.ts`, 변경 06)
+
+- `toLeagueView`: 큐 종류 한글화(D33, `RANKED_SOLO_5x5`→"솔로/듀오", `RANKED_FLEX_SR`→"자유랭크", 그 외 원문), 티어+단계 한글 글자(D34, 마스터 이상은 단계 없음), 승률은 `wins/(wins+losses)`를 프론트가 계산(`formatPercent` 재사용).
+- `toKeystoneMap(trees)`: `getRuneTrees()`를 평탄화해 `Map<perkId, {id, name, iconUrl, description, treeName, treeIconUrl}>`로 한 번만 만든다(D32). 0번 줄(핵심 룬 줄)만 모은다.
+- `toMatchView`: 상대 시각(`formatRelativeKo`, "12분 전"~"N일 전"~30일 넘으면 날짜), 게임 길이("26분 24초"), KDA(`formatKda`), 분당 CS(`formatCsPerMinute`), 아이템 6칸(`itemId: 0`은 `null`), 소환사 주문 2개, 키스톤, 같은 팀/상대팀 챔피언 아이콘(이름 없음, D31)으로 바꾼다.
+- 아이템·소환사 주문 조회는 기존 `getItems(ids, [])`·`getSummonerSpells()`를 그대로 재사용한다(전적 검색엔 `window.patches`가 없어 두 번째 인자는 빈 배열).
 
 ---
 
@@ -420,6 +494,25 @@ Data Dragon에 파편 정보가 없어 프론트가 표로 갖는다.
 - 한계: API 없이 빌드한 페이지는 첫 재검증(최대 1시간) 전까지 "연결 실패" 안내가 보인다. 운영 배포는 API를 켠 상태에서 빌드한다.
 - 이전 빌드의 API 응답은 `.next/cache/fetch-cache`에 최대 1시간 남는다. API 없는 빌드를 일부러 확인하려면 이 폴더를 지우고 빌드한다.
 
+### 전적 검색 상태 처리 (변경 06)
+
+> **쉬운 요약**: 통계 화면(위 표)과 분기가 다르다. 매번 새로 부르므로 ISR 직전 페이지 유지 로직이 없고, Riot 오류 2종이 따로 있다.
+
+| 상황 | 화면 |
+|------|------|
+| 로딩 | `summoners/[region]/[riotId]/loading.tsx` 스켈레톤(프로필·랭크·매치 20행 모양) |
+| `404 SUMMONER_NOT_FOUND` / `region != kr` | `not-found.tsx`: "이름#태그를 확인해 주세요." + 헤더 검색창(`#riotid-search`) 다시 포커스 |
+| `502 RIOT_UNAVAILABLE` | `page.tsx`가 직접 "라이엇 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요." + [다시 시도] 렌더 |
+| `503 RIOT_KEY_EXPIRED` | `page.tsx`가 직접 "지금은 전적을 불러올 수 없습니다. 잠시 후 다시 시도해 주세요." 렌더(버튼 없음, 개발 단계 24시간 키 안내는 화면에 안 씀) |
+| 백엔드 자체 연결 실패(`unavailable`) | `page.tsx`가 직접 "서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요." + [다시 시도] 렌더 |
+| `leagues: []` | 랭크 영역 "랭크 정보가 없습니다" |
+| `matches: []` | 매치 영역 "최근 플레이한 게임이 없습니다" |
+| 매치 일부 항목 ID를 못 찾음(아이템·룬 등) | 그 칸만 회색 빈 칸/"알 수 없는 …", 페이지는 정상 |
+| 검색창 빈 입력·형식 오류(`#` 없음 등) | 제출 막고 입력창 아래 "이름#태그 형식으로 입력해 주세요" (서버 요청 안 보냄) |
+| 예상 밖 오류(Data Dragon 실패 등) | `error.tsx`(client, [다시 시도]+[챔피언 목록으로]) |
+
+- **Riot 502/503·백엔드 연결 실패는 오류를 던지지 않고 `page.tsx`가 `SummonerStatus` 컴포넌트로 직접 그린다.** 처음에는 `Error.message`에 상태 코드를 담아 던지고 `error.tsx`에서 문구를 고르는 방식을 시도했으나, **production 빌드에서 Next가 서버 컴포넌트가 던진 오류의 `message`를 클라이언트로 보내지 않고 가린다**(보안 동작)는 것을 직접 확인해 설계를 바꿨다. `error.tsx`는 이제 Data Dragon 실패 같은 예상 밖 오류만 잡는다.
+
 ---
 
 ## 8. 환경 변수
@@ -453,19 +546,21 @@ Data Dragon에 파편 정보가 없어 프론트가 표로 갖는다.
 | 스킬 트랙 | 칸 `size-6`(24px), 11칸 폭이 넘치면 트랙 전체 `overflow-x-auto` | 칸 `size-8`(32px) | ← | ← |
 | 룬 페이지 | 핵심→보조→파편 세로 1단 | ← | ← | 핵심\|보조\|파편 가로 3단 |
 | 스킨 격자 | 3열 | 4열 | 5열 | 6열 |
+| 헤더 검색창 (변경 06) | 로고·메뉴와 한 줄, `min-w-0`+`max-w-xs`로 줄어듦 | ← | ← | ← |
+| 전적 검색 (변경 06) | 1열: 랭크 카드 → 매치 목록(행 안 요소는 `flex-wrap`) | 1열 | 1열 | `grid-cols-[280px_1fr]` 2단(좌 랭크, 우 매치) |
 
 - 최소 지원 폭 360px, 페이지 가로 스크롤 없음.
 - 이미지는 `next/image` + `sizes` + 고정 비율·고정 크기 칸으로 CLS 0을 지킨다. 작은 아이콘은 `sizes`를 고정 px로.
 
 ### 접근성
 - `<html lang="ko">`, 페이지당 `h1` 1개, 제목 단계를 건너뛰지 않는다.
-- 이미지 `alt`: 챔피언 아이콘 = 이름, 스킬 = 스킬 이름, 스킨 = 스킨 이름, 아이템·주문·룬 = 이름, Hero 배경·고르지 않은 룬 = `alt=""`(룬은 `aria-hidden`도). 룬 영역 앞에 sr 요약 "핵심 룬(정밀): …".
-- 티어 배지는 글자("2티어", "표본 부족")를 항상 포함한다. 색은 보조.
-- 표: `<caption>`(sr-only, 예: "탑 챔피언 티어 표"), `th scope`. 스킬 트랙은 표가 아니라 `<ol aria-label="스킬 찍는 순서 1~11레벨">`이고, 칸마다 "N레벨: 스킬 이름" sr 텍스트를 넣는다(D25).
-- 검색 입력에 `<label>`(sr-only), 결과 개수 `aria-live="polite"`.
+- 이미지 `alt`: 챔피언 아이콘 = 이름, 스킬 = 스킬 이름, 스킨 = 스킨 이름, 아이템·주문·룬 = 이름, Hero 배경·고르지 않은 룬 = `alt=""`(룬은 `aria-hidden`도). 룬 영역 앞에 sr 요약 "핵심 룬(정밀): …". 전적 검색 매치의 같은 팀/상대팀 아이콘은 챔피언 이름 `alt`(D31), 빈 아이템 칸은 `aria-hidden`.
+- 티어 배지는 글자("2티어", "표본 부족")를 항상 포함한다. 색은 보조. 승/패도 글자("승리"/"패배")가 색과 함께 항상 보인다(변경 06, D35).
+- 표: `<caption>`(sr-only, 예: "탑 챔피언 티어 표"), `th scope`. 스킬 트랙은 표가 아니라 `<ol aria-label="스킬 찍는 순서 1~11레벨">`이고, 칸마다 "N레벨: 스킬 이름" sr 텍스트를 넣는다(D25). 매치 목록도 `<ol aria-label="최근 매치 목록">`(변경 06).
+- 검색 입력에 `<label>`(sr-only), 결과 개수 `aria-live="polite"`. 헤더 전적 검색창도 `<label>`(sr-only) + 형식 오류 시 `role="alert"` 안내(변경 06).
 - 리스트 탭 `nav` + `aria-current="page"`, 상세 탭 ARIA 탭 패턴, 룬·스킨 버튼 `aria-pressed`, 지연·연결 실패 안내 `role="status"`.
 - 모든 상호작용 요소는 네이티브 `a`/`button`/`input`, 공통 `focus-visible` 골드 2px 링.
-- 텍스트 대비 4.5:1 이상 (티어 배지 5색 포함). "본문으로 건너뛰기" 링크.
+- 텍스트 대비 4.5:1 이상 (티어 배지 5색 포함, 변경 06의 `--win`/`--lose`도 배경·표면 모두 4.5:1 이상 실측). "본문으로 건너뛰기" 링크.
 
 ---
 
@@ -523,6 +618,16 @@ Data Dragon에 파편 정보가 없어 프론트가 표로 갖는다.
   - 비교 기준값(변경 01 Review): `/champions` 성능 96 · LCP 2.77s · CLS 0, `/champions/Aatrox` 95 · 2.98s · 0. LCP 요소 이름도 함께 적는다
 - [ ] LCP 이미지 `fetchpriority="high"`, CLS 0, Lighthouse 접근성 100 유지
 
+### 전적 검색 (변경 06)
+- [ ] 헤더 검색창에 `너희는개다#KR1` 입력 → `/summoners/kr/너희는개다-KR1` 이동 → 프로필(아이콘·레벨·이름#태그), 랭크 카드(솔로/자유, LP·승패·승률), 매치 20건이 API 응답과 일치
+- [ ] 랭크 없음(`leagues: []`), 매치 없음(`matches: []`) 문구 확인
+- [ ] 존재하지 않는 `이상한이름#0000` 검색 시 404 안내 + 검색창 재포커스
+- [ ] `region=na` 등 잘못된 경로는 404
+- [ ] scratchpad 가짜 응답 서버로 `RIOT_UNAVAILABLE`(502)·`RIOT_KEY_EXPIRED`(503) 화면 확인
+- [ ] 아이템 빈 칸(`itemId: 0`), 참가자 챔피언 10명 아이콘, 키스톤 룬 아이콘+트리 아이콘 표시 확인
+- [ ] 360/768/1024px 가로 스크롤 없음, 키보드로 검색·결과 탐색 가능, 대비 4.5:1(신설 승/패 색 포함)
+- [ ] 린트·타입 검사·빌드 통과, 새 의존성 없음, `fetchApi` 기존 호출(통계 화면)의 캐시 동작 변화 없음(회귀 확인)
+
 ---
 
 ## 11. 결정 사항
@@ -573,6 +678,17 @@ Data Dragon에 파편 정보가 없어 프론트가 표로 갖는다.
 | D25 | 스킬 순서는 Q/W/E/R×레벨 표 대신 레벨 1~11을 가로 한 줄로 나열한 "스킬 트랙"(op.gg 스타일)으로 바꾼다. 표 마크업(`<table>`) 대신 `<ol aria-label="스킬 찍는 순서 1~11레벨">` + 칸마다 "N레벨: 스킬 이름" sr 텍스트를 쓴다. 칸 크기는 `size-6`(24px, `sm` 이상 `size-8`)로 D16보다 줄이고, 트랙 전체를 `overflow-x-auto`로 감싸 안 맞으면 그 안에서만 스크롤한다(변경 05 결정 2·5) | op.gg 챔피언 상세의 대표적인 스킬 순서 UI 모양이다. 레벨 수(11)가 고정값이라 칸을 줄이는 쪽이 표보다 "이 레벨에 뭘 찍었는지"를 더 직접적으로 보여준다. 표가 아니므로 `th scope`/`caption` 대신 목록 구조 + sr 텍스트로 접근성을 대체했다 | 2026-10-17 |
 | D26 | 2순위 스킬 데이터(`skills.builds[1]`)는 `lib/view/builds.ts`에서 계속 받아오지만 `SkillOrder.tsx`는 `set.builds[0]`만 읽고 화면에 쓰지 않는다(변경 05 결정 3) | API 계약과 뷰 변환 함수를 그대로 둬도 손해가 없고, 나중에 "2순위도 보기" 기능을 다시 넣을 때 변환 로직을 다시 짤 필요가 없다 | 2026-10-17 |
 | D27 | 스킬 트랙은 `PositionStatsPanel`의 2단 그리드 **밖**, 그리드 바로 아래 전체 폭 `BuildCard`로 그대로 둔다 (그리드 안으로 옮기지 않음)(변경 05 결정 4) | 그리드 안에 넣으면 셀이 늘어나 D23에서 이미 정리한 "스킬은 폭이 넓어 전체 폭이 필요하다"는 이유가 다시 생긴다. 지금 구조에서도 스킬이 이미 2단 카드 바로 아래에 있어 "2단 카드 영역 하단"이라는 요구를 만족한다 | 2026-10-17 |
+| D28 | 전적 검색 UI는 헤더 전역 검색창(`SummonerSearchForm`) | 모든 페이지에서 검색 가능해야 자연스럽고, 다른 화면에서도 재사용된다 | 2026-10-27 |
+| D29 | 전적 검색 라우트는 `/summoners/[region]/[riotId]` (계약과 1:1) | 나중에 다른 서버를 지원할 때 라우트를 안 바꿔도 된다. 지금은 `kr` 외 값을 `notFound()`로 막는다 | 2026-10-27 |
+| D30 | 매치 아이템은 거르지 않고 6칸+장신구 그대로 표시(상세 페이지의 "코어 빌드" 거르기 규칙 미적용) | "그 게임에 실제로 들고 있던 아이템"이라 통계용 코어 빌드 개념과 다르다 | 2026-10-27 |
+| D31 | 매치의 같은 팀/상대팀 참가자는 챔피언 아이콘만(이름 없음) | API가 `puuid`만 줘 사람이 읽을 이름이 없다 | 2026-10-27 |
+| D32 | 키스톤 룬에 소속 트리 아이콘도 작게 겹쳐 보여준다 (`getRuneTrees()` 평탄화) | 트리 id도 함께 얻을 수 있어 추가 비용이 거의 없다 | 2026-10-27 |
+| D33 | 큐 종류는 `RANKED_SOLO_5x5`→"솔로/듀오", `RANKED_FLEX_SR`→"자유랭크"만 한글화, 그 외는 원문 그대로 | 계약상 다른 큐 타입이 나올 수 있어 원문을 보여주면 정보가 사라지지 않는다 | 2026-10-27 |
+| D34 | 랭크 엠블럼(티어 아이콘)은 글자 배지만, 정식 이미지는 쓰지 않는다 | Data Dragon에 없고 별도 CDN·라이선스 확인이 필요해 "추가 의존성 없음" 원칙에 맞지 않는다 | 2026-10-27 |
+| D35 | 승/패 의미색 `--win`(`#5a9bff`)·`--lose`(`#f16565`) 신설, 배경·표면 대비 모두 4.5:1 이상 실측(배경 6.82·6.12 / 표면 6.16·5.53) | 지금 색 토큰엔 티어 5색만 있어 승/패를 색만으로 구분할 토큰이 없었다. D35안의 예시값이 실측에서 바로 통과해 별도 조정 없이 그대로 썼다 | 2026-10-27 |
+| D36 | `fetchApi`에 `options.cache?: "no-store"` 파라미터를 추가해 기존 함수를 확장(전용 함수를 새로 만들지 않음) | 기존 호출은 옵션을 생략하면 그대로 `revalidate: 3600`을 쓰게 해 중복 코드를 피한다 | 2026-10-27 |
+| D37 | 전적 검색의 Riot 502/503·백엔드 연결 실패는 `error.tsx`로 던지지 않고 `page.tsx`가 `SummonerStatus`로 직접 그린다 (계획과 다른 점, 당초엔 `Error.message`에 코드를 담아 `error.tsx`가 구분하는 설계였음) | production 빌드로 직접 확인한 결과, Next가 서버 컴포넌트에서 던진 오류의 `message`를 클라이언트로 보내지 않고 가린다(보안 동작). 그래서 `error.tsx`에서는 502/503/연결 실패를 구분할 수 없어, 예상된 상태는 페이지가 직접 분기해서 그리고 `error.tsx`는 예상 밖 오류(Data Dragon 실패 등)만 잡도록 바꿨다 | 2026-10-27 |
+| D38 | 동적 라우트 `params`(`riotId`)는 Next 16.4에서 URL 인코딩된 그대로 오고 자동 디코딩되지 않는다는 것을 직접 확인해, `page.tsx`가 `decodeURIComponent`로 한 번 디코딩한 뒤 백엔드를 부른다 | 처음엔 자동 디코딩을 가정해 이미 인코딩된 문자열을 다시 `encodeURIComponent`로 이중 인코딩하는 버그가 있었다(검색 결과가 항상 404). 브라우저로 직접 재현·확인 후 고쳤다 | 2026-10-27 |
 
 ---
 
@@ -605,3 +721,4 @@ Data Dragon에 파편 정보가 없어 프론트가 표로 갖는다.
 - 상태 확인용 가짜 응답 서버와 복사본은 scratchpad에서만 만든다.
 - `.env` 값은 읽기만 하고 문서·로그·응답에 쓰지 않는다. `.env`에 값을 넣는 일은 사용자에게 요청한다.
 - 계약을 바꿔야 하면 직접 고치지 않고 이 문서 12장에 적어 메인 에이전트에게 보고한다.
+

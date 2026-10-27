@@ -1,0 +1,260 @@
+import "server-only";
+import type {
+  League,
+  MatchParticipant,
+  MatchSummary,
+  SummonerResponse,
+} from "@/lib/api/types";
+import { profileIconUrl } from "@/lib/ddragon/images";
+import type { ChampionSummary, IconInfo, ItemInfo, RuneTreeInfo } from "@/lib/ddragon/types";
+import { formatCsPerMinute, formatDuration, formatKda, formatPercent, formatRelativeKo } from "./format";
+
+/* ───────── 랭크 (D33, D34) ───────── */
+
+const QUEUE_LABELS: Record<string, string> = {
+  RANKED_SOLO_5x5: "솔로/듀오",
+  RANKED_FLEX_SR: "자유랭크",
+};
+
+/** 모르는 큐는 원문 그대로 (D33 (a)) */
+function queueLabel(queueType: string): string {
+  return QUEUE_LABELS[queueType] ?? queueType;
+}
+
+const TIER_LABELS: Record<string, string> = {
+  IRON: "아이언",
+  BRONZE: "브론즈",
+  SILVER: "실버",
+  GOLD: "골드",
+  PLATINUM: "플래티넘",
+  EMERALD: "에메랄드",
+  DIAMOND: "다이아몬드",
+  MASTER: "마스터",
+  GRANDMASTER: "그랜드마스터",
+  CHALLENGER: "챌린저",
+};
+
+const RANK_LABELS: Record<string, string> = { I: "1", II: "2", III: "3", IV: "4" };
+
+/** 상위 4티어(마스터+)는 랭크(단계)가 없다 */
+const RANKLESS_TIERS = new Set(["MASTER", "GRANDMASTER", "CHALLENGER"]);
+
+/** "에메랄드 2" (D34: 글자 배지만) */
+function tierLabel(league: League): string {
+  const tier = TIER_LABELS[league.tier] ?? league.tier;
+  if (RANKLESS_TIERS.has(league.tier)) return tier;
+  const rank = RANK_LABELS[league.rank] ?? league.rank;
+  return `${tier} ${rank}`;
+}
+
+export type LeagueView = {
+  queueLabel: string;
+  tierLabel: string;
+  leaguePoints: number;
+  wins: number;
+  losses: number;
+  winRate: string;
+};
+
+function toLeagueView(league: League): LeagueView {
+  const total = league.wins + league.losses;
+  const winRate = total > 0 ? formatPercent((league.wins / total) * 100) : "0.0%";
+  return {
+    queueLabel: queueLabel(league.queueType),
+    tierLabel: tierLabel(league),
+    leaguePoints: league.leaguePoints,
+    wins: league.wins,
+    losses: league.losses,
+    winRate,
+  };
+}
+
+/* ───────── 프로필 ───────── */
+
+export type SummonerProfileView = {
+  gameName: string;
+  tagLine: string;
+  level: number;
+  iconUrl: string;
+};
+
+/* ───────── 아이템·주문·룬 조회표 ───────── */
+
+export type SlotView = {
+  id: number;
+  name: string;
+  iconUrl?: string;
+  description?: string;
+} | null;
+
+function toSlotView(itemId: number, items: Map<number, ItemInfo>): SlotView {
+  if (itemId === 0) return null;
+  const info = items.get(itemId);
+  return {
+    id: itemId,
+    name: info?.name ?? `알 수 없는 아이템 #${itemId}`,
+    iconUrl: info?.iconUrl,
+    description: info?.description,
+  };
+}
+
+function toSpellView(spellId: number, spells: Map<string, IconInfo>) {
+  const info = spells.get(String(spellId));
+  return {
+    id: spellId,
+    name: info?.name ?? `알 수 없는 주문 #${spellId}`,
+    iconUrl: info?.iconUrl,
+    description: info?.description,
+  };
+}
+
+export type KeystoneView = {
+  id: number;
+  name: string;
+  iconUrl?: string;
+  description?: string;
+  treeName?: string;
+  treeIconUrl?: string;
+};
+
+/** 핵심 룬 id → 룬 정보 + 소속 트리(D32). `getRuneTrees()`를 평탄화해 한 번만 만든다 */
+export type KeystoneMap = Map<number, KeystoneView>;
+
+export function toKeystoneMap(trees: RuneTreeInfo[]): KeystoneMap {
+  const map: KeystoneMap = new Map();
+  for (const tree of trees) {
+    // 0번 줄 = 핵심 룬 줄
+    for (const rune of tree.rows[0] ?? []) {
+      map.set(rune.id, {
+        id: rune.id,
+        name: rune.name,
+        iconUrl: rune.iconUrl,
+        description: rune.description,
+        treeName: tree.name,
+        treeIconUrl: tree.iconUrl,
+      });
+    }
+  }
+  return map;
+}
+
+function toKeystoneView(perkId: number, keystones: KeystoneMap): KeystoneView {
+  return (
+    keystones.get(perkId) ?? {
+      id: perkId,
+      name: `알 수 없는 룬 #${perkId}`,
+    }
+  );
+}
+
+export type ChampionIconView = {
+  championId: number;
+  name: string;
+  iconUrl?: string;
+};
+
+function toChampionIconView(
+  championId: number,
+  champions: Map<string, ChampionSummary>,
+): ChampionIconView {
+  const info = champions.get(String(championId));
+  return {
+    championId,
+    name: info?.name ?? `챔피언 #${championId}`,
+    iconUrl: info?.iconUrl,
+  };
+}
+
+function toParticipantView(
+  participant: MatchParticipant,
+  champions: Map<string, ChampionSummary>,
+): ChampionIconView {
+  return toChampionIconView(participant.championId, champions);
+}
+
+/* ───────── 매치 ───────── */
+
+export type MatchView = {
+  matchId: string;
+  win: boolean;
+  champion: ChampionIconView;
+  /** POSITION_LABELS에 없는 값(빈 문자열 등)은 undefined */
+  positionLabel?: string;
+  relativeTime: string;
+  duration: string;
+  kills: number;
+  deaths: number;
+  assists: number;
+  kda: string;
+  cs: number;
+  csPerMinute: string;
+  items: SlotView[];
+  trinket: SlotView;
+  summonerSpells: ReturnType<typeof toSpellView>[];
+  keystone: KeystoneView;
+  team: ChampionIconView[];
+  enemy: ChampionIconView[];
+};
+
+type MatchContext = {
+  champions: Map<string, ChampionSummary>;
+  items: Map<number, ItemInfo>;
+  spells: Map<string, IconInfo>;
+  keystones: KeystoneMap;
+};
+
+const POSITION_KO: Record<string, string> = {
+  TOP: "탑",
+  JUNGLE: "정글",
+  MIDDLE: "미드",
+  BOTTOM: "원딜",
+  UTILITY: "서폿",
+};
+
+function toMatchView(match: MatchSummary, ctx: MatchContext): MatchView {
+  return {
+    matchId: match.matchId,
+    win: match.win,
+    champion: toChampionIconView(match.championId, ctx.champions),
+    positionLabel: POSITION_KO[match.individualPosition],
+    relativeTime: formatRelativeKo(match.gameStartAt),
+    duration: formatDuration(match.gameDurationSec),
+    kills: match.kills,
+    deaths: match.deaths,
+    assists: match.assists,
+    kda: formatKda(match.kills, match.deaths, match.assists),
+    cs: match.cs,
+    csPerMinute: formatCsPerMinute(match.cs, match.gameDurationSec),
+    items: match.items.map((itemId) => toSlotView(itemId, ctx.items)),
+    trinket: toSlotView(match.trinket, ctx.items),
+    summonerSpells: match.summonerSpells.map((id) => toSpellView(id, ctx.spells)),
+    keystone: toKeystoneView(match.keystone, ctx.keystones),
+    team: match.participants.team.map((p) => toParticipantView(p, ctx.champions)),
+    enemy: match.participants.enemy.map((p) => toParticipantView(p, ctx.champions)),
+  };
+}
+
+/* ───────── 전체 화면용 데이터 ───────── */
+
+export type SummonerPageView = {
+  profile: SummonerProfileView;
+  leagues: LeagueView[];
+  matches: MatchView[];
+};
+
+export function toSummonerPageView(
+  response: SummonerResponse,
+  version: string,
+  ctx: MatchContext,
+): SummonerPageView {
+  return {
+    profile: {
+      gameName: response.summoner.gameName,
+      tagLine: response.summoner.tagLine,
+      level: response.summoner.summonerLevel,
+      iconUrl: profileIconUrl(version, response.summoner.profileIconId),
+    },
+    leagues: response.leagues.map(toLeagueView),
+    matches: response.matches.map((match) => toMatchView(match, ctx)),
+  };
+}

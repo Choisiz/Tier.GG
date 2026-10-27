@@ -1,6 +1,6 @@
 # 프론트엔드 구현 상태 — Tier.GG 챔피언 화면
 
-> 기준: `front_spec.md` (현재 계획), `docs/contracts/api_contract.md` v2. 코드 상태: 변경 05 Build 반영 후 (2026-10-17).
+> 기준: `front_spec.md` (현재 계획), `docs/contracts/api_contract.md` v3. 코드 상태: 변경 06 Build 반영 후 (2026-10-27).
 > 이 문서는 **지금 구현 상태**만 적는다. 이전 시도와 과정 기록은 git 커밋 `87cfc78`에 있다.
 > 상태 표기: ✅ 완료 / ⚠️ 부분 완료 / ❌ 실패 / ⏸️ 보류
 
@@ -19,6 +19,7 @@
 - [11. 최신 검증 결과](#11-최신-검증-결과)
 - [12. 실행 방법](#12-실행-방법)
 - [13. 남은 문제](#13-남은-문제)
+- [14. 전적 검색 (변경 06)](#14-전적-검색-변경-06)
 
 ---
 
@@ -304,5 +305,66 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 | 룬 1·2순위 중복 | 71/173명이 같은 조합(보조 룬 순서만 다름). 백엔드 집계 쪽에서 고칠 일 | ⏸️ |
 | `npm audit` | high 5건 (`eslint-config-next` → `fast-glob` 등 개발 의존성, 2026-10-16 확인). 조치하지 않음 | ⏸️ |
 | **(범위 밖, 메인 에이전트 보고)** `ChampionAbilities.tsx`(스킬/패시브 설명 카드) `<ul class="flex space-x-3">`에 줄바꿈이 없어 360px에서 그 섹션까지 스크롤하면 페이지 전체 가로 스크롤이 생김(`scrollWidth` 360→779). 변경 05(`PositionStatsPanel.tsx`·`SkillOrder.tsx`만 수정)가 만든 문제가 아니며, 세션 시작 시점 `git status`에 `ChampionAbilities.tsx`가 이미 수정(M) 상태였다 — 다른 작업이 진행 중인 것으로 보인다. 변경 05 작업 범위 밖이라 고치지 않았다 | ⚠️ 미보고 발견 |
+| **(메인 에이전트 보고, 변경 06)** `npm run build`가 "Your version of Next.js is affected by a known security vulnerability"라며 한 번 멈추고, `next upgrade --agent=security`로 별도 Git worktree에서 업그레이드를 실행할지 사용자에게 물어보라고 안내한다(재시도하면 경고만 남기고 빌드는 계속 진행됨). 이번 변경 범위(새 의존성 금지, Next.js 버전 변경 없음)에서 처리할 일이 아니라 조치하지 않았다. 다음 의존성 점검 때 함께 본다 | ⚠️ 미보고 발견 |
+| 전적 검색 랭크 없음(`leagues: []`) 상태 | 테스트 계정(`너희는개다#KR1`)이 항상 랭크 2개를 갖고 있어 실제 계정으로는 못 봤다. scratchpad 가짜 응답 서버(`leagues: []`)로 "랭크 정보가 없습니다" 카드를 확인했다(14장) | ✅ (가짜 데이터로 확인) |
 
 변경 02에서 해결: `CHAMPION_TAGS` 삭제, `TierBadge` 대비 주석 수정, `layout.tsx` description 갱신.
+
+---
+
+## 14. 전적 검색 (변경 06)
+
+> 기준: `front_spec.md` 5-7·11장 D28~D38, `docs/contracts/api_contract.md` v3 2-5. "이름#태그" 검색 → 프로필·랭크·최근 매치 20건.
+
+### 14-1. 신규/수정 파일
+
+| 파일 | 변경 내용 | 상태 |
+|------|-----------|------|
+| `src/lib/api/client.ts` | `fetchApi<T>(path, options?)`로 확장, `options.cache === "no-store"`면 `revalidate` 대신 `cache: "no-store"`. `classifyError`에 `SUMMONER_NOT_FOUND`(404)→`not_found`, `RIOT_UNAVAILABLE`(502)→`riot_unavailable`, `RIOT_KEY_EXPIRED`(503)→`riot_key_expired` 추가 | ✅ |
+| `src/lib/api/types.ts` | 계약 2-5 타입(`SummonerProfile`, `League`, `MatchParticipant`, `MatchSummary`, `SummonerResponse`) 추가 | ✅ |
+| `src/lib/api/api.ts` | `SummonerState`, `getSummoner(region, riotId)` 추가 (`StatsState`와 분리 — `window`가 없어 `requireStats`/빌드 중 판단이 맞지 않음) | ✅ |
+| `src/lib/ddragon/images.ts` | `profileIconUrl(version, profileIconId)` 추가 | ✅ |
+| `src/lib/view/summoner.ts` (신규) | 큐 한글화(D33), 티어+단계 글자(D34), 승률 계산, `toKeystoneMap`(룬 트리 평탄화, D32), 상대 시각·게임 길이·KDA·분당 CS, 아이템/주문/키스톤/참가자 뷰 변환 | ✅ |
+| `src/lib/view/format.ts` | `formatRelativeKo`(상대 시각), `formatDuration`, `formatKda`, `formatCsPerMinute` 추가 | ✅ |
+| `src/app/globals.css` | `--win`(`#5a9bff`)·`--lose`(`#f16565`) 토큰 + `@theme inline` 등록 (D35) | ✅ |
+| `src/components/layout/SummonerSearchForm.tsx` (신규, client) | 헤더 전역 검색 폼. "이름#태그" 파싱(`parseRiotIdInput`), 형식 오류 시 서버 요청 없이 안내, `router.push("/summoners/kr/{riotId}")` | ✅ |
+| `src/components/layout/Header.tsx` | `SummonerSearchForm` 추가, 로고·nav에 `shrink-0` 적용해 좁은 화면에서 검색창이 줄어들게 함 | ✅ |
+| `src/components/summoners/ProfileHeader.tsx` (신규) | 프로필 아이콘·이름#태그·레벨. 재검색 폼 없음(2026-10-27 사용자 교정) | ✅ |
+| `src/components/summoners/RankList.tsx` (신규) | 랭크 카드 세로 목록 / 빈 상태 "랭크 정보가 없습니다" | ✅ |
+| `src/components/summoners/MatchList.tsx`, `MatchRow.tsx` (신규) | 매치 20건 목록 / 매치 1건(챔피언·시간·KDA·CS·주문·키스톤·아이템·참가자). 아이템·주문·키스톤 아이콘에 기존 `Tooltip` 재사용 | ✅ |
+| `src/components/summoners/SummonerStatus.tsx`, `RetryButton.tsx` (신규) | Riot 502/503·백엔드 연결 실패 안내(서버) + [다시 시도] 새로고침 버튼(client) | ✅ |
+| `src/app/summoners/[region]/[riotId]/page.tsx` (신규) | `dynamic = "force-dynamic"`, `region !== "kr"` → `notFound()`, `riotId` 디코딩(D38), 상태별 분기(404/Riot 오류/정상), Data Dragon 병렬 호출 | ✅ |
+| `src/app/summoners/[region]/[riotId]/loading.tsx` (신규) | 프로필·랭크·매치 스켈레톤 | ✅ |
+| `src/app/summoners/[region]/[riotId]/not-found.tsx` (신규, client) | "소환사를 찾을 수 없습니다" + 헤더 검색창(`#riotid-search`) 재포커스 | ✅ |
+| `src/app/summoners/[region]/[riotId]/error.tsx` (신규, client) | 예상 밖 오류(Data Dragon 실패 등)만 처리. Riot 502/503은 `page.tsx`가 `SummonerStatus`로 직접 그림(D37) | ✅ |
+| `frontend/mockup-summoner-search.html` | 목적 달성(승인용 목업)으로 삭제 | ✅ |
+
+### 14-2. 계획과 다르게 구현한 점
+
+1. **D37 — Riot 502/503·연결 실패를 `error.tsx`로 던지지 않고 `page.tsx`가 직접 그린다.** 처음엔 `Error.message`에 상태 코드(`"RIOT_UNAVAILABLE"` 등)를 담아 던지고 `error.tsx`가 그 값으로 문구를 고르게 만들었다. 운영 빌드(`next build && next start`)로 실제 확인하니 메시지가 항상 기본 문구("데이터를 불러오지 못했습니다…")로만 나왔다 — Next가 **production 빌드에서 서버 컴포넌트가 던진 오류의 `message`를 클라이언트로 보내지 않고 가리기 때문**(보안 동작, 의도된 것으로 Next 문서에 설명됨)이다. 그래서 설계를 바꿔 `page.tsx`가 상태별로 `SummonerStatus` 컴포넌트를 직접 반환하게 했고, `error.tsx`는 Data Dragon 실패 같은 예상 밖 오류만 잡는 안전망으로 남겼다.
+2. **D38 — 동적 라우트 `params.riotId`는 자동 디코딩되지 않는다.** 계획 당시엔 Next가 `params`를 디코딩해 줄 것으로 가정했으나, 운영 빌드로 직접 확인한 결과 URL 인코딩된 문자열 그대로 온다(Next 16.4). 처음 구현은 이미 인코딩된 값을 다시 `encodeURIComponent`로 감싸 이중 인코딩하는 버그가 있었고, 실제 테스트 계정으로 검색하면 항상 `SUMMONER_NOT_FOUND`가 나왔다. `decodeRiotId()`(디코딩 실패 시 원문 그대로)를 추가해 고쳤다.
+3. 계획 문서의 "결정이 필요한 사항" 표는 Plan 단계에서 ★ 추천안으로 전부 승인됐으므로, Build에서는 추천안 그대로 구현했다(계획과 다른 점 아님).
+
+### 14-3. 검증 결과 (2026-10-27)
+
+- `npm run lint`: 오류·경고 0
+- `npx next typegen && npx tsc --noEmit`: 오류 0
+- 새 런타임 의존성: `git diff -- frontend/package.json frontend/package-lock.json` 0줄
+- `npm run build` (백엔드 켬, 로컬 `http://localhost:4000`): **183정적 페이지 + 신규 동적 라우트 1개(`ƒ /summoners/[region]/[riotId]`)** 성공, `[api]`/`[view]`/`[stats]` 경고 0줄 (Next.js 보안 업그레이드 안내가 한 번 빌드를 멈췄으나 재시도로 통과 — 13장 참고, 조치 안 함)
+- **기존 통계 화면 회귀 확인**: `rm -rf .next/cache/fetch-cache` 후 백엔드를 끄고 다시 빌드 → 183페이지 그대로 성공, `[api] 통계 서버에 연결하지 못했습니다` 경고 7줄(변경 06 이전과 동일한 줄 수) — 기존 `fetchApi` 호출의 기본 캐시 동작(`revalidate: 3600`)이 이번 `options` 파라미터 추가로 바뀌지 않았음을 확인
+- **실제 API 검증** (운영 빌드, 백엔드 켬, 격리된 포트 3002에서 `next start`로 확인 — 이미 다른 세션이 포트 3000의 `next dev`를 쓰고 있어 간섭하지 않으려고 별도 포트 사용):
+  - 헤더 검색창에 `너희는개다#KR1` 입력 → `/summoners/kr/너희는개다-KR1` 이동, 프로필(소환사 아이콘·"너희는개다 #KR1"·레벨 629), 랭크 카드(자유랭크 실버2 52LP 31승40패 43.7%, 솔로/듀오 실버1 6LP 130승136패 48.9%), 매치 20건 모두 확인. `read_page` 접근성 트리로 `listitem` 20개, 각 행 아이템 6~7칸(빈 칸 포함)·소환사 주문 2개·키스톤·같은 팀/상대팀 5+5명 alt 텍스트 확인
+  - 존재하지 않는 `이상한이름#0000` 검색 → "소환사를 찾을 수 없습니다" + "이름#태그를 확인해 주세요." 확인, 검색창에 포커스 링이 다시 생김(`not-found.tsx`의 `#riotid-search` 포커스 확인)
+  - 형식 오류(`형식오류`, `#` 없음) 검색 → 서버 요청 없이 "이름#태그 형식으로 입력해 주세요" 안내, 페이지 이동 없음
+  - `region=na` → 404
+  - scratchpad 가짜 백엔드(`/private/tmp/.../scratchpad/fake-summoner-api.js`, 포트 4099)로 `API_BASE_URL`만 바꿔 별도 포트(3005)에서 확인: `502 RIOT_UNAVAILABLE` → "라이엇 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요." + [다시 시도], `503 RIOT_KEY_EXPIRED` → "지금은 전적을 불러올 수 없습니다. 잠시 후 다시 시도해 주세요."(버튼 없음, 개발 키 안내 없음), `leagues: []`/`matches: []` → "랭크 정보가 없습니다"/"최근 플레이한 게임이 없습니다"
+  - 360px: `document.documentElement.scrollWidth === clientWidth`(360) 확인, 1열(랭크→매치), 헤더 검색창도 겹침 없이 줄어듦
+  - 768px: `scrollWidth === clientWidth`(768), 1열 유지
+  - 1024px: `scrollWidth === clientWidth`(1024), `grid-cols-[280px_1fr]` 2단(좌 랭크, 우 매치) 확인
+  - 콘솔 오류 0건(`read_console_messages onlyErrors`)
+  - 승/패 색 대비: `#5a9bff`(승)·`#f16565`(패)를 배경(`#0b1020`)·표면(`#141b2f`) 각각에 대해 WCAG 상대 휘도 공식으로 계산 — 배경 6.82/6.12, 표면 6.16/5.53으로 모두 4.5:1 이상 (스크립트로 계산, globals.css 주석에 수치 반영)
+- 사용한 테스트 계정은 항상 랭크 2개를 갖고 있어, 랭크 없음(`leagues: []`)은 실제 계정이 아니라 가짜 응답으로만 확인했다(13장에 기록).
+
+### 14-4. 사용한 scratchpad 보조 파일 (저장소에 포함되지 않음)
+
+- `fake-summoner-api.js`: 포트 4099에서 `SUMMONER_NOT_FOUND`/`RIOT_UNAVAILABLE`/`RIOT_KEY_EXPIRED`/빈 랭크·매치 응답을 주는 최소 Node `http` 서버. 확인 후 종료, 프로젝트·DB 변경 없음.
