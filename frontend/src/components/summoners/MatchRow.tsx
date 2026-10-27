@@ -127,22 +127,27 @@ export default function MatchRow({ match }: { match: MatchView }) {
               <span className="sr-only">{match.champion.name}</span>
             )}
           </span>
-          <div className="flex shrink-0 flex-col gap-0.5">
-            {match.summonerSpells.map((spell) => (
-              <SpellSlot key={spell.id} spell={spell} />
-            ))}
-            <RuneSlot
-              iconUrl={match.keystone.iconUrl}
-              name={match.keystone.name}
-              description={match.keystone.description}
-            />
-            {match.keystone.treeIconUrl ? (
+          {/* 좌: 소환사 주문 2칸(세로) / 우: 룬 2칸(세로), 2026-10-27 */}
+          <div className="flex shrink-0 items-start gap-0.5">
+            <div className="flex flex-col gap-0.5">
+              {match.summonerSpells.map((spell) => (
+                <SpellSlot key={spell.id} spell={spell} />
+              ))}
+            </div>
+            <div className="flex flex-col gap-0.5">
               <RuneSlot
-                iconUrl={match.keystone.treeIconUrl}
-                name={`${match.keystone.name} 트리`}
-                align="right"
+                iconUrl={match.keystone.iconUrl}
+                name={match.keystone.name}
+                description={match.keystone.description}
               />
-            ) : null}
+              {match.keystone.treeIconUrl ? (
+                <RuneSlot
+                  iconUrl={match.keystone.treeIconUrl}
+                  name={`${match.keystone.name} 트리`}
+                  align="right"
+                />
+              ) : null}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-0.5">
