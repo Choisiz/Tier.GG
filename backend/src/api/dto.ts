@@ -80,6 +80,8 @@ function sideDto(p: ParticipantDto) {
     win: p.win,
     gameName: p.riotIdGameName || null,
     tagLine: p.riotIdTagline || null,
+    /** 챔피언 대상 딜량. 참가자 목록의 딜량 막대그래프용(2026-10-27 추가, 추가 호출 없음) */
+    damage: p.totalDamageDealtToChampions,
   };
 }
 

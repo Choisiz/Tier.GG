@@ -72,6 +72,7 @@ export interface ParticipantDto {
   individualPosition?: string;
   champLevel: number;
   goldEarned: number;
+  totalDamageDealtToChampions: number;
   riotIdGameName?: string;
   riotIdTagline?: string;
   gameEndedInEarlySurrender?: boolean;
