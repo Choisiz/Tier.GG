@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import AbilityTipContent from "@/components/champions/AbilityTipContent";
 import HeroSkinSwitcher from "@/components/champions/HeroSkinSwitcher";
+import Tooltip from "@/components/common/Tooltip";
 import { TAG_LABELS } from "@/lib/ddragon/transform";
 import type { ChampionDetail, ChampionSkin } from "@/lib/ddragon/types";
 
@@ -43,55 +45,94 @@ export default function ChampionHero({ champion }: ChampionHeroProps) {
         />
       </div>
 
-      <div className="relative flex items-end gap-4 p-4 sm:p-6 md:min-h-[420px] md:p-8">
-        <div className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 ring-2 ring-accent sm:size-20">
-          <Image
-            src={champion.iconUrl}
-            alt={champion.name}
-            fill
-            sizes="80px"
-            className="object-cover"
-          />
+      <div className="relative flex flex-col justify-end gap-3 p-4 sm:p-6 md:min-h-[420px] md:p-8">
+        <div>
+          <h1
+            id="champion-name"
+            className="text-3xl font-extrabold sm:text-4xl"
+          >
+            {champion.name}
+          </h1>
         </div>
-        <div className="min-w-0 space-y-2">
-          <div>
-            <h1
-              id="champion-name"
-              className="text-3xl font-extrabold sm:text-4xl"
-            >
-              {champion.name}
-            </h1>
-            <p className="text-muted md:text-foreground/85">{champion.title}</p>
+        <div className="flex items-start gap-4">
+          <div className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 ring-2 ring-accent sm:size-20">
+            <Image
+              src={champion.iconUrl}
+              alt={champion.name}
+              fill
+              sizes="80px"
+              className="object-cover"
+            />
           </div>
-          {skin.value ? (
-            <p aria-live="polite" className="text-sm text-muted md:text-foreground/85">
-              스킨: {skin.value.name} ({skin.index + 1}/{champion.skins.length})
-            </p>
-          ) : null}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <ul className="flex flex-wrap gap-1.5" aria-label="역할군">
-              {champion.tags.map((tag) => (
-                <li
-                  key={tag}
-                  className="rounded-full border border-accent/60 bg-background/70 px-2.5 py-0.5 text-xs font-semibold text-accent"
-                >
-                  {TAG_LABELS[tag]}
+          <div className="min-w-0 space-y-2">
+            {skin.value ? (
+              <p
+                aria-live="polite"
+                className="text-sm text-muted md:text-foreground/85"
+              >
+                스킨: {skin.value.name} ({skin.index + 1}/
+                {champion.skins.length})
+              </p>
+            ) : null}
+            <ul className="flex gap-1.5" aria-label="스킬">
+              {champion.abilities.map((ability, index) => (
+                <li key={ability.key}>
+                  <Tooltip
+                    content={
+                      <AbilityTipContent
+                        abilityKey={ability.key}
+                        name={ability.name}
+                        cooldown={ability.cooldown}
+                        description={ability.description}
+                      />
+                    }
+                    placement="top"
+                    align={index > 2 ? "right" : "left"}
+                  >
+                    <span className="relative block size-9 overflow-hidden rounded-md bg-surface-2 ring-1 ring-border sm:size-10">
+                      <Image
+                        src={ability.iconUrl}
+                        alt={`${ability.key} ${ability.name}`}
+                        fill
+                        sizes="40px"
+                        className="object-cover"
+                      />
+                      <span
+                        aria-hidden="true"
+                        className="absolute right-0 bottom-0 rounded-tl-md bg-background/90 px-1 text-[10px] leading-4 font-bold text-accent"
+                      >
+                        {ability.key}
+                      </span>
+                    </span>
+                  </Tooltip>
                 </li>
               ))}
             </ul>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="font-semibold">난이도</span>
-              <span aria-hidden="true" className="flex gap-0.5">
-                {Array.from({ length: DIFFICULTY_MAX }, (_, i) => (
-                  <span
-                    key={i}
-                    className={`size-2.5 rounded-full ${i < difficulty ? "bg-accent" : "bg-border"}`}
-                  />
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <ul className="flex flex-wrap gap-1.5" aria-label="역할군">
+                {champion.tags.map((tag) => (
+                  <li
+                    key={tag}
+                    className="rounded-full border border-accent/60 bg-background/70 px-2.5 py-0.5 text-xs font-semibold text-accent"
+                  >
+                    {TAG_LABELS[tag]}
+                  </li>
                 ))}
-              </span>
-              <span className="text-muted md:text-foreground/85">
-                ({difficulty}/{DIFFICULTY_MAX})
-              </span>
+              </ul>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-semibold">난이도</span>
+                <span aria-hidden="true" className="flex gap-0.5">
+                  {Array.from({ length: DIFFICULTY_MAX }, (_, i) => (
+                    <span
+                      key={i}
+                      className={`size-2.5 rounded-full ${i < difficulty ? "bg-accent" : "bg-border"}`}
+                    />
+                  ))}
+                </span>
+                <span className="text-muted md:text-foreground/85">
+                  ({difficulty}/{DIFFICULTY_MAX})
+                </span>
+              </div>
             </div>
           </div>
         </div>

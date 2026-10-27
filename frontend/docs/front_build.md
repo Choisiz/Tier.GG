@@ -1,6 +1,6 @@
 # 프론트엔드 구현 상태 — Tier.GG 챔피언 화면
 
-> 기준: `front_spec.md` (현재 계획), `docs/contracts/api_contract.md` v2. 코드 상태: 변경 04 Build 반영 후 (2026-10-17).
+> 기준: `front_spec.md` (현재 계획), `docs/contracts/api_contract.md` v2. 코드 상태: 변경 05 Build 반영 후 (2026-10-17).
 > 이 문서는 **지금 구현 상태**만 적는다. 이전 시도와 과정 기록은 git 커밋 `87cfc78`에 있다.
 > 상태 표기: ✅ 완료 / ⚠️ 부분 완료 / ❌ 실패 / ⏸️ 보류
 
@@ -120,20 +120,20 @@
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
 | 통계 호출 | `position` 없이 1번 → `positions[]`. 2순위가 있으면 `?position=…` 1번 더. 2순위가 `STATS_NOT_FOUND`·집계 전·빌드 중 연결 실패면 그 탭만 뺀다. 두 응답 `aggregatedAt`이 다르면 서버 경고 + 1순위 기간 표시 | ✅ |
-| `ChampionHero` (client, 변경 03) | 아이콘, `h1`, 칭호, 스킨 이름/순서 줄(`aria-live="polite"`), 역할군 배지, 난이도 10칸 + `(n/10)`. `HeroSkinSwitcher`를 스플래시 자리에 렌더링하고 `onChange`로 선택 상태를 받아 캡션에 표시. 모바일 세로, md 이상 오버레이. `splashUrl` prop 제거, `skins` prop 추가 | ✅ |
+| `ChampionHero` (client, 변경 03) | `h1`을 프로필 아이콘 위(상단)로 이동하고 칭호(부제목, 예: "나주마의 긍지") 줄은 삭제(변경 06; `<title>`·메타 설명의 칭호는 유지), 그 아래 아이콘 + 스킨 이름/순서 줄(`aria-live="polite"`), 패시브·Q·W·E·R 아이콘 줄(난이도 위, 호버·포커스·탭 시 `AbilityTipContent` 툴팁, 히어로 `overflow-hidden`에 잘리지 않게 `Tooltip placement="top"`), 역할군 배지, 난이도 10칸 + `(n/10)`. `HeroSkinSwitcher`를 스플래시 자리에 렌더링하고 `onChange`로 선택 상태를 받아 캡션에 표시. 모바일 세로, md 이상 오버레이. `splashUrl` prop 제거, `skins` prop 추가 | ✅ |
 | `HeroSkinSwitcher` (client, 신규, 변경 03) | Hero 스플래시(`fetchPriority="high"` + `loading="eager"`, `alt=""`) + 좌우 화살표(`aria-label="이전/다음 스킨"`, 네이티브 `<button>`), `useState`로 선택 스킨 관리, 양 끝에서 순환. 스킨 1개면 화살표 숨김 | ✅ |
 | "← 목록" | 1순위 포지션 탭 주소 + "정글 티어 목록" (통계 없으면 `/champions`, "탑 티어 목록") | ✅ |
-| `PositionTabs` (client) | `role="tablist"/"tab"/"tabpanel"`, `aria-selected`, `aria-controls`, `aria-labelledby`, 로빙 `tabIndex`, ←/→·Home/End(끝에서 처음으로 순환), 숨은 패널 `hidden`. 두 패널 모두 정적 HTML. 탭 1개면 "탑" 글자(`p`)만 | ✅ |
+| `PositionTabs` (client) | `role="tablist"/"tab"/"tabpanel"`, `aria-selected`, `aria-controls`, `aria-labelledby`, 로빙 `tabIndex`, ←/→·Home/End(끝에서 처음으로 순환), 숨은 패널 `hidden`. 두 패널 모두 정적 HTML. 탭 1개면 포지션 이름("탑") 글자(`p`)를 화면에서 숨김(`sr-only`, 변경 06) | ✅ |
 | 탭 글자 | "정글 · 2티어 · 86%", `null`이면 "탑 · 표본 부족 · 11%" | ✅ |
-| `PositionStatsPanel` (변경 04) | 요약 줄(배지·승률·픽률·밴률·게임, `null`이면 "표본 부족 (50게임 미만)" + "표본이 적어 참고용입니다."). `lg` 이상 1행: 룬(좌) + 소환사 주문(우) 2단 그리드. 2행: "스킬 순서"를 그리드 밖 전체 폭 카드로 따로(D23, 11열로 넓어진 스킬 표가 절반 폭에 안 들어가서). 3행: "많이 완성한 아이템" 전체 폭. `lg` 미만은 룬→주문→스킬→아이템 1열. 빈 영역 "표본이 부족해 추천이 없습니다" | ✅ |
-| `RunePage` (client, 변경 04) | 1순위 전체 페이지를 핵심 트리 → 보조 트리 → 능력치 파편 순으로. `lg`(1024px) 이상은 세 블록을 가로 3단(`grid-cols-[2fr_1.5fr_1fr] gap-3`)으로 나란히, 그 미만은 변경 03의 세로 1단 유지(D21). "사용 …% · 승률 …% · …게임"(D17)은 가로 배치에서도 핵심 트리 칸 **안**에 그대로 둠(핵심 트리 아래 줄). 안 고른 룬 흐리게 + `alt=""` + `aria-hidden`, 고른 룬만 `alt`. 2개면 맨 위에 "1순위/2순위" 버튼(`aria-pressed`, 사용률·승률), 전환 시 핵심 트리 아래 줄도 선택된 조합을 따라감. sr 요약 "핵심 룬(정밀): …". 룬 칸(`RuneIcon`)·`RuneTree` 컴포넌트는 손대지 않음(배치만 변경) | ✅ (1·2순위가 같은 조합인 챔피언이 많음, 13장) |
-| `SummonerSpells` | 상위 2조합, 아이콘 2개 + "점멸 + 점화" + 사용률·승률·게임. 아이콘에 `Tooltip` 적용(`description`) | ✅ |
-| `SkillOrder` (변경 04) | `<table>` + `caption` "스킬 찍는 순서 1~11레벨". 행 머리(`th scope="row"`) = Q/W/E/R(4행, 각 `Tooltip` 적용), 열 머리(`th scope="col"`) = 레벨 1~11(11열), 본문 = Q/W/E/R 4행 × 레벨 11칸(축 전환, D22). 칸 `h-7 w-7 sm:h-8 sm:w-8`(변경 없음). 표를 `overflow-x-auto` div로 감싸고 Q/W/E/R 행 머리는 `sticky left-0 z-10 bg-surface`로 고정해 좁은 화면에서 가로 스크롤해도 어떤 스킬인지 보이게 함. 레벨 열 머리 "레벨" 칸도 같은 방식으로 고정. 2순위 한 줄 + 사용률·승률 | ✅ (360/768/1280px 모두 실측으로는 11열이 셀 크기 그대로 들어가 스크롤이 실제로 발생하지 않음. `overflow-x-auto`/`sticky`는 더 넓은 화면 구성이 필요해질 경우를 위한 안전장치로 유지) |
-| `CoreItems` (변경 03) | 핵심 3개 + "신발" 1개(5% 미만 숨김), "게임이 끝날 때 가지고 있던 아이템 기준 · 구매 순서 아님". 아이콘에 `Tooltip` 적용(`description`) | ✅ |
+| `PositionStatsPanel` (변경 05) | 요약 줄(배지·승률·픽률·밴률·게임, 수치 글자는 난이도 점과 같은 포인트 골드 `text-accent`(변경 06), `null`이면 "표본 부족 (50게임 미만)" + "표본이 적어 참고용입니다."). `lg` 이상 2단 그리드: 좌 "룬 · 스킬" 카드(h3는 화면에서 숨김 `sr-only`, 변경 06) 안에 `BuildSubsection`(h4) 위 "추천 룬" → 구분선 → 아래 "스킬 순서"(note "1~11레벨"), 우 "주문 · 아이템" 카드(h3는 화면에서 숨김 `sr-only`, 변경 06) 안에 "소환사 주문", "많이 완성한 아이템"(note·empty 문구 그대로, D24). 우측 카드에 비해 좌측 룬 카드 아래가 비어 보여 스킬 순서를 전체 폭 카드에서 좌측 카드 안으로 합침(변경 06). 전체 폭 `BuildCard`는 더 없음. `lg` 미만은 룬·스킬→주문·아이템 1열. 빈 영역 "표본이 부족해 추천이 없습니다"(섹션 단위로 개별 적용) | ✅ |
+| `RunePage` (client, 변경 04) | 1순위 전체 페이지를 핵심 트리 → 보조 트리 → 능력치 파편 순으로. `lg`(1024px) 이상은 세 블록을 가로 3단(`grid-cols-[2fr_1.5fr_1fr] gap-3`)으로 나란히, 그 미만은 변경 03의 세로 1단 유지(D21). "사용 …% · 승률 …% · …게임"(D17)은 가로 배치에서도 핵심 트리 칸 **안**에 그대로 둠(핵심 트리 아래 줄). 안 고른 룬 흐리게 + `alt=""` + `aria-hidden`, 고른 룬만 `alt`. 2개면 맨 위에 "1순위/2순위" 버튼(`aria-pressed`, 사용률·승률, 버튼 안 주요·보조 트리 아이콘 20px → 28px로 확대, 변경 06), 전환 시 핵심 트리 아래 줄도 선택된 조합을 따라감. sr 요약 "핵심 룬(정밀): …". 룬 칸(`RuneIcon`)·`RuneTree` 컴포넌트는 손대지 않음(배치만 변경). `lg` 이상에서 보조 트리를 `lg:mt-12`(48px = 핵심 룬 줄 40px + 간격 8px)로 내려 보조 1행이 핵심 트리 2행과 같은 높이에서 시작(고정값이라 룬 크기를 바꾸면 함께 조정). 능력치 파편은 제목(`text-sm` 20px + 간격 8px)이 있어 `lg:mt-5`(20px)로 내려, 파편 첫 줄이 보조 1행과 같은 높이(48px)에서 시작 | ✅ (1·2순위가 같은 조합인 챔피언이 많음, 13장) |
+| `SummonerSpells` (위치만 변경 05) | 상위 2조합, 아이콘 2개 + "점멸 + 점화" + 사용률·승률·게임. 아이콘에 `Tooltip` 적용(`description`). 컴포넌트 자체는 수정하지 않음 — 변경 05에서 "주문 · 아이템" 카드 안 `BuildSubsection`("소환사 주문")으로 이동 | ✅ |
+| `SkillOrder` (변경 05) | 표(`<table>`)를 없애고 op.gg 스타일 "스킬 트랙"으로 교체(D25): `<ol aria-label="스킬 찍는 순서 1~11레벨">` + `<li>` 11개, 각 칸에 그 레벨에 찍은 스킬 아이콘 1개(`Tooltip` 유지, `content`는 `head.description`) + 호버 툴팁은 스킬 카드와 같은 내용(키·이름 / 재사용 대기시간 / 설명, 변경 06; `Tooltip`의 `content`를 `ReactNode`로 넓히고 `toSkillOrders` heads에 `cooldown` 추가). 아이콘 아래 스킬 키 글자 Q/W/E/R(`text-xs font-bold`) + 작은 레벨 숫자(둘 다 `aria-hidden`). 칸 안 `span.sr-only`에 "N레벨: 스킬 이름"을 넣어 레벨·스킬을 스크린리더로 전달. 아이콘 크기 `size-6 sm:size-8`(D25, D16의 `h-7/h-8`보다 축소). `overflow-x-auto` 래퍼는 absolute 툴팁 패널을 잘라 설명이 안 보여서 제거하고, 좁은 화면에서 11칸이 다 안 들어가면 `flex-wrap`으로 줄바꿈(결정 5 변경). 7레벨 이후 칸은 툴팁을 `align="right"`로 열어 오른쪽 끝에서 잘리지 않게 함. 2순위 한 줄 표기(`second.order.join(" ")`)는 삭제(D26, `set.builds[1]`은 여전히 받아오지만 컴포넌트가 `set.builds[0]`만 읽음) | ✅ (360px 실측: 트랙 wrapper `scrollWidth 304 / clientWidth 294` = 약 10px만 트랙 내부에서 스크롤, 페이지 전체 가로 스크롤 아님. 768px·1280px는 스크롤 없이 들어감) |
+| `CoreItems` (변경 03, 위치만 변경 05) | 핵심 3개 + "신발" 1개(5% 미만 숨김), 아이콘에 `Tooltip` 적용(`description`). 컴포넌트 자체는 수정하지 않음 — 변경 05에서 렌더링 위치만 `PositionStatsPanel`의 "주문 · 아이템" 카드 안 `BuildSubsection`("많이 완성한 아이템", note "게임이 끝날 때 가지고 있던 아이템 기준 · 구매 순서 아님")으로 이동 | ✅ |
 | `Tooltip` (client, 신규, 변경 03) | 호버(`onMouseEnter`/`onMouseLeave`)·포커스(`onFocus`/`onBlur`)·탭(`onClick` 토글 + 바깥 탭 시 `document` 클릭 리스너로 닫힘) 공용. `role="tooltip"` + `aria-describedby`. `content`가 없으면 트리거만 그대로 렌더링(툴팁 없음). 패널은 `w-max max-w-64`(Build 중 발견: `max-w-*`만 쓰면 `<span>`이 비치환 inline이라 폭이 거의 0으로 찌그러지는 버그가 있어 `w-max` 추가로 수정) | ✅ |
 | 통계 없음 상태 | `STATS_NOT_FOUND` "최근 14일 통계가 없습니다.", 집계 전 문구, 빌드 중 연결 실패 문구. Hero·스킬·스토리는 정상 | ✅ |
-| `ChampionAbilities` | 패시브 + Q/W/E/R, 아이콘(`image.full`)·키·이름(`h3`)·재사용 대기시간(패시브 제외)·설명(`description`, HTML 제거, `whitespace-pre-line`). `dangerouslySetInnerHTML` 없음 | ✅ |
-| `ChampionLore` | `lore` 텍스트 | ✅ |
+| `ChampionAbilities` (변경 06: 상세 페이지에서 렌더링 제거, 파일은 미사용으로 남김) | 패시브 + Q/W/E/R, 아이콘(`image.full`)·키·이름(`h3`)·재사용 대기시간(패시브 제외)·설명(`description`, HTML 제거, `whitespace-pre-line`). `dangerouslySetInnerHTML` 없음. 카드 5개를 가로 한 줄(`flex`, 줄바꿈 없음)로 늘어놓아 폭이 넘치던 배치를 세로 1열(`space-y-3`)로 바꾸고, 각 카드는 왼쪽 아이콘 + 오른쪽(이름·재사용 대기시간·설명)으로 정리(변경 06). 13장의 360px 가로 스크롤 문제도 이 배치 변경으로 해소될 것으로 예상(미확인) | ✅ |
+| `ChampionLore` | `lore` 텍스트. "스토리" 제목(`h2`)을 카드 안으로 이동(변경 06) | ✅ |
 | 미표시 | `stats`, `allytips/enemytips`, `recommended` 표시 안 함 | ✅ |
 | 제목 구조 | `h1` 이름 → `h2` "포지션별 통계와 추천 빌드" → 카드 `h3` → `h2` 스킬·스킨·스토리 | ✅ |
 | `[championId]/loading.tsx` | Hero·통계 제목·기간 줄·탭 2개·요약 줄·빌드 카드 4개·스킬 스켈레톤 | ✅ |
@@ -142,7 +142,7 @@
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
-| 반응형 | 360 / 768 / 1280px 가로 스크롤 없음. 표 5 / 8 / 8열, 상세 빌드 1 / 1 / 2열(변경 04: `lg` 이상 룬 좌 + 주문 우 2단 → 스킬 표 전체 폭 → 아이템 전체 폭). 룬(변경 04: `lg` 이상 핵심\|보조\|파편 가로 3단, 미만은 세로 1단)과 스킬 격자(변경 04: Q/W/E/R 4행 × 레벨 11열, 칸 `h-7 w-7 sm:h-8 sm:w-8` 그대로, 좁은 화면은 `overflow-x-auto` + 행 머리 `sticky`)가 360px에서도 가로 스크롤 없이 들어감 | ✅ |
+| 반응형 | 360 / 768 / 1280px 페이지 가로 스크롤 없음. 표 5 / 8 / 8열, 상세 빌드 1 / 1 / 2열(변경 05: `lg` 이상 룬 좌 + "주문·아이템" 우 2단 → 스킬 트랙 전체 폭). 룬(변경 04: `lg` 이상 핵심\|보조\|파편 가로 3단, 미만은 세로 1단)과 스킬 트랙(변경 05: 레벨 1~11 가로 1줄, 칸 `size-6 sm:size-8`, 360px에서는 트랙 자체 `overflow-x-auto`로 약 10px만 내부 스크롤되고 페이지 전체 스크롤은 없음)이 360px에서도 가로 스크롤 없이 들어감 | ✅ |
 | 이미지 | 전부 `next/image` + `sizes` + 고정 비율 칸. `priority` 사용 0건 | ✅ |
 | alt | 아이콘·스킬·스킨·아이템·주문·룬 = 이름, 장식·안 고른 룬 = `alt=""`. 누락 0 | ✅ |
 | 키보드 | 네이티브 `a`/`button`/`input`, 상세 탭 화살표 이동, 금색 2px `focus-visible` 링 | ✅ |
@@ -164,7 +164,25 @@
 
 ## 11. 최신 검증 결과
 
-> **쉬운 요약**: 린트·타입·빌드 통과. 백엔드를 켠 빌드와 끈 빌드 모두 성공했다. 리스트 전 행과 상세 173명이 API와 맞았다. (2026-10-15, Build 확인 + Review 수정 후 재확인). 변경 03도 린트·타입·빌드 통과 + 브라우저로 레이아웃·스킨 전환·툴팁·룬 통계를 직접 확인했다. Review가 모바일 탭 첫 번째 터치에서 툴팁이 안 열리는 결함을 찾아 `Tooltip.tsx`를 직접 수정했다(PASS with issues, "변경 03 Review 수정" 참고). 변경 04(룬 가로 3단, 스킬 표 축 전환)도 린트·타입·빌드 통과 + 브라우저로 1280px(룬 좌 가로 3단 + 주문 우, 스킬 표 전체 폭)·360px(룬 세로, 스킬 표 가로 스크롤 없이 들어감)를 직접 확인했다.
+> **쉬운 요약**: 린트·타입·빌드 통과. 백엔드를 켠 빌드와 끈 빌드 모두 성공했다. 리스트 전 행과 상세 173명이 API와 맞았다. (2026-10-15, Build 확인 + Review 수정 후 재확인). 변경 03도 린트·타입·빌드 통과 + 브라우저로 레이아웃·스킨 전환·툴팁·룬 통계를 직접 확인했다. Review가 모바일 탭 첫 번째 터치에서 툴팁이 안 열리는 결함을 찾아 `Tooltip.tsx`를 직접 수정했다(PASS with issues, "변경 03 Review 수정" 참고). 변경 04(룬 가로 3단, 스킬 표 축 전환)도 린트·타입·빌드 통과 + 브라우저로 1280px(룬 좌 가로 3단 + 주문 우, 스킬 표 전체 폭)·360px(룬 세로, 스킬 표 가로 스크롤 없이 들어감)를 직접 확인했다. 변경 05(아이템을 주문 카드로 합치기, 스킬을 op.gg 스타일 가로 트랙으로 교체)도 린트·타입·빌드 통과 + 브라우저로 1280px·360px·768px 확인, `skillOrder` 레벨별 1:1 대조 통과.
+
+### 변경 05 Build 검증 (2026-10-17)
+
+- 수정 파일: `frontend/src/components/champions/SkillOrder.tsx`(전면 재작성: 표 → 가로 트랙), `frontend/src/components/champions/PositionStatsPanel.tsx`(`BuildSubsection` 추가, "주문 · 아이템" 카드로 합치고 아이템 전체 폭 카드 삭제). `CoreItems.tsx`·`SummonerSpells.tsx`·`lib/view/builds.ts`·`lib/api/types.ts`는 계획대로 수정하지 않음(렌더링 위치만 이동)
+- `npm run lint`: 오류·경고 0
+- `npx next typegen && npx tsc --noEmit`: 오류 0
+- `npm run build` (백엔드 켬, 로컬 `http://localhost:4000` 응답 확인): 183페이지 성공, 경고 0줄
+- 브라우저 확인: 이미 떠 있던 `next dev`(포트 3000, 다른 세션이 띄워 둔 서버, HMR로 수정 사항 반영)에 접속해 확인. 자체 `preview_start`는 "이미 다른 next dev가 실행 중"이라는 오류로 새로 못 띄워 기존 서버에 그대로 접속했다(백엔드는 `backend-api`(4000)에 접속 확인, 별도로 새로 띄우지 않음)
+  - **1280px (`/champions/Aatrox`)**: 룬 카드(좌, 가로 3단 그대로) + "주문 · 아이템" 카드(우)가 2단 그리드로 보임. 우측 카드 안에 h4 "소환사 주문"(상위 2조합) → 구분선 → h4 "많이 완성한 아이템"(핵심 3개 + 신발, note 문구 "게임이 끝날 때 가지고 있던 아이템 기준 · 구매 순서 아님" 그대로) 2섹션 확인. 그 아래 "스킬 순서" 카드가 전체 폭 1행, 레벨 1~11 가로 트랙(아이콘 + 레벨 숫자)으로 보임. 별도 "많이 완성한 아이템" 전체 폭 카드는 더는 없음
+  - **`skillOrder` 대조**: 아트록스 `QEWQQRQEQER`를 각 칸의 sr-only 텍스트("N레벨: 스킬 이름")로 추출해 1:1 대조 — 1=Q(다르킨의 검) 2=E(파멸의 돌진) 3=W(지옥사슬) 4=Q 5=Q 6=R(세계의 종결자) 7=Q 8=E 9=Q 10=E 11=R, 전부 일치. 징크스(`QWEQQRQWQWW`)도 sr-only 텍스트로 추출해 Q/W/E/R 라벨이 섞이지 않고 순서대로 나옴을 확인
+  - **2순위 삭제 확인**: "2순위" 한 줄 표기(`second.order.join(" ")`)가 화면 어디에도 없음(페이지 텍스트 검색 0건). `SkillOrder.tsx`는 `set.builds[0]`만 읽고, `lib/view/builds.ts`·`toSkillOrders`는 수정하지 않아 2순위 데이터는 계속 받아옴(D26)
+  - **툴팁**: 스킬 트랙 1레벨 칸을 프로그램적 `click()`으로 토글 — `document.querySelectorAll('[role="tooltip"]').length`가 0→1로 바뀌고 내용이 "아트록스가 대검을 내리쳐 물리 피해를 줍니다…"로 Q 설명과 일치함을 확인. (참고: 이 브라우저 패널의 `computer` 좌표 클릭/호버 액션은 이 세션에서 포커스·클릭 이벤트가 기대대로 전달되지 않아 — `Tooltip.tsx` 자체는 변경 05에서 손대지 않았고 변경 04에서 이미 호버·포커스·탭 전부 검증됨 — DOM에 직접 `click()`을 디스패치해 같은 핸들러가 정상 동작함을 확인했다. 수동 UI 조작으로 호버/포커스까지 재확인하지는 못했다. 13장 참고)
+  - **징크스(`/champions/Jinx`, 원딜) 신발 숨김**: "주문·아이템" 카드의 "많이 완성한 아이템" 섹션에 "신발" 소제목이 없음(사용률 5% 미만이라 숨김, D9 그대로 유지) 확인
+  - **360px (`/champions/Aatrox`)**: 신선한 네비게이션 직후 `document.documentElement.scrollWidth === clientWidth`(360) 확인(페이지 가로 스크롤 없음). "주문·아이템" 카드가 세로 1단으로 소환사 주문 → 구분선 → 많이 완성한 아이템 순서로 쌓임. 스킬 트랙은 `overflow-x-auto` wrapper 기준 `scrollWidth 304 / clientWidth 294`로 약 10px만 트랙 자체 내부에서 스크롤되고(결정 5(b)로 자연히 보강됨, 11칸이 `size-6`+`gap-1`로는 294px 안에 다 안 들어감), 페이지 전체 스크롤로는 번지지 않음을 확인
+    - **범위 밖 발견(수정하지 않음)**: 360px에서 실제 스크롤(가짜 `scrollIntoView`가 아니라 `computer scroll` 액션)로 "스킬"(패시브+Q/W/E/R 설명, `ChampionAbilities.tsx`) 섹션까지 내려가면 그 섹션의 `<ul class="flex space-x-3">`(줄바꿈 없음)가 넓어져 페이지 전체 `scrollWidth`가 779px까지 늘어나는 가로 스크롤이 있음. `ChampionAbilities.tsx`는 이번 변경 05 작업 범위에 없고, 세션 시작 시점 `git status`에 이미 수정됨(M)으로 떠 있던 파일이라 내가 만든 변경이 아니다(변경 05는 `PositionStatsPanel.tsx`·`SkillOrder.tsx`만 수정). 메인 에이전트에게 보고 필요(13장에 기록)
+  - **768px**: 스킬 트랙 wrapper `scrollWidth === clientWidth`(686), 스크롤 없이 들어감
+  - 콘솔 오류 0건(`read_console_messages onlyErrors`)
+- `chosenNames`(변경 02) 등 `lib/view/builds.ts` 로직은 이번 변경에서 건드리지 않아 그대로 유효
 
 ### 변경 04 Build 검증 (2026-10-17)
 
@@ -285,5 +303,6 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 | 소문자 상세 주소 | macOS 로컬 `next start`에서 정적 페이지 덮어쓰기. 사용자 결정으로 보류 | ⏸️ |
 | 룬 1·2순위 중복 | 71/173명이 같은 조합(보조 룬 순서만 다름). 백엔드 집계 쪽에서 고칠 일 | ⏸️ |
 | `npm audit` | high 5건 (`eslint-config-next` → `fast-glob` 등 개발 의존성, 2026-10-16 확인). 조치하지 않음 | ⏸️ |
+| **(범위 밖, 메인 에이전트 보고)** `ChampionAbilities.tsx`(스킬/패시브 설명 카드) `<ul class="flex space-x-3">`에 줄바꿈이 없어 360px에서 그 섹션까지 스크롤하면 페이지 전체 가로 스크롤이 생김(`scrollWidth` 360→779). 변경 05(`PositionStatsPanel.tsx`·`SkillOrder.tsx`만 수정)가 만든 문제가 아니며, 세션 시작 시점 `git status`에 `ChampionAbilities.tsx`가 이미 수정(M) 상태였다 — 다른 작업이 진행 중인 것으로 보인다. 변경 05 작업 범위 밖이라 고치지 않았다 | ⚠️ 미보고 발견 |
 
 변경 02에서 해결: `CHAMPION_TAGS` 삭제, `TierBadge` 대비 주석 수정, `layout.tsx` description 갱신.

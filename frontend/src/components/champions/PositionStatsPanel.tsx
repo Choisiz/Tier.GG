@@ -31,6 +31,32 @@ function BuildCard({
   title,
   note,
   empty,
+  hideTitle = false,
+  children,
+}: {
+  title: string;
+  note?: string;
+  empty: boolean;
+  /** 제목을 화면에서만 숨긴다(스크린리더·제목 계층은 유지) */
+  hideTitle?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-3 rounded-lg border border-border bg-surface p-4">
+      <h3 className={hideTitle ? "sr-only" : "font-bold"}>
+        {title}
+        {note ? <span className="ml-2 text-xs font-normal text-muted">{note}</span> : null}
+      </h3>
+      {empty ? <p className="text-sm text-muted">{EMPTY}</p> : children}
+    </section>
+  );
+}
+
+/** `BuildCard` 안에 들어가는 소제목 섹션 (예: "주문 · 아이템" 카드 안의 "소환사 주문"/"많이 완성한 아이템") */
+function BuildSubsection({
+  title,
+  note,
+  empty,
   children,
 }: {
   title: string;
@@ -39,13 +65,13 @@ function BuildCard({
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-3 rounded-lg border border-border bg-surface p-4">
-      <h3 className="font-bold">
+    <div className="space-y-3">
+      <h4 className="font-bold">
         {title}
         {note ? <span className="ml-2 text-xs font-normal text-muted">{note}</span> : null}
-      </h3>
+      </h4>
       {empty ? <p className="text-sm text-muted">{EMPTY}</p> : children}
-    </section>
+    </div>
   );
 }
 
@@ -61,38 +87,52 @@ export default function PositionStatsPanel({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <TierBadge tier={view.tier} minTierPick={minTierPick} showThreshold />
-        <span>승률 {view.winRate}</span>
+        <span className="text-accent">승률 {view.winRate}</span>
         <span aria-hidden="true" className="text-muted">·</span>
-        <span>픽률 {view.pickRate}</span>
+        <span className="text-accent">픽률 {view.pickRate}</span>
         <span aria-hidden="true" className="text-muted">·</span>
-        <span>밴률 {view.banRate}</span>
+        <span className="text-accent">밴률 {view.banRate}</span>
         <span aria-hidden="true" className="text-muted">·</span>
-        <span>{view.pick}게임</span>
+        <span className="text-accent">{view.pick}게임</span>
         {view.tier === null ? (
           <span className="w-full text-xs text-muted">표본이 적어 참고용입니다.</span>
         ) : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <BuildCard title="추천 룬" empty={view.runes.length === 0}>
-          <RunePage pages={view.runes} />
+        <BuildCard title="룬 · 스킬" empty={false} hideTitle>
+          <div className="space-y-4">
+            <BuildSubsection title="추천 룬" empty={view.runes.length === 0}>
+              <RunePage pages={view.runes} />
+            </BuildSubsection>
+            <div className="border-t border-border pt-4">
+              <BuildSubsection
+                title="스킬 순서"
+                note="1~11레벨"
+                empty={view.skills.builds.length === 0}
+              >
+                <SkillOrder set={view.skills} />
+              </BuildSubsection>
+            </div>
+          </div>
         </BuildCard>
-        <BuildCard title="소환사 주문" empty={view.spells.length === 0}>
-          <SummonerSpells combos={view.spells} />
+        <BuildCard title="주문 · 아이템" empty={false} hideTitle>
+          <div className="space-y-4">
+            <BuildSubsection title="소환사 주문" empty={view.spells.length === 0}>
+              <SummonerSpells combos={view.spells} />
+            </BuildSubsection>
+            <div className="border-t border-border pt-4">
+              <BuildSubsection
+                title="많이 완성한 아이템"
+                note="게임이 끝날 때 가지고 있던 아이템 기준 · 구매 순서 아님"
+                empty={view.items.core.length === 0 && !view.items.boots}
+              >
+                <CoreItems items={view.items} />
+              </BuildSubsection>
+            </div>
+          </div>
         </BuildCard>
       </div>
-
-      <BuildCard title="스킬 순서" note="1~11레벨" empty={view.skills.builds.length === 0}>
-        <SkillOrder set={view.skills} />
-      </BuildCard>
-
-      <BuildCard
-        title="많이 완성한 아이템"
-        note="게임이 끝날 때 가지고 있던 아이템 기준 · 구매 순서 아님"
-        empty={view.items.core.length === 0 && !view.items.boots}
-      >
-        <CoreItems items={view.items} />
-      </BuildCard>
     </div>
   );
 }

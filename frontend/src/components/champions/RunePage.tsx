@@ -3,7 +3,11 @@
 import Image from "next/image";
 import { useState } from "react";
 import Tooltip from "@/components/common/Tooltip";
-import type { RuneCellView, RunePageView, RuneTreeView } from "@/lib/view/builds";
+import type {
+  RuneCellView,
+  RunePageView,
+  RuneTreeView,
+} from "@/lib/view/builds";
 
 /** 룬 칸 1개. 고른 룬만 alt를 갖고, 나머지는 장식(흐리게). 설명이 있으면 호버·포커스·탭 툴팁 */
 function RuneIcon({ cell, size }: { cell: RuneCellView; size: "lg" | "md" }) {
@@ -43,20 +47,24 @@ function RuneIcon({ cell, size }: { cell: RuneCellView; size: "lg" | "md" }) {
   );
 }
 
-function RuneTree({ tree, keystone }: { tree: RuneTreeView; keystone: boolean }) {
+function RuneTree({
+  tree,
+  keystone,
+}: {
+  tree: RuneTreeView;
+  keystone: boolean;
+}) {
   return (
     <div className="min-w-0 space-y-2">
-      <p className="flex items-center gap-2 text-sm font-semibold">
-        {tree.iconUrl ? (
-          <Image src={tree.iconUrl} alt="" width={20} height={20} className="size-5" />
-        ) : null}
-        {tree.name}
-      </p>
       <ul className="space-y-2">
         {tree.rows.map((row, rowIndex) => (
           <li key={rowIndex} className="flex gap-2">
             {row.map((cell) => (
-              <RuneIcon key={cell.id} cell={cell} size={keystone && rowIndex === 0 ? "lg" : "md"} />
+              <RuneIcon
+                key={cell.id}
+                cell={cell}
+                size={keystone && rowIndex === 0 ? "lg" : "md"}
+              />
             ))}
           </li>
         ))}
@@ -73,21 +81,52 @@ export default function RunePage({ pages }: { pages: RunePageView[] }) {
   return (
     <div className="space-y-4">
       {pages.length > 1 ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2">
           {pages.map((item, index) => (
             <button
               key={index}
               type="button"
               aria-pressed={index === selected}
               onClick={() => setSelected(index)}
-              className={`rounded-md border px-3 py-1.5 text-left text-xs transition-colors ${
+              className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-md border px-3 py-1.5 text-center text-xs transition-colors ${
                 index === selected
                   ? "border-accent bg-surface-2 text-foreground"
                   : "border-border text-muted hover:bg-surface-2"
               }`}
             >
-              <span className="block font-semibold">{index + 1}순위</span>
-              사용 {item.pickRate} · 승률 {item.winRate}
+              <span className="flex shrink-0 items-center gap-1">
+                {[item.primary, item.secondary].map((tree, treeIndex) =>
+                  tree.iconUrl ? (
+                    <Image
+                      key={treeIndex}
+                      src={tree.iconUrl}
+                      alt=""
+                      width={28}
+                      height={28}
+                      className="size-7"
+                    />
+                  ) : null,
+                )}
+              </span>
+              <span className="min-w-0">
+                <span className="block font-semibold">{index + 1}순위</span>
+                <span className="mt-1 flex justify-center gap-3">
+                  {[
+                    ["사용", item.pickRate],
+                    ["승률", item.winRate],
+                    ["게임", item.pick],
+                  ].map(([label, value]) => (
+                    <span key={label} className="block">
+                      <span className="block text-[11px] text-muted">
+                        {label}
+                      </span>
+                      <span className="block font-medium text-foreground">
+                        {value}
+                      </span>
+                    </span>
+                  ))}
+                </span>
+              </span>
             </button>
           ))}
         </div>
@@ -98,12 +137,11 @@ export default function RunePage({ pages }: { pages: RunePageView[] }) {
       <div className="space-y-4 lg:grid lg:grid-cols-[2fr_1.5fr_1fr] lg:items-start lg:gap-3 lg:space-y-0">
         <div className="space-y-2">
           <RuneTree tree={page.primary} keystone />
-          <p className="text-xs text-muted">
-            사용 {page.pickRate} · 승률 {page.winRate} · {page.pick}게임
-          </p>
         </div>
-        <RuneTree tree={page.secondary} keystone={false} />
-        <div className="space-y-2">
+        <div className="lg:mt-12">
+          <RuneTree tree={page.secondary} keystone={false} />
+        </div>
+        <div className="space-y-2 lg:mt-5">
           <p className="text-sm font-semibold">능력치 파편</p>
           <ul className="space-y-2">
             {page.shards.map((row) => (

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import ChampionAbilities from "@/components/champions/ChampionAbilities";
 import ChampionHero from "@/components/champions/ChampionHero";
 import ChampionLore from "@/components/champions/ChampionLore";
 import PositionStatsPanel, {
@@ -21,8 +20,17 @@ import {
   getSummonerSpells,
 } from "@/lib/ddragon/api";
 import type { ChampionDetail } from "@/lib/ddragon/types";
-import { toCoreItems, toRunePage, toSkillOrders, toSpellCombo } from "@/lib/view/builds";
-import { formatCount, formatPercent, toWindowInfoView } from "@/lib/view/format";
+import {
+  toCoreItems,
+  toRunePage,
+  toSkillOrders,
+  toSpellCombo,
+} from "@/lib/view/builds";
+import {
+  formatCount,
+  formatPercent,
+  toWindowInfoView,
+} from "@/lib/view/format";
 
 // 빌드 시 전 챔피언 정적 생성 + ISR. dynamicParams는 기본값(true) 유지.
 export const revalidate = 3600;
@@ -78,7 +86,11 @@ async function toPanelView(
     runes: builds.runes.map((rune) => toRunePage(rune, runeTrees)),
     spells: builds.spells.map((spell) => toSpellCombo(spell, spells)),
     skills: toSkillOrders(builds.skills, champion.abilities),
-    items: toCoreItems(builds.items, items, `${champion.id} ${response.position}`),
+    items: toCoreItems(
+      builds.items,
+      items,
+      `${champion.id} ${response.position}`,
+    ),
   };
 }
 
@@ -98,11 +110,17 @@ async function loadChampionStats(championKey: string, championId: string) {
     return { state: first.status, responses: [] as ChampionStatsResponse[] };
   }
   const responses = [first.data];
-  const second = first.data.positions.find((p) => p.position !== first.data.position);
+  const second = first.data.positions.find(
+    (p) => p.position !== first.data.position,
+  );
   if (second) {
-    const secondState = requireStats(await getChampionStats(championKey, second.position));
+    const secondState = requireStats(
+      await getChampionStats(championKey, second.position),
+    );
     if (secondState.status === "ok") {
-      if (secondState.data.window.aggregatedAt !== first.data.window.aggregatedAt) {
+      if (
+        secondState.data.window.aggregatedAt !== first.data.window.aggregatedAt
+      ) {
         console.warn(
           `[stats] ${championId} 두 포지션 응답의 집계 시각이 다릅니다. 1순위 기간을 표시합니다.`,
         );
@@ -132,7 +150,9 @@ export default async function ChampionDetailPage({
   const primary = responses[0];
   const tabs = await Promise.all(
     responses.map(async (response) => {
-      const summary = primary.positions.find((p) => p.position === response.position);
+      const summary = primary.positions.find(
+        (p) => p.position === response.position,
+      );
       const label = POSITION_LABELS[response.position];
       return {
         key: response.position,
@@ -151,13 +171,14 @@ export default async function ChampionDetailPage({
   const backPosition = primary?.position ?? "TOP";
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <div className="space-y-4">
         <Link
           href={tierListHref(backPosition)}
           className="inline-flex items-center gap-1 text-sm font-semibold text-muted hover:text-foreground"
         >
-          <span aria-hidden="true">←</span> {POSITION_LABELS[backPosition]} 티어 목록
+          <span aria-hidden="true">←</span> {POSITION_LABELS[backPosition]} 티어
+          목록
         </Link>
         <ChampionHero champion={champion} />
       </div>
@@ -167,7 +188,9 @@ export default async function ChampionDetailPage({
           <h2 id="stats-heading" className="text-xl font-bold">
             포지션별 통계와 추천 빌드
           </h2>
-          {primary ? <WindowInfo info={toWindowInfoView(primary.window)} /> : null}
+          {primary ? (
+            <WindowInfo info={toWindowInfoView(primary.window)} />
+          ) : null}
         </div>
         {state === "ok" && tabs.length > 0 ? (
           <PositionTabs tabs={tabs} />
@@ -176,7 +199,6 @@ export default async function ChampionDetailPage({
         )}
       </section>
 
-      <ChampionAbilities abilities={champion.abilities} />
       <ChampionLore lore={champion.lore} />
     </div>
   );
