@@ -470,6 +470,7 @@ GET /api/v1/summoners/kr/너희는개다-KR1
       "matchId": "KR_7654321098",
       "gameStartAt": "2026-10-26T11:02:00.000Z",
       "gameDurationSec": 1584,
+      "queueId": 420,
       "win": true,
       "championId": 23,
       "champLevel": 18,
@@ -499,6 +500,7 @@ GET /api/v1/summoners/kr/너희는개다-KR1
 | `summoner.puuid`·`gameName`·`tagLine`·`profileIconId`·`summonerLevel` | - | 아니오 | account-v1 + summoner-v4 |
 | `leagues[]` | array | 아니오 | league-v4 그대로 (큐 종류는 Riot이 주는 대로 — 보통 `RANKED_SOLO_5x5`, `RANKED_FLEX_SR`). 둘 다 없으면 `[]` (언랭크) |
 | `matches[]` | array | 아니오 | match-v5 최근 20건(큐 필터 없음), 최신 먼저. 최근 게임이 없으면 `[]`. 일부 매치 상세만 실패해도 나머지로 응답 |
+| `matches[].queueId` | int | 아니오 | Riot 큐 ID 그대로(`420`=솔로/듀오, `440`=자유랭크 등, 2026-10-27 추가). 이름표로 바꾸는 건 프론트 몫 |
 | `matches[].champLevel` | int | 아니오 | 그 게임에서 도달한 챔피언 레벨(`champLevel`, 2026-10-27 추가). 소환사 레벨(`summoner.summonerLevel`)과는 다름 |
 | `matches[].cs` | int | 아니오 | `totalMinionsKilled + neutralMinionsKilled` (백엔드가 더해서 줌) |
 | `matches[].items` | int[6] | 아니오 | `item0~5`. 빈 칸 0 |
@@ -623,3 +625,4 @@ GET /api/v1/summoners/kr/너희는개다-KR1
 | 2026-10-27 | v3 (작은 추가) | 2-5 `matches[].participants.team`/`enemy`에 `gameName`/`tagLine`(닉네임#태그) 추가. match-v5 응답에 이미 포함된 `riotIdGameName`/`riotIdTagline`을 그대로 노출(추가 Riot 호출 없음). 사용자 요청("참가자 닉네임 표시 가능한지 확인") |
 | 2026-10-27 | v3 (작은 추가) | 2-5 `matches[].champLevel`(그 게임에서 도달한 챔피언 레벨) 추가. `ParticipantDto`에 이미 있던 `champLevel`을 검색한 소환사 쪽에 노출(추가 Riot 호출 없음). 사용자 요청("챔피언 초상화 옆에 레벨 표시") |
 | 2026-10-27 | v3 (작은 추가) | 2-5 `matches[].participants.team`/`enemy[].damage`(챔피언 대상 딜량) 추가. 참가자 목록 딜량 막대그래프용, 추가 Riot 호출 없음. 사용자 요청("초상화·이름 하단에 얇은 딜량 그래프") |
+| 2026-10-27 | v3 (작은 추가) | 2-5 `matches[].queueId`(Riot 큐 ID) 추가. match-v5 응답에 이미 있던 `info.queueId`를 그대로 노출(추가 Riot 호출 없음), 이름표는 프론트가 한글화. 사용자 요청("승리 하단에 큐 종류(솔랭 등) 표시") |

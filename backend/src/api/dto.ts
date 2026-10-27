@@ -97,6 +97,8 @@ export function matchListItem(match: MatchDto, puuid: string) {
     matchId: match.metadata.matchId,
     gameStartAt: new Date(match.info.gameStartTimestamp).toISOString(),
     gameDurationSec: match.info.gameDuration,
+    /** Riot 큐 ID(420=솔로/듀오, 440=자유랭크 등). 큐 이름 한글화는 프론트가 한다(2026-10-27 추가) */
+    queueId: match.info.queueId,
     win: me.win,
     championId: me.championId,
     champLevel: me.champLevel,
