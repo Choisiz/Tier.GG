@@ -1,6 +1,12 @@
 "use client";
 
-import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 type PositionTab = {
   /** "TOP" */
@@ -26,7 +32,7 @@ export default function PositionTabs({ tabs }: { tabs: PositionTab[] }) {
   if (tabs.length === 1) {
     return (
       <div className="space-y-3">
-        <p className="text-lg font-bold">{tabs[0].title}</p>
+        <p className="sr-only">{tabs[0].title}</p>
         {tabs[0].panel}
       </div>
     );
@@ -38,7 +44,10 @@ export default function PositionTabs({ tabs }: { tabs: PositionTab[] }) {
     tabRefs.current[next]?.focus();
   };
 
-  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+  const onKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
     const moves: Record<string, number> = {
       ArrowRight: index + 1,
       ArrowLeft: index - 1,

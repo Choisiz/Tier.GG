@@ -3,11 +3,13 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 type TooltipProps = {
-  /** 설명 글자. 없으면(undefined) 툴팁을 달지 않고 children만 그대로 렌더링한다 */
-  content?: string;
+  /** 설명 글자(또는 span 조합). 없으면(undefined) 툴팁을 달지 않고 children만 그대로 렌더링한다 */
+  content?: ReactNode;
   children: ReactNode;
   /** 화면 오른쪽 끝에 가까운 트리거는 패널을 오른쪽 정렬한다 (단순 규칙, 충돌 방지는 하지 않음) */
   align?: "left" | "right";
+  /** 패널을 트리거 아래(기본)·위에 연다. 아래가 잘리는 자리(예: 히어로 하단)에서 "top" */
+  placement?: "bottom" | "top";
   className?: string;
 };
 
@@ -17,7 +19,13 @@ type TooltipProps = {
  * 모바일(터치): 탭하면 토글, 바깥을 탭하면 닫힘.
  * `content`가 없으면(설명 없는 항목) 트리거만 그대로 렌더링해 툴팁을 달지 않는다.
  */
-export default function Tooltip({ content, children, align = "left", className }: TooltipProps) {
+export default function Tooltip({
+  content,
+  children,
+  align = "left",
+  placement = "bottom",
+  className,
+}: TooltipProps) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const ref = useRef<HTMLSpanElement>(null);
@@ -73,9 +81,9 @@ export default function Tooltip({ content, children, align = "left", className }
         <span
           id={panelId}
           role="tooltip"
-          className={`absolute top-full z-20 mt-1 w-max max-w-64 rounded-md border border-border bg-surface-2 p-2 text-xs leading-relaxed text-foreground shadow-lg ${
-            align === "right" ? "right-0" : "left-0"
-          }`}
+          className={`absolute z-20 w-max max-w-64 rounded-md border border-border bg-surface-2 p-2 text-xs leading-relaxed text-foreground shadow-lg ${
+            placement === "top" ? "bottom-full mb-1" : "top-full mt-1"
+          } ${align === "right" ? "right-0" : "left-0"}`}
         >
           {content}
         </span>

@@ -9,7 +9,11 @@ const KEY_LABELS: Record<ChampionAbility["key"], string> = {
   R: "R",
 };
 
-export default function ChampionAbilities({ abilities }: { abilities: ChampionAbility[] }) {
+export default function ChampionAbilities({
+  abilities,
+}: {
+  abilities: ChampionAbility[];
+}) {
   return (
     <section aria-labelledby="abilities-heading" className="space-y-4">
       <h2 id="abilities-heading" className="text-xl font-bold">
@@ -35,11 +39,15 @@ export default function ChampionAbilities({ abilities }: { abilities: ChampionAb
             </div>
             <div className="min-w-0 flex-1 space-y-1">
               <h3 className="font-semibold">
-                <span className="mr-2 text-sm text-accent">{KEY_LABELS[ability.key]}</span>
+                <span className="mr-2 text-sm text-accent">
+                  {KEY_LABELS[ability.key]}
+                </span>
                 {ability.name}
               </h3>
               {ability.cooldown && (
-                <p className="text-xs text-muted">재사용 대기시간 {ability.cooldown}초</p>
+                <p className="text-xs text-muted">
+                  재사용 대기시간 {ability.cooldown}초
+                </p>
               )}
               <p className="text-sm leading-relaxed whitespace-pre-line text-foreground/90">
                 {ability.description}

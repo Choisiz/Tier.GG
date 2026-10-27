@@ -158,7 +158,14 @@ export type SkillOrderView = BuildRateView & {
 
 export type SkillOrderSet = {
   /** Q/W/E/R 줄 머리 (스킬 이름·아이콘·설명) */
-  heads: { key: SkillKey; name?: string; iconUrl?: string; description?: string }[];
+  heads: {
+    key: SkillKey;
+    name?: string;
+    iconUrl?: string;
+    description?: string;
+    /** "14/12/10/8/6" */
+    cooldown?: string;
+  }[];
   builds: SkillOrderView[];
 };
 
@@ -171,6 +178,7 @@ export function toSkillOrders(builds: SkillBuild[], abilities: ChampionAbility[]
         name: ability?.name,
         iconUrl: ability?.iconUrl,
         description: ability?.description,
+        cooldown: ability?.cooldown,
       };
     }),
     builds: builds.map((build) => ({
