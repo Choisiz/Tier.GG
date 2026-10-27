@@ -72,8 +72,10 @@ function RuneSlot({
 }
 
 /**
- * 참가자 5명 세로 1열 (왼쪽=같은 팀, 오른쪽=상대 팀으로 나란히 두기 위함). 닉네임이 있으면 아이콘 옆에 표시.
- * 초상화+이름 아래 얇은 딜량 막대그래프: 같은 팀은 파랑(`--win`), 상대 팀은 빨강(`--lose`) (2026-10-27 추가)
+ * 참가자 5명 세로 1열 (왼쪽=같은 팀, 오른쪽=상대 팀으로 나란히 두기 위함). 닉네임이 있으면 이름 칸에 표시.
+ * 2026-10-27: 딜량 막대그래프를 닉네임 바로 아래로(아이콘 밑이 아님), 챔피언 아이콘은 "닉네임+막대"
+ * 칸과 같은 높이로 늘림(`items-stretch`) — 아이콘이 둘을 아우르는 하나의 상자처럼 보이게 한다.
+ * 막대 색: 같은 팀 파랑(`--win`), 상대 팀 빨강(`--lose`)
  */
 function ParticipantIcons({
   label,
@@ -88,31 +90,33 @@ function ParticipantIcons({
   return (
     <div className="flex flex-col gap-1" aria-label={label}>
       {participants.map((participant, index) => (
-        <div key={`${participant.championId}-${index}`} className="w-20">
-          <div className="flex items-center gap-1">
-            <span className="relative block size-5 shrink-0 overflow-hidden rounded-full border border-border bg-surface-2">
-              {participant.iconUrl ? (
-                <Image
-                  src={participant.iconUrl}
-                  alt={participant.name}
-                  fill
-                  sizes="20px"
-                  className="object-cover"
-                />
-              ) : (
-                <span className="sr-only">{participant.name}</span>
-              )}
-            </span>
+        <div key={`${participant.championId}-${index}`} className="flex w-20 items-stretch gap-1">
+          <span className="relative block w-5 shrink-0 self-stretch overflow-hidden rounded-full border border-border bg-surface-2">
+            {participant.iconUrl ? (
+              <Image
+                src={participant.iconUrl}
+                alt={participant.name}
+                fill
+                sizes="20px"
+                className="object-cover"
+              />
+            ) : (
+              <span className="sr-only">{participant.name}</span>
+            )}
+          </span>
+          <div className="min-w-0 flex-1">
             {participant.displayName ? (
-              <span className="max-w-14 truncate text-[11px] text-muted">{participant.displayName}</span>
+              <span className="block max-w-14 truncate text-[11px] text-muted">
+                {participant.displayName}
+              </span>
             ) : null}
-          </div>
-          <div
-            className="mt-0.5 h-0.5 w-full overflow-hidden rounded-full bg-surface-2"
-            role="img"
-            aria-label={`딜량 ${participant.damagePercent}%`}
-          >
-            <div className={`h-full ${barClass}`} style={{ width: `${participant.damagePercent}%` }} />
+            <div
+              className="mt-0.5 h-0.5 w-full overflow-hidden rounded-full bg-surface-2"
+              role="img"
+              aria-label={`딜량 ${participant.damagePercent}%`}
+            >
+              <div className={`h-full ${barClass}`} style={{ width: `${participant.damagePercent}%` }} />
+            </div>
           </div>
         </div>
       ))}
@@ -183,6 +187,13 @@ export default function MatchRow({ match }: { match: MatchView }) {
               ) : null}
             </div>
           </div>
+          {/* 2026-10-27: 챔피언+주문·룬 줄이 아이템 줄(7칸)보다 좁아 생기던 빈 공간(아이템 약 3개 분량)에 KDA를 넣는다 */}
+          <div className="ml-1 text-sm">
+            <p className="font-semibold">
+              {match.kills} / {match.deaths} / {match.assists}
+            </p>
+            <p className="text-xs text-muted">{match.kda} KDA</p>
+          </div>
         </div>
         <div className="flex items-center gap-0.5">
           {match.items.map((item, index) => (
@@ -190,13 +201,6 @@ export default function MatchRow({ match }: { match: MatchView }) {
           ))}
           <ItemSlot item={match.trinket} />
         </div>
-      </div>
-
-      <div className="w-24 shrink-0 text-sm">
-        <p className="font-semibold">
-          {match.kills} / {match.deaths} / {match.assists}
-        </p>
-        <p className="text-xs text-muted">{match.kda} KDA</p>
       </div>
 
       <div className="w-24 shrink-0 text-sm">
