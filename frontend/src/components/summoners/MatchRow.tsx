@@ -70,6 +70,7 @@ function KeystoneSlot({ keystone }: { keystone: KeystoneView }) {
   );
 }
 
+/** 참가자 5명 세로 1열 (왼쪽=같은 팀, 오른쪽=상대 팀으로 나란히 두기 위함) */
 function ParticipantIcons({
   label,
   participants,
@@ -78,7 +79,7 @@ function ParticipantIcons({
   participants: ChampionIconView[];
 }) {
   return (
-    <div className="flex gap-0.5" aria-label={label}>
+    <div className="flex flex-col gap-0.5" aria-label={label}>
       {participants.map((participant, index) => (
         <span
           key={`${participant.championId}-${index}`}
@@ -108,8 +109,8 @@ export default function MatchRow({ match }: { match: MatchView }) {
 
   return (
     <div className={`flex flex-wrap items-center gap-3 rounded-lg border-l-4 bg-surface p-3 ${borderClass}`}>
-      {/* 챔피언+주문·룬(위) + 아이템(아래, 초상화 밑) 묶음 */}
-      <div className="flex w-32 shrink-0 flex-col gap-1">
+      {/* 챔피언+주문·룬(위) + 아이템 6칸+장신구 한 줄(아래, 초상화 밑) 묶음. 너비는 아이템 한 줄(7칸)에 맞춰 늘어난다 */}
+      <div className="flex shrink-0 flex-col gap-1">
         <div className="flex items-center gap-2">
           <span className="relative block size-10 shrink-0 overflow-hidden rounded-md bg-surface-2">
             {match.champion.iconUrl ? (
@@ -131,7 +132,7 @@ export default function MatchRow({ match }: { match: MatchView }) {
           </div>
           <KeystoneSlot keystone={match.keystone} />
         </div>
-        <div className="flex flex-wrap items-center gap-0.5">
+        <div className="flex items-center gap-0.5">
           {match.items.map((item, index) => (
             <ItemSlot key={index} item={item} />
           ))}
@@ -158,9 +159,10 @@ export default function MatchRow({ match }: { match: MatchView }) {
         <p className="text-xs text-muted">{match.csPerMinute} /분</p>
       </div>
 
-      <div className="ml-auto flex items-center gap-2 text-xs">
+      {/* 왼쪽 5(같은 팀) - 오른쪽 5(상대 팀) 세로 두 열로 나란히 */}
+      <div className="ml-auto flex items-start gap-2 text-xs">
         <ParticipantIcons label="같은 팀 챔피언" participants={match.team} />
-        <span aria-hidden="true" className="text-muted">
+        <span aria-hidden="true" className="self-center text-muted">
           vs
         </span>
         <ParticipantIcons label="상대 팀 챔피언" participants={match.enemy} />
