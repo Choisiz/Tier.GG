@@ -165,7 +165,7 @@ function toChampionIconView(
   };
 }
 
-/** 같은 팀/상대팀 참가자 1명. 챔피언 아이콘 + (있으면) 닉네임#태그 */
+/** 같은 팀/상대팀 참가자 1명. 챔피언 아이콘 + (있으면) 닉네임. 목록에선 태그(#...)는 빼고 이름만(2026-10-27) */
 export type ParticipantView = ChampionIconView & { displayName?: string };
 
 function toParticipantView(
@@ -173,11 +173,7 @@ function toParticipantView(
   champions: Map<string, ChampionSummary>,
 ): ParticipantView {
   const icon = toChampionIconView(participant.championId, champions);
-  const displayName =
-    participant.gameName && participant.tagLine
-      ? `${participant.gameName}#${participant.tagLine}`
-      : undefined;
-  return { ...icon, displayName };
+  return { ...icon, displayName: participant.gameName ?? undefined };
 }
 
 /* ───────── 매치 ───────── */
