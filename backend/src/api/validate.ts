@@ -22,3 +22,38 @@ export function parseChampionIdParam(v: unknown): Parsed<number> {
   }
   return { ok: true, value: Number(v) };
 }
+
+// 전적 검색 (back_spec 변경 03 W-5, 결정 S1·S2)
+
+/** region 경로 값. RIOT_PLATFORM_URL·RIOT_REGION_URL이 단일 지역(KR/asia)이라 kr만 허용 */
+export function parseRegionParam(v: unknown): Parsed<'kr'> {
+  if (v !== 'kr') return { ok: false, message: 'region은 kr만 지원합니다.' };
+  return { ok: true, value: 'kr' };
+}
+
+export interface RiotIdParts {
+  gameName: string;
+  tagLine: string;
+}
+
+const TAG_LINE_RE = /^[0-9A-Za-z]{2,5}$/;
+
+/**
+ * riotId 경로 파라미터(`gameName-tagLine`)를 **마지막** '-'에서 자른다.
+ * tagLine은 짧은 영숫자로 고정이고 gameName은 공백·하이픈을 포함할 수 있어, 마지막 '-'로 자르면 안전하다.
+ */
+export function parseRiotIdParam(v: unknown): Parsed<RiotIdParts> {
+  if (typeof v !== 'string') {
+    return { ok: false, message: 'riotId는 gameName-tagLine 형식이어야 합니다.' };
+  }
+  const idx = v.lastIndexOf('-');
+  if (idx <= 0 || idx === v.length - 1) {
+    return { ok: false, message: 'riotId는 gameName-tagLine 형식이어야 합니다.' };
+  }
+  const gameName = v.slice(0, idx);
+  const tagLine = v.slice(idx + 1);
+  if (!TAG_LINE_RE.test(tagLine)) {
+    return { ok: false, message: 'tagLine은 영숫자 2~5자여야 합니다.' };
+  }
+  return { ok: true, value: { gameName, tagLine } };
+}

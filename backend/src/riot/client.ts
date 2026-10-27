@@ -9,7 +9,14 @@ import {
   RiotNotFoundError,
   RiotRetryExhaustedError,
 } from './errors.js';
-import type { LeagueEntryDto, MatchDto, TimelineDto } from './types.js';
+import type {
+  AccountDto,
+  LeagueEntryByPuuidDto,
+  LeagueEntryDto,
+  MatchDto,
+  SummonerDto,
+  TimelineDto,
+} from './types.js';
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -73,6 +80,34 @@ export class RiotClient {
 
   getTimeline(matchId: string): Promise<TimelineDto> {
     return this.get(this.opts.regionUrl, `/lol/match/v5/matches/${encodeURIComponent(matchId)}/timeline`);
+  }
+
+  // 아래 4개는 전적 검색(소환사 상세, back_spec 변경 03 W-2)용. collector/*는 이 메서드들을 쓰지 않는다.
+
+  /** account-v1. 지역 라우팅(RIOT_REGION_URL). 실제 Riot 경로는 "riot/account/v1/…" (account-v1은 account 서비스 전용 하위 경로) */
+  getAccountByRiotId(gameName: string, tagLine: string): Promise<AccountDto> {
+    return this.get(
+      this.opts.regionUrl,
+      `/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
+    );
+  }
+
+  /** summoner-v4 by-puuid. 플랫폼 라우팅(RIOT_PLATFORM_URL) */
+  getSummonerByPuuid(puuid: string): Promise<SummonerDto> {
+    return this.get(this.opts.platformUrl, `/lol/summoner/v4/summoners/by-puuid/${encodeURIComponent(puuid)}`);
+  }
+
+  /** league-v4 entries by-puuid. 플랫폼 라우팅. 언랭크면 빈 배열 */
+  getLeagueEntriesByPuuid(puuid: string): Promise<LeagueEntryByPuuidDto[]> {
+    return this.get(this.opts.platformUrl, `/lol/league/v4/entries/by-puuid/${encodeURIComponent(puuid)}`);
+  }
+
+  /** match-v5 ids by-puuid. 큐 필터 없음(전적은 모든 큐). 지역 라우팅. 수집기 전용 getMatchIds와 별도 */
+  getRecentMatchIds(puuid: string, q: { start: number; count: number }): Promise<string[]> {
+    return this.get(
+      this.opts.regionUrl,
+      `/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?start=${q.start}&count=${q.count}`,
+    );
   }
 
   /** 로그용 경로: puuid가 들어간 경로는 앞 8자만 */

@@ -3,9 +3,11 @@
 import express, { type Express } from 'express';
 import type { Queryable } from '../db/tx.js';
 import { createLogger, type Logger } from '../lib/logger.js';
-import { errorHandler, notFoundHandler } from './errors.js';
+import { ApiError, errorHandler, notFoundHandler } from './errors.js';
 import { championsRouter } from './routes/champions.js';
 import { metaRouter } from './routes/meta.js';
+import { summonersRouter } from './routes/summoners.js';
+import type { SummonerSearchFn } from './summonerSearch.js';
 import { createStaleWarner } from './window.js';
 
 /**
@@ -24,10 +26,27 @@ export interface ApiDeps {
   now: () => number;
   /** isStale을 보면 1시간에 1번 경고 */
   warnIfStale: (aggregatedAt: Date, nowMs: number) => void;
+  /** 전적 검색(소환사 상세, 변경 03). server.ts가 실제 RiotClient로 만들어 넣는다 */
+  summonerSearch: SummonerSearchFn;
 }
 
-export function createApp(db: ApiDb, logger: Logger = createLogger('api'), opts: { now?: () => number } = {}): Express {
-  const deps: ApiDeps = { db, logger, now: opts.now ?? Date.now, warnIfStale: createStaleWarner(logger) };
+/** summonerSearch를 넘기지 않은 createApp 호출(예: 기존 테스트)에서 /summoners를 부르면 500 */
+const unavailableSummonerSearch: SummonerSearchFn = async () => {
+  throw new ApiError(500, 'INTERNAL_ERROR', '소환사 검색이 설정되지 않았습니다.');
+};
+
+export function createApp(
+  db: ApiDb,
+  logger: Logger = createLogger('api'),
+  opts: { now?: () => number; summonerSearch?: SummonerSearchFn } = {},
+): Express {
+  const deps: ApiDeps = {
+    db,
+    logger,
+    now: opts.now ?? Date.now,
+    warnIfStale: createStaleWarner(logger),
+    summonerSearch: opts.summonerSearch ?? unavailableSummonerSearch,
+  };
   const app = express();
   app.disable('x-powered-by');
   app.set('etag', false); // ETag·304 없음 (api_contract 4장)
@@ -50,6 +69,7 @@ export function createApp(db: ApiDb, logger: Logger = createLogger('api'), opts:
 
   app.use('/api/v1', metaRouter(deps));
   app.use('/api/v1', championsRouter(deps));
+  app.use('/api/v1', summonersRouter(deps));
   app.use(notFoundHandler);
   app.use(errorHandler(logger));
   return app;

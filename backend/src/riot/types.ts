@@ -8,6 +8,30 @@ export interface LeagueEntryDto {
   leaguePoints?: number;
 }
 
+// account-v1 by-riot-id (back_spec 변경 03 W-2)
+export interface AccountDto {
+  puuid: string;
+  gameName: string;
+  tagLine: string;
+}
+
+// summoner-v4 by-puuid (back_spec 변경 03 W-2)
+export interface SummonerDto {
+  profileIconId: number;
+  summonerLevel: number;
+}
+
+// league-v4 entries by-puuid (back_spec 변경 03 W-2). entries/{tier}/{division} 응답(LeagueEntryDto)과 모양이 다르다.
+export interface LeagueEntryByPuuidDto {
+  queueType: string;
+  tier: string;
+  rank: string;
+  leaguePoints: number;
+  wins: number;
+  losses: number;
+  hotStreak: boolean;
+}
+
 export interface PerkSelectionDto {
   perk: number;
 }
@@ -36,6 +60,21 @@ export interface ParticipantDto {
     statPerks: { offense: number; flex: number; defense: number };
     styles: PerkStyleDto[];
   };
+  // 아래부터 전적 검색(소환사 상세, back_spec 변경 03 W-2)에만 쓰는 필드. 수집기(transform.ts)는 쓰지 않는다.
+  /** 100 또는 200. 같은 팀/상대팀 구분용 (팀 순서가 항상 100 먼저는 아님) */
+  teamId: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  totalMinionsKilled: number;
+  neutralMinionsKilled: number;
+  item6: number;
+  individualPosition?: string;
+  champLevel: number;
+  goldEarned: number;
+  riotIdGameName?: string;
+  riotIdTagline?: string;
+  gameEndedInEarlySurrender?: boolean;
 }
 
 export interface BanDto {

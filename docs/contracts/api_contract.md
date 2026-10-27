@@ -2,9 +2,9 @@
 
 > 이 문서는 `!백엔드`가 작성하고 `!프론트`가 읽는 계약 문서다. 엔드포인트, 파라미터, 응답 형식, 오류 형식을 정한다. (CLAUDE.md 9장)
 
-- 상태: **v2 승인됨 (구현 반영)** — `backend/docs/back_spec.md` "변경 01"과 함께 승인 (2026-10-15). Build 구현 결과 내용 변경 없음 (`backend/docs/back_build.md` 변경 01).
-- 근거: `docs/contracts/db_contract.md` **v7** (`stats_window`, `stats_window_patch`, `champion_tier_view`, 매일 05:00 KST 집계)
-- 범위: 챔피언 티어리스트(포지션별) + 챔피언 상세(포지션, 빌드). 통계는 **최근 14일에 시작한 게임** 기준. 전적 검색·SSE는 포함하지 않는다.
+- 상태: **v3 (구현 반영)** — `backend/docs/back_spec.md` "변경 03"과 함께 승인 (2026-10-27). 2-5 전적 검색 추가. 나머지(1~4·6장, 2-0~2-4)는 v2(변경 02)와 같다.
+- 근거: `docs/contracts/db_contract.md` **v8**. 2-5(전적 검색)는 DB를 쓰지 않고 Riot API를 그대로 중계한다 (back_spec 변경 03 W-6, 계약 변경 요청 없음).
+- 범위: 챔피언 티어리스트(포지션별) + 챔피언 상세(포지션, 빌드) + **전적 검색**(프로필·랭크·최근 매치 20건, 2-5). 통계(2-0~2-4)는 **최근 14일에 시작한 게임** 기준. SSE·과거 매치 더보기·스킬 순서(전적 검색)는 포함하지 않는다.
 
 ### v1 → v2 변경 (2026-10-15, 백엔드 변경 01)
 
@@ -437,6 +437,91 @@ GET /api/v1/champions/23?position=TOP
 
 ---
 
+### 2-5. `GET /api/v1/summoners/:region/:riotId` — 전적 검색 (프로필 + 랭크 + 최근 매치 20건)
+
+> 요약: `riotId`(`gameName-tagLine`)로 소환사를 찾아 프로필, 랭크 전체, 최근 매치 20건을 준다. **이 엔드포인트에는 `window` 객체가 없다** — 집계 창과 무관하게 Riot에서 그 자리에서 받아온 값이다. DB에 저장하지 않고, API 프로세스 메모리에 60초만 캐시한다(back_spec 변경 03).
+
+#### 파라미터
+
+| 이름 | 위치 | 필수 | 형식 | 검사 | 예 |
+|------|------|------|------|------|-----|
+| `region` | 경로 | 예 | `kr`만 | 그 밖은 400 (단일 지역만 지원) | `kr` |
+| `riotId` | 경로 | 예 | `gameName-tagLine` | **마지막** `-`에서 자름. `tagLine`은 `^[0-9A-Za-z]{2,5}$` | `너희는개다-KR1` |
+
+```http
+GET /api/v1/summoners/kr/너희는개다-KR1
+```
+
+```json
+{
+  "summoner": {
+    "puuid": "abcd1234…",
+    "gameName": "너희는개다",
+    "tagLine": "KR1",
+    "profileIconId": 4568,
+    "summonerLevel": 312
+  },
+  "leagues": [
+    { "queueType": "RANKED_SOLO_5x5", "tier": "EMERALD", "rank": "II", "leaguePoints": 54, "wins": 120, "losses": 110, "hotStreak": false },
+    { "queueType": "RANKED_FLEX_SR", "tier": "GOLD", "rank": "I", "leaguePoints": 10, "wins": 8, "losses": 9, "hotStreak": false }
+  ],
+  "matches": [
+    {
+      "matchId": "KR_7654321098",
+      "gameStartAt": "2026-10-26T11:02:00.000Z",
+      "gameDurationSec": 1584,
+      "win": true,
+      "championId": 23,
+      "individualPosition": "TOP",
+      "kills": 7,
+      "deaths": 3,
+      "assists": 5,
+      "cs": 182,
+      "goldEarned": 13500,
+      "items": [3006, 3046, 1036, 3031, 1018, 3074],
+      "trinket": 3364,
+      "summonerSpells": [4, 12],
+      "keystone": 8010,
+      "participants": {
+        "team": [{ "puuid": "…", "championId": 23, "win": true }],
+        "enemy": [{ "puuid": "…", "championId": 54, "win": false }]
+      }
+    }
+  ]
+}
+```
+
+#### 필드
+
+| 필드 | 타입 | null | 의미 |
+|------|------|------|------|
+| `summoner.puuid`·`gameName`·`tagLine`·`profileIconId`·`summonerLevel` | - | 아니오 | account-v1 + summoner-v4 |
+| `leagues[]` | array | 아니오 | league-v4 그대로 (큐 종류는 Riot이 주는 대로 — 보통 `RANKED_SOLO_5x5`, `RANKED_FLEX_SR`). 둘 다 없으면 `[]` (언랭크) |
+| `matches[]` | array | 아니오 | match-v5 최근 20건(큐 필터 없음), 최신 먼저. 최근 게임이 없으면 `[]`. 일부 매치 상세만 실패해도 나머지로 응답 |
+| `matches[].cs` | int | 아니오 | `totalMinionsKilled + neutralMinionsKilled` (백엔드가 더해서 줌) |
+| `matches[].items` | int[6] | 아니오 | `item0~5`. 빈 칸 0 |
+| `matches[].trinket` | int | 아니오 | `item6` |
+| `matches[].keystone` | int | 아니오 | `perks.styles[0].selections[0].perk` (핵심 룬 1개만, 트리는 안 줌) |
+| `matches[].participants.team`/`enemy` | array[5] | 아니오 | 같은 팀/상대팀 챔피언만 (이름·아이콘은 프론트가 Data Dragon) |
+
+- 캐시: `Cache-Control: no-store` (검색 결과는 거의 실시간이어야 하므로. 2·4장의 `public, max-age=600`은 챔피언 통계 3개에만 해당).
+- 타임라인은 부르지 않는다. 스킬 순서는 이 엔드포인트에 없다 (이번 범위 밖).
+
+#### 오류 (3장 형식 그대로)
+
+| HTTP | `code` | 언제 |
+|------|--------|------|
+| 400 | `INVALID_PARAMETER` | `region`이 `kr`이 아님, `riotId` 형식 오류 |
+| 404 | `SUMMONER_NOT_FOUND` | 그 `gameName#tagLine`을 가진 소환사가 없음 |
+| 502 | `RIOT_UNAVAILABLE` | Riot API 429·5xx 재시도 소진 |
+| 503 | `RIOT_KEY_EXPIRED` | Riot API 키 만료(401/403). **이 요청만** 실패하고 서버는 계속 응답한다 |
+
+```json
+{ "error": { "code": "SUMMONER_NOT_FOUND", "message": "해당 소환사를 찾을 수 없습니다." } }
+```
+
+---
+
 ## 3. 오류 형식
 
 > 요약: 모든 오류는 같은 모양의 JSON이다. `code`로 분기하고, `message`는 사람이 읽는 한국어 설명이다.
@@ -465,6 +550,9 @@ GET /api/v1/champions/23?position=TOP
 | 503 | `STATS_NOT_READY` | 집계된 창이 없음 (첫 집계 전). `/meta`, `/champions`, 상세가 준다 |
 | 503 | `DB_UNAVAILABLE` | DB 연결 실패 |
 | 500 | `INTERNAL_ERROR` | 그 밖의 서버 오류. 내부 내용은 응답에 넣지 않음 |
+| 404 | `SUMMONER_NOT_FOUND` | 전적 검색(2-5): 그 소환사가 없음 |
+| 502 | `RIOT_UNAVAILABLE` | 전적 검색(2-5): Riot API 재시도 소진 |
+| 503 | `RIOT_KEY_EXPIRED` | 전적 검색(2-5): Riot API 키 만료. 이 요청만 실패 |
 
 집계 전 응답 예:
 
@@ -527,3 +615,4 @@ GET /api/v1/champions/23?position=TOP
 | 2026-10-15 | v2 초안 | 최근 14일 창: `patch` 쿼리·대체 규칙·`PATCH_NOT_FOUND` 삭제, `window` 객체(`displayName`, `share`, `aggregatedAt`, `isStale`), `/health` `stats`, 한 응답 한 스냅숏 (back_spec 변경 01) |
 | 2026-10-15 | v2 (구현 반영) | 백엔드 변경 01 Build 구현. 계약 내용 변경 없음, 상태만 갱신 |
 | 2026-10-16 | v2 (문구 정정) | 2-4 아이템 거르기 설명을 프론트 실제 동작(핵심 아이템 3개+신발)에 맞게 고침. 응답 필드·형식은 바뀌지 않음 (back_spec 변경 02) |
+| 2026-10-27 | v3 | 2-5 `GET /summoners/:region/:riotId` 추가(전적 검색: 프로필+랭크+최근 매치 20건). `window` 없는 첫 엔드포인트, 캐시 `no-store`. 오류 코드 `SUMMONER_NOT_FOUND`·`RIOT_UNAVAILABLE`·`RIOT_KEY_EXPIRED` 추가 (back_spec 변경 03) |

@@ -1,8 +1,8 @@
-# 백엔드 검토 기록 — 변경 02 (L1~L5, 계약 문구, 프리셋 250) 검토
+# 백엔드 검토 기록 — 변경 03 (전적 검색 MVP) 검토
 
-> 검토일: 2026-10-17 (KST)
-> 기준: `CLAUDE.md` 9장 백엔드 Review, `backend/docs/back_spec.md`(승인됨, 변경 02 10-5·12장 V1~V8), `docs/contracts/api_contract.md` v2(문구 정정), `docs/contracts/db_contract.md`·`.dbml` v8
-> 방법: Build 기록을 믿지 않고 코드를 직접 읽고, 검사·테스트를 다시 돌리고, 실제 Supabase(읽기 전용)로 표본 인원을 확인했다. 사용자가 2026-10-16 02-9 표의 결정 8건(V1~V8)을 모두 추천안대로 승인한 상태에서 구현이 그대로 됐는지 본다.
+> 검토일: 2026-10-27 (KST)
+> 기준: `CLAUDE.md` 3장 "Review 적용 기준", 9장 백엔드 Review, `backend/docs/back_spec.md`(승인됨, 결정 S1~S8 + Build가 보탠 W9), `docs/contracts/api_contract.md` v3(2-5 전적 검색)
+> 방법: 이번 변경은 "중간~큰 변경"이라 Review를 생략하지 않았다. Build가 이미 돌린 `npm test`(117개)·`npm run test:integration`(17개)·`typecheck`·`lint` 결과는 재실행 없이 신뢰하지 않고 실제로 다시 돌려 숫자를 확인했고(2장), 독립 검토는 diff를 읽어 로직·설계 결함을 찾는 것과 실제 Riot API 호출(`너희는개다-KR1`)로 핵심 지점을 표본 확인하는 데 집중했다.
 > 이 문서는 **가장 최근 검토만** 둔다. 해결되지 않은 문제는 `back_overview.md` "해결되지 않은 점"에 있다.
 > 상태 표기: ✅ 통과 / ⚠️ 문제 있음 / ❌ 실패 / ⏸️ 확인 못 함
 
@@ -10,112 +10,142 @@
 
 - [1. 결론](#1-결론)
 - [2. 검사·테스트 재실행](#2-검사테스트-재실행)
-- [3. 완료 기준 10-5 확인](#3-완료-기준-10-5-확인)
-- [4. 코드 품질 메모](#4-코드-품질-메모)
-- [5. 범위 확인](#5-범위-확인)
-- [6. Review가 고친 것](#6-review가-고친-것)
-- [7. 남은 문제](#7-남은-문제)
+- [3. 완료 기준(10-6) 확인](#3-완료-기준10-6-확인)
+- [4. 계획과 다른 부분 4가지 판단](#4-계획과-다른-부분-4가지-판단)
+- [5. 실제 Riot API 재확인](#5-실제-riot-api-재확인)
+- [6. 코드 품질·보안 메모](#6-코드-품질보안-메모)
+- [7. Rate limit 설계](#7-rate-limit-설계)
+- [8. npm audit](#8-npm-audit)
+- [9. 범위 확인](#9-범위-확인)
+- [10. 남은 문제](#10-남은-문제)
 
 ---
 
 ## 1. 결론
 
-> 요약: **PASS.** 승인된 8개 결정(V1~V8)이 모두 코드·테스트·문서에 반영됐고, 완료 기준 10-5를 전부 충족한다. 버그는 찾지 못했다. 설계를 바꿔야 하는 결함도 없다.
+> 요약: **PASS with issues.** 완료 기준(10-6)을 모두 충족하고, 실제 Riot 호출로 계약(2-5)과 일치함을 확인했다. "계획과 다른 부분" 4가지는 모두 타당하다고 판단한다. 다만 **Medium 1건**(API 전용 제한기와 수집 CLI 제한기를 더하면 Riot 실제 한도를 넘을 수 있어 "여유를 둔다"는 설계 의도가 실제로는 성립하지 않음)과 Low 2건을 찾았다. 서버가 죽거나 데이터가 깨지는 결함은 아니라서 PASS로 두지만, 사용자에게 알려야 한다.
 
 | 구분 | 결과 |
 |------|------|
-| 판정 | **PASS** |
+| 판정 | **PASS with issues** |
 | High | 0 |
-| Medium | 0 |
-| Low | 1 (L5 적용 범위가 `withTransaction`·`readSnapshot`로 한정돼, `aggregate` 시험용 명령의 직접 `pool.connect()`에는 리스너가 없음 — 계획에서 명시적으로 그렇게 범위를 정했으므로 결함이 아니라 참고 사항) |
-| 고친 코드 | 없음 (작게 고칠 것도 발견하지 못함) |
-| DB에 남긴 변화 | 없음 (읽기 전용 조회만) |
+| Medium | 1 (M1 — 7장) |
+| Low | 2 (L1 `matchListItem`이 puuid를 못 찾으면 전체 요청이 500으로 죽음, L2 동시에 같은 소환사를 검색하면 캐시 미스 구간에서 중복 호출 — 6장) |
 
 ---
 
 ## 2. 검사·테스트 재실행
 
+> 요약: Build가 보고한 숫자와 같다. 직접 다시 돌려 확인했다.
+
 | 명령 | 결과 |
 |------|------|
 | `npm run typecheck` | 오류 0 |
 | `npm run lint` | 오류 0 |
-| `npm audit` | 취약점 0 |
-| `npm test` | **92개** 통과 / 실패 0 |
-| `npm run test:integration` | **17개** 통과 / 실패 0 (약 8.4초). 모두 ROLLBACK, 끝난 뒤 테스트 데이터 0줄 |
-
-- Build 보고의 수치(92·17)와 그대로 일치한다.
+| `npm test` | **117개 통과** / 실패 0 |
+| `npm audit` | 1건(기존, 8장에서 판단) |
 
 ---
 
-## 3. 완료 기준 10-5 확인
+## 3. 완료 기준(10-6) 확인
 
-| # | 항목 | 확인 방법 | 결과 |
-|---|------|-----------|------|
-| 02-2 | 표본 보충은 모자란 만큼만, `--resample`은 전체 재샘플 | `sample.ts` 코드: `divisionQuota(opts.resample ? cfg.playersPerTier : Math.max(0, cfg.playersPerTier - have))`. `sample.test.ts` 4개(have=180→70명만, have=0→250명 전체, 충분하면 건너뜀, `--resample`이면 250명 전체를 다시) | ✅ |
-| 02-3 | 중단·실패 종료의 `stoppedBy`가 `aborted`/`failed` | `matches.ts`에 타입 추가, `collect.ts` catch에서 `if (m && m.stoppedBy === 'done') m.stoppedBy = err instanceof UserAbortError ? 'aborted' : 'failed'`. `collection_logs.status`(원래부터 정확)는 그대로 둠 | ✅ |
-| 02-4 | ② 게임 ID에도 연속 20개 실패 상한 | `matches.ts`에 `idsConsecutiveFailures` 카운터, 성공 시 리셋, `riotCfg.maxConsecutiveMatchFailures`(③~⑤와 같은 상수) 도달 시 `TooManyFailuresError`. `matches.test.ts` 2개: 연속 20개에서 멈춤(정확히 20번만 호출), 10번째 성공 시 리셋돼 30번째에서 멈춤 — 둘 다 실제로 함수를 돌려 호출 횟수로 검증 | ✅ |
-| 02-5 | `/health` DB 오류가 서버 로그에 남음(응답은 그대로) | `meta.ts`: `catch (err) { logger.error('health DB 확인 실패', { error: formatError(err) }); throw new ApiError(503, 'DB_UNAVAILABLE', …); }`. 응답 바디·코드는 안 바뀜. `app.test.ts` 신규 테스트: 503 + `DB_UNAVAILABLE` 확인과 동시에 `logger.errors`에 1건, 메시지에 `ECONNREFUSED` 포함 확인 | ✅ |
-| 02-6 | `withTransaction`·`readSnapshot`에 `logger` 선택 매개변수로 연결 오류 리스너 | `tx.ts`·`snapshot.ts`: `logger?: Logger` 추가, 넘기면 `client.on('error', …)`로 로그만. `db.test.ts` 4개: 로그 남음/안 남김(리스너 미부착) 양쪽 다 확인. `server.ts`가 `readSnapshot(pool, fn, logger)`로 실제 연결, `matches.ts`의 ⑤ 저장이 `withTransaction(pool, fn, logger)`로 실제 연결 | ✅ |
-| 02-7 | `config/collection.ts`의 `test.playersPerTier === 250` | 코드에서 확인, `db_contract.md` v8(변경 04)의 "티어당 250명"과 일치. `rules.test.ts`가 `c.playersPerTier === 250`과 `divisionQuota(250) = {63,63,62,62}` 확인 | ✅ |
-| 02-8 | `api_contract.md` 2-4 문구·6장 날짜 순서 | 2-4: "프론트는 핵심 아이템 3개와 신발을 따로 골라 보여준다(계산 방식은 프론트 범위). 백엔드는 지금처럼 전체 아이템을 pick 순으로 준다" — 3-1 참조 결과 프론트 실제 동작과 일치. 6장: 2026-10-14(v2 초안) → 2026-10-15(구현 반영, 날짜 오타 고침) → 2026-10-16(문구 정정)으로 순서가 맞게 됐다 | ✅ |
-| 02-1 | 15명 400은 조치 없음, 조사 완료로 닫음 | `back_overview.md` 10장·`back_spec.md` 12장 V1에 "이전 만료 키 시기에 뽑히고 재확인 안 된 표본, 영향 0.17%" 기록. DB에 삭제·수정 없음(아래 3-1 확인) | ✅ |
-
-### 3-1. L1 실제 DB 확인 (읽기 전용)
-
-`ranked_players`를 티어별로 `count(*)`한 결과:
-
-| 티어 | 인원 |
-|------|------|
-| PLATINUM | 250 |
-| EMERALD | **265** |
-| DIAMOND | 250 |
-
-- 에메랄드 265명은 **변경 01 당시(이전 버그로 전체 재추가)의 기존 데이터**이고, 이번 Review는 DB에 쓰기를 하지 않았으므로 숫자가 바뀌지 않는다. `back_overview.md`도 이미 "에메랄드가 265명이 됐다"를 과거 사실로 적어 두고 있어 문서와 실제가 일치한다.
-- L1 수정은 **다음 실행부터** 적용된다: `sample.test.ts`로 have=180/playersPerTier=250이면 70명만 더함을 확인했고, 실제로 `run`을 다시 돌리면 에메랄드는 265 → (250 이상이라 건너뜀, upserted 0)가 될 것이다. `--resample`을 주면 250명 전체를 다시 뽑아 더해 265+250 = 515명이 된다(결정 02-2, V2와 일치하는 예상 동작).
-- 15명 400 플레이어도 그대로 있다(조치 없음, V1과 일치). `DELETE` 등 쓰기 SQL은 실행하지 않았다.
-
-### 3-2. 가짜 pool stub `.on` 추가의 실제 pg 적합성
-
-Build 보고에 있던 "가짜 pool stub에 `.on` 추가"를 실제 `pg` 동작과 대조했다.
-
-- 실제 `pg.Pool.connect()`는 콜백/프라미스로 **`pg.PoolClient`**(= 실제 백엔드 연결을 감싼 `Client`에 `release` 메서드를 추가한 객체)를 돌려준다. `PoolClient`는 Node `EventEmitter`를 상속하는 `Client`를 확장하므로 `.on('error', …)`는 실제 pg 타입에 존재하는 정상 API다 (pg 공식 문서: "클라이언트가 예기치 않게 연결을 잃으면 풀이 아니라 **클라이언트 인스턴스**가 `'error'`를 낸다").
-- `tx.ts`/`snapshot.ts`에서 쓰는 `client.on('error', …)`는 바로 이 공식 패턴과 같다. 테스트의 가짜 `fakeClient()`(`db.test.ts`)도 `EventEmitter`를 `Object.assign`해 같은 인터페이스를 흉내 냈고, `matches.test.ts`/`sample.test.ts`의 가짜 pool도 `connect: async () => ({ query, release, on: () => undefined })`로 실제 호출 시그니처(세 메서드)를 그대로 맞췄다.
-- 결론: 가짜 stub이 실제 운영 `pg.Pool`의 동작과 다르게 치우쳐 테스트를 통과시키는 문제는 없다.
+| 기준 | 확인 | 결과 |
+|------|------|------|
+| `region=kr`만 허용, 다르면 400 | `curl /summoners/na/foo-bar` → 400 `INVALID_PARAMETER` | ✅ |
+| `riotId` 마지막 `-`로 분리 | `curl /summoners/kr/a-b-cd` → `gameName=a-b, tagLine=cd`로 404(계정 없음이지만 분리는 맞음) | ✅ |
+| Riot 호출 순서(account→summoner+league 병렬→ids→상세 병렬) | `summonerSearch.ts` 코드 확인 + 실제 호출 로그(계정 1 → summoner/league 병렬 → ids 1 → 매치 20 병렬) | ✅ |
+| 응답에 `window` 없음, `no-store` | 실제 응답 확인 | ✅ |
+| 캐시: TTL 60초, 최대 200개, 실패 캐시 안 됨 | 코드 + `summonerCache.test.ts` 5개 + 실제 캐시 적중(두 번째 호출 1.6ms) | ✅ |
+| API 전용 `RateLimiter` 별도 인스턴스 | `server.ts`에서 `new RateLimiter(...)`를 따로 생성해 주입 | ✅ (단, 7장 문제) |
+| 오류 매핑 404/503/502 | 단위 테스트 + 실제 404 확인 | ✅ |
+| `collector/*` import 없음, `RIOT_API_KEY`는 `server.ts`에서만 읽음 | `grep` 재확인 | ✅ |
+| 비밀값 미노출 | 서버 로그 `grep` 재확인(0건) | ✅ |
+| 실제 테스트 계정 1회 이상 호출 확인 | 5장 | ✅ |
 
 ---
 
-## 4. 코드 품질 메모
+## 4. 계획과 다른 부분 4가지 판단
 
-수정된 모든 파일(`sample.ts`, `matches.ts`, `collect.ts`, `meta.ts`, `tx.ts`, `snapshot.ts`, `server.ts`, `collection.ts`, 신규/수정 테스트, 문서)을 리뷰어 관점에서 읽었다.
+| # | 내용 | 판단 |
+|---|------|------|
+| 15 | `ParticipantDto.teamId` 추가 | **타당하다.** `matchListItem`이 `team`/`enemy`를 가르는 유일한 방법은 `teamId`(100/200) 비교다. 참가자 배열 순서(0~4/5~9)로 추정하는 방법은 Riot이 순서를 보장하지 않는 경우(리메이크, 커스텀 등)에 깨질 수 있어 실제 필드를 쓰는 쪽이 맞다. 수집기(`transform.ts`)는 이 필드를 읽지 않으므로 영향도 없다. |
+| 16 | `RIOT_API_KEY` 없이도 서버가 켜지고 전적 검색만 503을 줌 | **타당하다.** 개발 키가 24시간마다 만료된다는 전제(CLAUDE.md, `.env` 표)와 맞는 설계다. 서버가 꺼지면 챔피언 통계 API(프론트의 주 화면)까지 같이 죽는데, 전적 검색은 이번 변경의 부가 기능이라 "이 기능만 503"이 사용자 영향이 작다. 다만 이건 **"API 서버는 Riot 키를 읽지 않는다"는 기존 아키텍처 경계를 바꾸는 결정**이라 Build가 스스로 판단해 구현한 것이 설계적으로는 맞지만, 절차상 사전 승인 없이 들어간 점은 메인 에이전트가 사용자에게 알려야 한다(10장 참고). 코드 자체는 `catch`로 안전하게 처리돼 있고 실제로 키가 없을 때 서버가 안 죽는지는 별도로 확인하지 않았으나(실제 키가 있는 환경이라 재현 못함), `server.ts`의 `buildSummonerSearch()` 로직을 읽어보면 `loadRiotEnv()` 실패 시 `catch`로 넘어가 대체 함수를 반환하고 `main()`은 계속 진행하므로 서버가 켜지는 경로는 코드상 명확하다. |
+| 17 | account-v1 실제 경로가 `riot/account/v1/…` | **타당하고 정확하다.** Riot의 Account-V1 API는 실제로 `/riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}`이다(계획 W-2 표기가 줄여 쓴 것). 실제 호출(5장)로 200을 받아 경로가 맞음을 재확인했다. |
+| 18 | 계획 오류표에 없는 Riot 오류는 500으로 처리 | **타당하다.** `RiotBadRequestError`(400) 같은 경로는 애초에 이 엔드포인트의 입력 검사(파라미터)를 통과한 뒤 Riot이 거부하는 경우라 실제로는 거의 발생하지 않는다. 서버가 죽지 않고 500으로 막히는 보수적 처리이며, 다른 통계 엔드포인트도 같은 원칙(`그 밖은 500`)을 쓰고 있어 일관적이다. |
 
-- **버그·회귀 없음.** ②의 연속 실패 상한이 ③~⑤와 같은 `riotCfg.maxConsecutiveMatchFailures`를 재사용하는 점(V4)도 코드로 확인했고, 설정값이 늘지 않아 유지보수 부담이 적다.
-- **네이밍**: `idsConsecutiveFailures`(②)와 `consecutiveFailures`(③~⑤)가 스코프가 분리된 지역 변수라 혼동 위험이 작다. 굳이 통합할 필요는 없다(②는 ③~⑤ 루프 시작 전에 끝나는 별도 단계).
-- **중복**: `withTransaction`과 `readSnapshot`의 로거-리스너 부착 코드가 2곳에서 거의 같은 모양으로 반복된다(`if (logger) { client.on('error', …) }`). 작은 중복이라 공용 헬퍼로 뽑을 만큼의 가치는 크지 않다고 판단해 손대지 않았다(설계 변경에 해당해 Review 범위를 넘어선다고 보고 보고만 함).
-- **`meta.ts`**: `catch` 블록이 `err`를 받아 로그만 남기고 그대로 `ApiError`로 바꾸는 흐름이 명확하다. `formatError`가 기존에 쓰던 가리기 함수를 그대로 재사용해 비밀값 노출 위험이 없다.
-- **테스트**: `matches.test.ts`의 리셋 테스트("10번째만 성공 → n=30에서 멈춤")는 숫자를 하드코딩하지 않고 실제 함수 동작으로 값을 검증해, 카운터 리셋 로직이 실제로 동작함을 의미 있게 보장한다. `sample.test.ts`/`db.test.ts`도 마찬가지로 실제 모듈을 호출해 결과를 비교한다(목표 동작을 가정해 끼워 맞추지 않음).
-- **문서**: `back_build.md`·`back_spec.md`·`api_contract.md`의 수치·날짜가 코드·테스트 결과와 모두 일치했다(92개 단위 테스트, divisionQuota(250)=63/63/62/62, 날짜 순서).
+- 종합: 4가지 모두 받아들인다. 16번만 "설계는 맞지만 승인 절차가 사후"라는 점을 메인 에이전트가 사용자에게 명시적으로 알려야 한다(이미 결정 W9로 back_spec에 기록돼 있어 사실상 사용자가 본 것과 같지만, 아키텍처 경계 변경이라는 무게가 있다).
 
 ---
 
-## 5. 범위 확인
+## 5. 실제 Riot API 재확인
+
+> 요약: `너희는개다-KR1`(KR)로 서버를 직접 띄워 재확인했다. Build가 이미 확인한 내용을 독립적으로 1회 더 확인(과도하게 반복하지 않음).
 
 | 확인 | 결과 |
 |------|------|
-| `docs/contracts/db_contract.md`, `.dbml` 수정 여부 | 수정 없음 (`git diff --stat`에 없음) |
-| `db/` 수정 여부 | 수정 없음 |
-| `frontend/` 수정 여부 | 수정 없음 |
-| `.env`, `.env.example` | `.env.example` 변경 없음 (새 환경 변수 없음과 일치) |
-| 비밀값 노출 | `grep`으로 `RIOT_API_KEY=`·`DATABASE_URL=postgres` 실제 값 패턴 검색, 변경된 문서·로그에 값 없음 (테스트 환경 변수 예시 `RIOT_API_KEY=invalid`는 기존 문서에 이미 있던 것으로 비밀값이 아님) |
+| 캐시 미스(최초 호출) | `GET /api/v1/summoners/kr/너희는개다-KR1` → **200 OK**, 약 2.47초. `summoner`(gameName/tagLine/profileIconId/summonerLevel), `leagues`(RANKED_FLEX_SR SILVER II, RANKED_SOLO_5x5 SILVER I), `matches` 20건 |
+| 응답 형식 | `api_contract.md` 2-5 예시와 필드 구성 일치(`matchId/gameStartAt/gameDurationSec/win/championId/individualPosition/kills/deaths/assists/cs/goldEarned/items(6)/trinket/summonerSpells(2)/keystone/participants.team(5)/enemy(5)`) |
+| 캐시 적중(두 번째 호출) | **1.6ms**, 서버 로그에 `소환사 검색 캐시 적중` 1줄, Riot 재호출 없음 |
+| `region=na` | 400 `INVALID_PARAMETER` |
+| `riotId` 형식 오류(대시 없음) | 400 `INVALID_PARAMETER` |
+| `gameName`에 `-`가 있는 경우(`a-b-cd`) | `gameName="a-b", tagLine="cd"`로 올바르게 분리됨(계정은 없어 404, 분리 로직 자체는 정확) |
+| 존재하지 않는 소환사 | 404 `SUMMONER_NOT_FOUND`, `details.gameName`·`details.tagLine` 포함 |
+| 429 | 0회 |
+| 기존 `/meta` 영향 확인 | 그대로 200 |
+| 비밀값 노출 | 서버 로그(`/tmp/tiergg-review-server.log`) `grep` 0건 |
 
 ---
 
-## 6. Review가 고친 것
+## 6. 코드 품질·보안 메모
 
-- 없음. 설계를 바꿔야 하는 결함을 찾지 못했고, 오타·테스트 보강이 필요한 곳도 보이지 않았다.
+| 파일 | 메모 |
+|------|------|
+| `summonerCache.ts` | TTL·최대 200개·지연 정리 로직에 버그 없음. `set()`에서 `delete()` 후 `set()`으로 Map 삽입 순서를 갱신해 "가장 오래 넣은 것부터 삭제" 규칙이 갱신 후에도 올바르게 유지됨(단위 테스트로 확인). Node는 단일 스레드 이벤트 루프라 Map 읽기/쓰기 자체의 동시성 문제는 없다. |
+| 동시 요청 **(L2, Low)** | 같은 소환사를 거의 동시에 두 번 요청하면, 첫 요청이 Riot 호출을 끝내고 `cache.set()`을 부르기 전까지는 두 번째 요청도 캐시 미스로 처리돼 Riot을 중복 호출한다(캐시는 "진행 중" 상태를 표시하지 않음). 데이터가 깨지거나 캐시가 오염되는 문제는 아니고, TTL 60초·개발 단계 동시 사용자가 적은 점을 고려하면 영향은 작다. in-flight 요청을 합치는 방식(Promise 캐시)으로 고칠 수 있지만, 이는 설계를 바꾸는 선택이라 직접 고치지 않고 보고한다. |
+| `matchListItem` **(L1, Low)** | `dto.ts`의 `matchListItem`이 참가자 중 검색한 `puuid`를 못 찾으면 `throw new Error(...)`를 던진다. 이 예외는 `summonerSearch.ts`의 catch에서 Riot 오류 타입이 아니므로 그대로 올라가 오류 미들웨어가 500 `INTERNAL_ERROR`로 처리한다 — 즉 **매치 20건 중 1건만 이상해도 전체 요청이 500으로 실패**한다. 실무에서는 `match-v5 ids by-puuid`로 가져온 매치 ID는 항상 그 puuid를 포함하므로 거의 발생하지 않지만, 이미 코드에 "매치 상세 일부 실패는 그 매치만 빼고 응답"하는 패턴(`summonerSearch.ts`의 `Promise.all` + `ok/err` 래핑)이 있는 만큼, 같은 원칙을 `matchListItem` 호출에도 적용(실패한 매치만 건너뛰고 로그)하는 편이 일관적이다. 동작을 바꾸는 선택이라 직접 고치지 않고 보고한다. |
+| 보안 | `.env`의 `RIOT_API_KEY`는 서버 로그·API 응답·오류 메시지에 노출되지 않음(실제 로그 `grep` 재확인). 캐시에는 `summonerSearchDto`만 저장되고 Riot 키나 DB 접속 문자열 등 민감정보는 담기지 않는다. `puuid`는 응답 필드로 그대로 노출되는데, 이는 계약(2-5)에 명시된 정상 동작이고 서버 로그에서만 앞 8자로 가린다(기존 규칙과 일치). |
 
 ---
 
-## 7. 남은 문제
+## 7. Rate limit 설계 — **M1 (Medium)**
 
-- L5(연결 오류 리스너)는 계획대로 `withTransaction`·`readSnapshot`에만 적용됐다. `collector/aggregate.ts`의 `aggregateWindowOnPool`은 여전히 `pool.connect()`에 리스너가 없다 — 다만 이 명령은 사람이 직접 실행하는 시험용이라(자동 집계는 DB 예약 작업이 SQL로 직접 함) 위험이 작고, 계획에서 범위를 명시적으로 좁혔으므로 이번 변경의 결함은 아니다. 다음에 연결 안전성을 더 다루게 되면 참고할 항목으로만 남긴다.
-- 그 밖의 남은 점은 `back_overview.md` 10장(해결되지 않은 점)에 갱신해 두었다.
+> 요약: API 전용 제한기(1초 10회·120초 50회)와 수집 CLI 제한기(1초 19회·120초 98회)는 **서로 다른 프로세스의 별개 인스턴스**다. 둘 다 같은 `RIOT_API_KEY`를 쓰므로, Riot 서버 쪽에서 보는 실제 사용량은 두 제한기의 합이다.
+
+| 창 | 계산 | Riot 실제 한도(back_overview 3-2) | 결과 |
+|----|------|-----------------------------------|------|
+| 1초 | 수집 19 + API 10 = **29회** | 20회 | 수집 CLI가 돌고 있는 동안 API로 몇 건만 겹쳐도 바로 초과 |
+| 120초 | 수집 98 + API 50 = **148회** | 100회 | 수집 CLI 혼자서도(98) 이미 거의 한도를 다 쓰고 있어, API 쪽 호출이 조금만 겹쳐도 바로 초과 |
+
+- back_spec W3의 근거("API 전용 제한기는 Riot 실제 한도의 절반이라 수집 CLI와 동시에 돌 수 있어 여유를 둔다")는 **제한기가 프로세스별 로컬 카운터일 뿐, Riot 쪽 실제 한도는 키 전체에 걸리는 전역 값**이라는 점을 놓치고 있다. "절반이라 여유가 있다"는 설명과 실제 동작이 맞지 않는다.
+- 다만 실제로 문제가 되는 상황은 "수집 CLI가 돌고 있는 동안 누군가 전적 검색도 쓰는" 경우뿐이다. CLAUDE.md·`.env.example`에 따르면 수집은 사람이 수동으로, 하루 중 정해진 시간(약 3시간)에만 돌리고, 지금 개발 단계에서 전적 검색 API 사용자는 거의 없다. 겹쳐도 각 클라이언트가 429를 받으면 `Retry-After`만큼 재시도하므로(2-2) **서버가 죽거나 데이터가 깨지지는 않고, 느려지거나 수집이 일시적으로 멈출 수 있는 정도**다.
+- 설계를 바꿔야 하는 문제(두 제한기를 합쳐야 하는지, API 쪽 한도를 더 낮춰야 하는지는 운영 판단이 필요)라 직접 고치지 않고 보고한다. 권장: 두 프로세스가 동시에 돌 가능성이 낮다는 전제를 문서에 명시하거나, API 쪽 한도를 더 보수적으로(예: 1초 3~5회) 낮춰 수집 CLI와 합쳐도 실제 한도를 넘지 않게 하는 것을 고려할 수 있다.
+
+---
+
+## 8. npm audit
+
+- `body-parser`(express 2.x 전이 의존성) DoS high 1건. `git log -- package.json`으로 확인한 결과 이 패키지는 최초 커밋(`f62d425`, 변경 03 이전)부터 있었고 이번 변경에서 `package.json`·`package-lock.json`을 건드리지 않았다 — **이번 변경과 무관한 기존 문제**임을 확인했다.
+- `npm audit fix --dry-run`을 다시 실행해 `body-parser 2.3.0 → 2.4.0`, `qs 6.16.0 → 6.17.0` 패치 범위 업데이트만 있음을 재확인했다. 조치는 범위 밖(이 변경의 작업 범위가 아님)이라 직접 실행하지 않았다. 사용자 승인을 받아 별도로 `npm audit fix`를 실행하는 것을 권장한다.
+
+---
+
+## 9. 범위 확인
+
+| 확인 | 결과 |
+|------|------|
+| `backend/src/collector/*`, `backend/src/cli/collect.ts` 수정 여부 | `git diff --stat` 기준 수정 없음 |
+| `docs/contracts/db_contract.md`, `.dbml` 수정 여부 | 수정 없음 |
+| `frontend/*` 수정 여부 | 수정 없음(`frontend/mockup-current.html`은 untracked 상태로 이미 있었고, 이번 변경이 만들거나 고치지 않았다) |
+| DB 쓰기 | 이번 기능은 DB를 쓰지 않음(계획 W-6). 확인만 하고 쓰기 없음 |
+
+---
+
+## 10. 남은 문제
+
+> 요약: 동작을 막는 결함은 없다. 운영 판단이 필요한 것 1건(M1), 설계는 그대로 두고 참고할 것 2건(L1·L2), 기존 의존성 문제 1건(npm audit)이 남는다. 전부 `back_overview.md` "해결되지 않은 점"에 옮겼다.
+
+1. (M1) API 전용 제한기(10/120s:50)와 수집 CLI 제한기(19/120s:98)를 더하면 Riot 실제 한도(20/1초, 100/120초)를 넘는다. 둘이 동시에 돌 가능성이 낮아 지금은 429 재시도로 흡수되지만, 운영 판단(한도 재조정 또는 "동시 운용 안 함" 명시)이 필요하다.
+2. (L1) `matchListItem`이 puuid를 못 찾는 매치가 하나라도 있으면 전체 검색 요청이 500으로 실패한다(실무에서 거의 발생 안 함). 다른 매치 실패 처리와 같은 방식(그 매치만 건너뜀)으로 통일하는 것을 권장한다.
+3. (L2) 같은 소환사를 거의 동시에 검색하면 캐시 미스 구간에서 Riot을 중복 호출할 수 있다(데이터 깨짐 없음, 영향 작음).
+4. (기존) `npm audit` 1건(`body-parser` DoS). 이번 변경과 무관. 사용자 승인 뒤 `npm audit fix` 권장.
+5. (기존, 변경 02에서 이미 닫힘) ③~⑤ 연속 20개 실패, 전적 검색의 429·5xx·매치 일부 실패 경로는 실제 Riot 장애로 재현하지 못해 가짜 클라이언트로만 확인했다.

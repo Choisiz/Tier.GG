@@ -10,7 +10,11 @@ export type ErrorCode =
   | 'NOT_FOUND'
   | 'STATS_NOT_READY'
   | 'DB_UNAVAILABLE'
-  | 'INTERNAL_ERROR';
+  | 'INTERNAL_ERROR'
+  // 전적 검색(소환사 상세, back_spec 변경 03 W-5)
+  | 'SUMMONER_NOT_FOUND'
+  | 'RIOT_KEY_EXPIRED'
+  | 'RIOT_UNAVAILABLE';
 
 export class ApiError extends Error {
   constructor(

@@ -1,9 +1,9 @@
 # 백엔드 계획서 — 수집 워커 + 챔피언 통계 API
 
-> 상태: **승인됨** (v1 2026-10-14, 변경 01 2026-10-15, 변경 02 2026-10-16)
+> 상태: **승인됨** (v1 2026-10-14, 변경 01 2026-10-15, 변경 02 2026-10-16, 변경 03 2026-10-27)
 > 읽는 계약: `docs/contracts/db_contract.md`, `docs/contracts/db_contract.dbml` **v8** (최근 14일 기준, 변경 04: 룬 보조 정렬·수집 범위 티어당 250명)
-> 작성하는 계약: `docs/contracts/api_contract.md` **v2** (문구 정정 2026-10-16)
-> 이 문서는 **지금 계획만** 적는다. 패치 기준이던 v1 계획과 변경 01·02 원문은 git 기록(`87cfc78`, 변경 02는 이 Build 커밋 이전)에 남아 있다.
+> 작성하는 계약: `docs/contracts/api_contract.md` **v3** (전적 검색 추가, 2026-10-27)
+> 이 문서는 **지금 계획만** 적는다. 패치 기준이던 v1 계획과 변경 01·02·03 원문은 git 기록(`87cfc78`, 변경 02·03은 각 Build 커밋 이전)에 남아 있다.
 
 ## 목차
 
@@ -32,12 +32,14 @@
   - [5-4. 한 요청은 한 스냅숏](#5-4-한-요청은-한-스냅숏)
   - [5-5. 집계 전 응답](#5-5-집계-전-응답)
   - [5-6. 프론트 사용 방식에 맞춘 점](#5-6-프론트-사용-방식에-맞춘-점)
+  - [5-7. 전적 검색 (변경 03)](#5-7-전적-검색-변경-03)
 - [6. 오류 처리와 로깅](#6-오류-처리와-로깅)
 - [7. 설정값](#7-설정값)
 - [8. 의존성](#8-의존성)
 - [9. 테스트 전략](#9-테스트-전략)
 - [10. 완료 기준](#10-완료-기준)
   - [10-5. 변경 02 (L1~L5, 계약 문구, 프리셋)](#10-5-변경-02-l1l5-계약-문구-프리셋)
+  - [10-6. 변경 03 (전적 검색)](#10-6-변경-03-전적-검색)
 - [11. 계약 변경 요청](#11-계약-변경-요청)
 - [12. 결정 사항](#12-결정-사항)
 - [13. 작업 범위](#13-작업-범위)
@@ -59,7 +61,8 @@
 | 5 | 원본 정리 | `purge`: 미리보기, `--yes`일 때만 `purge_old_games(21)` |
 | 6 | 읽기 API | 상태 확인, 메타(창 정보), 포지션별 티어리스트, 챔피언 상세(포지션 + 빌드) |
 | 7 | 테스트 | 변환·제한기·규칙 단위 테스트, 실제 Supabase에서 ROLLBACK하는 통합 테스트 |
-| 8 | 계약 | `docs/contracts/api_contract.md` v2 |
+| 8 | 계약 | `docs/contracts/api_contract.md` v3 |
+| 9 | 전적 검색 (변경 03) | `GET /api/v1/summoners/kr/:riotId`: account-v1 → summoner-v4 + league-v4(병렬) → match-v5 ids → 상세 20건(병렬, 일부 실패 허용). DB 저장 없음, API 프로세스 메모리에 60초 캐시 |
 
 ### 1-2. 하지 않는 것
 
@@ -70,7 +73,9 @@
 | 마스터 이상 리그 API (`masterleagues` 등) | 본 수집 범위. 테스트는 디비전이 있는 티어만 |
 | 스케줄러(자동 수집) | 개발 키가 24시간마다 만료된다. 수집은 사람이 직접 실행한다 |
 | HTTP로 수집 실행 | 예전 실수. 수집은 CLI로만 하고, API는 읽기 전용이다 |
-| 전적 검색, SSE 새로고침, AI 피드백 | 이후 단계 |
+| SSE 새로고침, AI 피드백 | 이후 단계 |
+| 전적 검색의 챔피언별 통계·플레이 스타일·숙련도 탭, 과거 매치 더보기, 스킬 순서(타임라인) | 변경 03 1차 범위 밖(검색→프로필→최근 매치 20건까지). 다음 단계 |
+| 전적 검색 결과의 DB 영구 저장 | 사용자가 검색한 임의의 소환사를 표본 수집(공정한 티어별 통계용) 테이블에 끼워 넣으면 표본이 편향된다. 메모리 캐시로 충분 (변경 03 W-6) |
 | DB 스키마 변경 | `!db` 영역. 필요하면 11장 "계약 변경 요청"에 적는다 |
 | 이름·이미지 | 백엔드는 숫자 ID만 준다. 이름·이미지는 프론트가 Data Dragon으로 |
 | 예전 코드의 GET 수집, 실행마다 TRUNCATE, `spell1Casts`를 소환사 주문으로 쓰기 | 예전 백엔드(`0234719`)의 실수. 다시 하지 않는다. 이중 창 제한기 아이디어만 가져왔다 |
@@ -94,9 +99,10 @@ backend/
 │   ├── server.ts               # 진입점 1: API 서버. 풀로 ApiDb를 만든다
 │   ├── cli/collect.ts          # 진입점 2: 수집 CLI (run / sample / matches / aggregate / purge)
 │   ├── config/
-│   │   ├── env.ts              # 환경 변수 읽기·검사 (값은 출력하지 않음)
+│   │   ├── env.ts              # 환경 변수 읽기·검사 (값은 출력하지 않음). loadRiotEnv()는 수집 CLI와 API 서버(변경 03)가 함께 쓴다
 │   │   ├── collection.ts       # 수집 프리셋(test, main), Riot 클라이언트 설정, windowStart()
-│   │   └── api.ts              # API 규칙 상수 (WINDOW_DAYS, STALE_AFTER_HOURS 등)
+│   │   ├── api.ts              # API 규칙 상수 (WINDOW_DAYS, STALE_AFTER_HOURS 등)
+│   │   └── summoner.ts         # 전적 검색 설정: 캐시 TTL·크기, API 전용 Riot 제한기(변경 03)
 │   ├── db/
 │   │   ├── pool.ts             # pg Pool, 연결 오류 판별, 오류 메시지 가리기
 │   │   ├── tx.ts               # withTransaction, inTransaction, Queryable 타입
@@ -118,15 +124,18 @@ backend/
 │   │   ├── logRepository.ts    # collection_logs
 │   │   └── statsRepository.ts  # readWindow, tierRows, tierRowsForChampion, champion_item/rune/spell/skill 읽기
 │   ├── api/
-│   │   ├── app.ts              # createApp(db, logger, { now }) — 테스트에서 롤백 연결·고정 시계를 넣을 수 있게
+│   │   ├── app.ts              # createApp(db, logger, { now, summonerSearch }) — 테스트에서 롤백 연결·고정 시계·가짜 summonerSearch를 넣을 수 있게
 │   │   ├── routes/meta.ts      # GET /api/v1/health, /api/v1/meta
 │   │   ├── routes/champions.ts # GET /api/v1/champions, /api/v1/champions/:championId
+│   │   ├── routes/summoners.ts # GET /api/v1/summoners/:region/:riotId (변경 03, window 없음)
+│   │   ├── summonerSearch.ts   # account-v1→summoner-v4+league-v4(병렬)→match-v5 ids→상세, 캐시, 오류 매핑 (변경 03)
+│   │   ├── summonerCache.ts    # Map 기반 TTL 캐시, 최대 200개 (변경 03)
 │   │   ├── window.ts           # window 객체, displayName, share, isStale, 503, 오래됨 경고
-│   │   ├── validate.ts         # position, championId 검사 (직접 작성)
+│   │   ├── validate.ts         # position, championId, region, riotId 검사 (직접 작성)
 │   │   ├── errors.ts           # ApiError, 오류 응답 형식, 오류 미들웨어
 │   │   ├── mainPositions.ts    # 주 포지션 최대 2개 규칙
 │   │   ├── cache.ts            # Cache-Control 헤더 한 곳
-│   │   └── dto.ts              # DB 줄 → 응답 DTO
+│   │   └── dto.ts              # DB 줄 → 응답 DTO, 소환사 검색 DTO(변경 03)
 │   └── lib/logger.ts           # 한 줄 로그 + 비밀값 가리기, puuid 앞 8자
 └── test/
     ├── fixtures/               # KR_8408851980.match.json / .timeline.json (실제 게임, 개인 정보는 가짜 값)
@@ -141,10 +150,13 @@ backend/
 
 | 진입점 | 명령 (backend/에서) | 하는 일 | DB |
 |--------|---------------------|---------|-----|
-| API 서버 | `npm run dev` (watch) / `npm start` | 읽기 API만. Riot 키를 읽지 않고 수집 코드를 import하지 않는다 | 읽기만 |
+| API 서버 | `npm run dev` (watch) / `npm start` | 읽기 API + 전적 검색(변경 03, Riot을 직접 호출). `collector/*`는 import하지 않는다 | 읽기만 |
 | 수집 CLI | `npm run collect -- <하위 명령> [옵션]` | Riot 호출, 저장, 시험용 집계, 정리 | 읽기·쓰기 |
 
-- API 서버는 `RIOT_API_KEY`가 없어도 켜진다. 수집 CLI는 없으면 바로 종료한다.
+- **(변경 03) API 서버가 `RIOT_API_KEY`를 읽는다** — 전적 검색(소환사 상세)이 Riot을 직접 불러야 해서다. 예전 전제("API 서버는 Riot 키를 읽지 않는다")는 더 이상 맞지 않는다. 단, `collector/*`는 여전히 import하지 않는다(경계는 "Riot 키를 읽느냐"가 아니라 "수집 코드를 쓰느냐"로 바뀜).
+- 키가 없거나 형식이 잘못돼도 API 서버는 계속 켜진다. 전적 검색만 모든 요청에서 503 `RIOT_KEY_EXPIRED`를 준다 (개발 키가 24시간마다 만료되므로 그 때문에 챔피언 통계까지 막히면 안 됨).
+- 수집 CLI는 `RIOT_API_KEY`가 없으면 바로 종료한다 (기존과 동일).
+- API 서버와 수집 CLI는 각자 `RateLimiter` 인스턴스를 따로 둔다 (다른 프로세스라 메모리 제한기를 공유할 수 없음). API 전용 한도는 Riot 실제 한도의 절반(1초 10회, 2분 50회) — 수집 CLI가 동시에 돌 수 있어 여유를 둔다.
 
 ### 2-3. 공유 모듈
 
@@ -377,7 +389,7 @@ backend/
 
 ## 5. API 설계
 
-> 요약: 읽기 전용 GET 엔드포인트 4개. 숫자 ID와 개수·비율, 그리고 어느 14일 창의 통계인지(`window`)를 준다. 자세한 형식은 `docs/contracts/api_contract.md` v2.
+> 요약: 읽기 전용 GET 엔드포인트 5개. 통계 4개는 숫자 ID와 개수·비율, 그리고 어느 14일 창의 통계인지(`window`)를 준다. 전적 검색(변경 03)은 `window`가 없고 Riot을 그 자리에서 중계한다. 자세한 형식은 `docs/contracts/api_contract.md` v3.
 
 | 메서드·경로 | 화면 | 내용 |
 |-------------|------|------|
@@ -385,6 +397,7 @@ backend/
 | `GET /api/v1/meta` | 공통 (푸터 등) | `window`, `lastCollectedAt`(마지막 `done` 수집), `positions`, `rules{minTierPick, secondaryPositionMinShare, windowDays, staleAfterHours}` |
 | `GET /api/v1/champions?position=TOP` | 챔피언 리스트(티어) | 그 포지션이 주 포지션인 챔피언, 티어 → 점수 순, `window` |
 | `GET /api/v1/champions/:championId[?position=]` | 챔피언 상세 | 주 포지션(최대 2개), 선택 포지션 통계, 아이템(전체)·룬·스펠·스킬(상위 2개), `window` |
+| `GET /api/v1/summoners/kr/:riotId` (변경 03) | 전적 검색 | 프로필, 랭크 전체, 최근 매치 20건(큐 필터 없음). `window` 없음, 캐시 `no-store` (5-7) |
 
 - 경로는 `/api/v1` 그대로다 (결정 D14). 예전 `patch` 쿼리와 모르는 쿼리는 400을 주지 않고 **무시**한다.
 
@@ -463,6 +476,25 @@ backend/
 - 상세 한 번 호출로 포지션 탭·빌드를 모두 받는다.
 - 아이템은 프론트가 Data Dragon으로 거르므로 **모든 아이템**을 pick 순으로 준다 (결정 D4).
 
+### 5-7. 전적 검색 (변경 03)
+
+> 요약: `riotId`(`gameName-tagLine`)로 소환사를 찾아 프로필·랭크·최근 매치 20건을 Riot에서 그 자리에서 받아 돌려준다. DB에 저장하지 않고 60초만 메모리에 캐시한다. `window`가 없는 유일한 엔드포인트다.
+
+| 항목 | 규칙 |
+|------|------|
+| 경로 | `GET /api/v1/summoners/:region/:riotId`. `region`은 `kr`만 허용(그 밖은 400, 결정 S1) |
+| `riotId` 파싱 | 마지막 `-`에서 `gameName`/`tagLine`으로 자른다 (결정 S2). `tagLine`은 `^[0-9A-Za-z]{2,5}$` |
+| Riot 호출 순서 | account-v1(지역) → summoner-v4 + league-v4 by-puuid(플랫폼, **병렬**) → match-v5 ids(지역, 큐 필터 없음 count=20) → match-v5 상세 × 최대 20(지역, **병렬**, 일부 실패는 그 매치만 빼고 응답) |
+| 새 클라이언트 메서드 | `getAccountByRiotId`, `getSummonerByPuuid`, `getLeagueEntriesByPuuid`, `getRecentMatchIds` (수집기 전용 `getMatchIds`와 별도). `getMatch`는 기존 메서드 재사용 |
+| 타임라인 | 부르지 않는다. 룬·스펠·아이템·KDA·CS는 `getMatch` 응답에 다 있다. 스킬 순서는 이번 범위 밖 |
+| 캐시 | `src/api/summonerCache.ts`, Map 기반, 키 `region:소문자gameName#소문자tagLine`, TTL **60초**(결정 S4), 최대 **200개**(넘치면 가장 오래 넣은 것부터 지움), 실패 응답은 캐시하지 않음 |
+| API 전용 제한기 | Riot 실제 한도의 절반(1초 10회, 2분 50회, 결정 S3). 수집 CLI와 공유하지 않는다 (다른 프로세스) |
+| `ApiDeps` 주입 | `summonerSearch(region, gameName, tagLine)` 함수 하나로 감싼다 (결정 S7). 라우트는 `RiotClient` 세부사항(캐시, 오류 매핑)을 모른다 |
+| 오류 매핑 | account-v1 404 → 404 `SUMMONER_NOT_FOUND`. 401/403 → 503 `RIOT_KEY_EXPIRED`(이 요청만 실패, 서버는 멈추지 않음, 매 요청 로그 — 결정 S5). 429·5xx 재시도 소진 → 502 `RIOT_UNAVAILABLE`. league 빈 배열·match ids 빈 배열은 오류 아님 |
+| 캐시 적중 표시 | 응답에 표시하지 않는다 (결정 S6). 서버 로그(캐시 적중/미스 1줄)로만 확인 |
+| 캐시 헤더 | `no-store` (검색 결과는 거의 실시간이어야 함. 통계 4개의 `public, max-age=600`과 다름) |
+| DB 영향 | 없음. 표본 수집 테이블(`ranked_players` 등)에 끼워 넣지 않는다 (W-6, 계약 변경 요청 없음) |
+
 ---
 
 ## 6. 오류 처리와 로깅
@@ -494,6 +526,9 @@ backend/
 | 503 | `STATS_NOT_READY` | `stats_window`가 비어 있음 |
 | 503 | `DB_UNAVAILABLE` | DB 연결 실패 |
 | 500 | `INTERNAL_ERROR` | 그 밖 (내부 내용은 응답에 넣지 않고 로그에만) |
+| 404 | `SUMMONER_NOT_FOUND` | 전적 검색(변경 03): account-v1에 없는 소환사 |
+| 502 | `RIOT_UNAVAILABLE` | 전적 검색(변경 03): Riot 429·5xx 재시도 소진 |
+| 503 | `RIOT_KEY_EXPIRED` | 전적 검색(변경 03): Riot 401/403. **이 요청만** 실패, 서버는 계속 응답 |
 
 - 형식: `{ "error": { "code": "...", "message": "...", "details": {...} } }`, `no-store`.
 
@@ -564,6 +599,17 @@ backend/
 | `STALE_AFTER_HOURS` | 26 | 5-3 |
 | `DETAIL_TOP_N` | 2 (룬·스펠·스킬) | 계약 10장 |
 | `CACHE_MAX_AGE_SEC` | 600 | 결정 D5 |
+
+### 7-5. 전적 검색 (config/summoner.ts, 변경 03)
+
+| 설정 | 기본 | 근거 |
+|------|------|------|
+| `SUMMONER_CACHE_TTL_MS` | 60,000 (60초) | 결정 S4 |
+| `SUMMONER_CACHE_MAX` | 200 | 메모리 무한 증가 방지 (개발 단계 동시 사용자 적음) |
+| `RECENT_MATCH_COUNT` | 20 | match-v5 ids `count` |
+| `API_RIOT_RATE_LIMIT` | 1초 10회, 2분 50회 | Riot 실제 한도(20/100)의 절반 (결정 S3) |
+
+- 수집 CLI의 `RateLimiter`(19/98)와는 **별개 인스턴스**다 (API 서버·수집 CLI가 다른 프로세스).
 
 ---
 
@@ -659,7 +705,7 @@ backend/
 - `npm run typecheck`, `npm run lint` 오류 0, `npm audit` 취약점 0
 - `npm test` 통과 (9-2 전부), `npm run test:integration` 통과, 끝난 뒤 테스트 데이터 0줄
 - 코드에 패치 기준 이름이 없음 (`grep`): `refresh_patch_stats`, `purge_old_patches`, `FROM patch`, `keepPatches`, `maxGamesPerPatch`, `patch_full`, `old_patch`, `isFallback`, `PATCH_NOT_FOUND`, `selectPatch`, `parsePatchParam`, `patchSelection`, `FALLBACK_MIN_GAMES`
-- 진입점 2개 분리 (API 서버가 수집 코드를 import하지 않고 Riot 키를 읽지 않음)
+- 진입점 2개 분리 (API 서버가 `collector/*`를 import하지 않음). **(변경 03) API 서버도 `RIOT_API_KEY`를 읽는다** — 전적 검색 때문이며, 더 이상 "Riot 키를 읽지 않음"은 기준이 아니다
 
 ### 10-2. 수집
 
@@ -678,7 +724,7 @@ backend/
 
 ### 10-3. API
 
-- 엔드포인트 4개가 `api_contract.md` v2의 경로·파라미터·응답 필드·null 여부와 일치
+- 엔드포인트 5개(통계 4개 + 전적 검색)가 `api_contract.md` v3의 경로·파라미터·응답 필드·null 여부와 일치
 - `tier`는 뷰 값 그대로, 정렬 `tier NULLS LAST, tier_score DESC, champion_id`
 - 주 포지션 최대 2개, 2순위 10% 기준
 - `window.patches[]` 최신 순, `displayName` = 메이저 + 10, `share` 소수 2자리
@@ -705,6 +751,18 @@ backend/
 - `docs/contracts/api_contract.md` 2-4 문구·6장 날짜 순서가 고쳐졌다. 응답 필드·형식은 그대로다 (02-8)
 - 15명 400은 조치 없이 `back_overview.md` 10장에서 "조사 완료"로 닫힌다 (02-1, V1)
 
+### 10-6. 변경 03 (전적 검색)
+
+- `GET /api/v1/summoners/:region/:riotId`: `region=kr`만 허용, 다르면 400. `riotId`는 마지막 `-`로 `gameName`/`tagLine` 분리
+- Riot 호출 순서 account-v1 → summoner-v4+league-v4(병렬) → match-v5 ids → 상세(병렬, 일부 실패 허용), 캐시 미스 1건 최대 24회
+- 응답에 `window` 없음, `Cache-Control: no-store`, 캐시 적중 여부 비표시
+- 캐시: Map TTL 60초, 최대 200개, 실패 응답 캐시 안 함, 가장 오래 넣은 것부터 지움
+- API 전용 `RateLimiter`(1초 10회/2분 50회)가 수집 CLI와 별도 인스턴스
+- 오류: 404 `SUMMONER_NOT_FOUND`, 503 `RIOT_KEY_EXPIRED`(이 요청만 실패, 서버는 안 멈춤), 502 `RIOT_UNAVAILABLE`
+- `collector/*` import 없음, `RIOT_API_KEY`는 `server.ts`에서만 읽음 (`grep`)
+- 비밀값(`RIOT_API_KEY`)이 로그·응답에 그대로 나오지 않음. puuid는 응답 필드라 그대로 주는 게 맞음(서버 로그만 가림 규칙 적용)
+- 실제 테스트 계정(`너희는개다#KR1`)으로 최소 1회 실제 호출 확인 (호출 수·429 0회·형식이 `api_contract.md` 2-5와 일치)
+
 ---
 
 ## 11. 계약 변경 요청
@@ -718,6 +776,7 @@ backend/
   3. `matches.game_start_at` 인덱스는 필요 없다 (창 상한·`purge` 미리보기는 최대 약 3만 7천 줄 순차 스캔).
   4. 표본 삭제 기능이 생기면 `matches(puuid)` 인덱스가 필요하다 (db_review L3).
 - API 계약(백엔드가 작성 영역) 문구 2건은 변경 02에서 고쳤다 (2-4 아이템 거르기 설명, 6장 변경 기록 날짜 순서).
+- 변경 03(전적 검색)도 DB 계약 변경 요청 없음. `ranked_players`·`matches`·`match_players` 등 표본 수집 테이블을 읽지도 쓰지도 않는다 (W-6). `api_contract.md`에는 2-5를 새로 추가했다(승인된 범위, 작성 영역이라 요청이 아님).
 
 ---
 
@@ -761,8 +820,17 @@ backend/
 | V6 | `withTransaction`·`readSnapshot`에 선택적 `logger` 매개변수로 연결 오류 리스너를 더한다 | `CollectorLock`과 같은 이론적 위험(처리되지 않은 `'error'`로 프로세스가 죽음)을 줄인다. 로그만 남기고 멈추지 않는다 | 2026-10-16 |
 | V7 | `test` 프리셋 기본값을 250으로 맞춘다 | db 계약 v8(변경 04)과 실제 운영값(R1)에 맞춘다 | 2026-10-16 |
 | V8 | `api_contract.md` 2-4 문구와 6장 날짜 순서를 고친다 (응답 필드는 안 바꿈) | 프론트 실제 동작·시간 순서와 맞춘다 | 2026-10-16 |
+| W1 | `region` 경로 값은 `kr`만 허용, 다르면 400 | `RIOT_PLATFORM_URL`/`RIOT_REGION_URL`이 단일 지역이다. 다지역은 범위 밖 | 2026-10-27 |
+| W2 | `riotId`는 마지막 `-`에서 자른다 (`gameName-tagLine`) | tagLine은 짧은 영숫자로 고정, gameName은 자유 문자(하이픈 포함)라 마지막 `-`가 안전하다 | 2026-10-27 |
+| W3 | API 전용 제한기는 Riot 실제 한도의 절반(1초 10회, 2분 50회) | 수집 CLI가 같은 키로 동시에 돌 수 있어 여유를 둔다. 429가 나도 재시도로 흡수돼 느려지기만 함 | 2026-10-27 |
+| W4 | 캐시 TTL 60초 | "같은 소환사 반복 조회"를 줄이는 목적에 충분히 짧다 | 2026-10-27 |
+| W5 | 401/403 로그는 매번 남긴다(제한 없음) | 검색 API 호출 빈도가 낮은 개발 단계라 스팸 위험이 작다 | 2026-10-27 |
+| W6 | 캐시 적중 여부를 응답에 표시하지 않는다 | 계약을 단순하게 유지. 운영 확인은 서버 로그로 충분 | 2026-10-27 |
+| W7 | Riot 클라이언트를 `summonerSearch` 함수로 감싸 `ApiDeps`에 주입한다 | 라우트가 Riot 세부사항을 몰라도 되고, 테스트에서 가짜 함수로 바꿔 끼우기 쉽다 | 2026-10-27 |
+| W8 | `api_contract.md`에 2-5로 추가한다(새 장으로 빼지 않음) | 기존 번호 체계 유지. `window`가 없는 유일한 엔드포인트임을 문서에 명시 | 2026-10-27 |
+| W9 | API 서버는 `RIOT_API_KEY`가 없거나 잘못돼도 계속 켜지고, 전적 검색만 503 `RIOT_KEY_EXPIRED`를 준다 | 개발 키가 24시간마다 만료된다. 키 문제로 챔피언 통계 API까지 막히면 안 된다 | 2026-10-27 |
 
-- D 번호는 계획의 결정 항목, B는 Build가 정하고 Review가 받아들인 것, U는 변경 01의 사용자 결정, R은 Review 추천을 사용자가 고른 것, V는 변경 02에서 사용자가 승인한 결정(02-9)이다.
+- D 번호는 계획의 결정 항목, B는 Build가 정하고 Review가 받아들인 것, U는 변경 01의 사용자 결정, R은 Review 추천을 사용자가 고른 것, V는 변경 02에서 사용자가 승인한 결정(02-9)이다. W는 변경 03(전적 검색)에서 사용자가 승인한 추천안(결정 S1~S8, Build가 보탠 W9)이다.
 
 ---
 
@@ -780,9 +848,10 @@ backend/
 | Review | `backend/` 안의 수정 | 검토에서 찾은 문제 |
 | Review | `docs/career_log.md` | 아래에 추가만 (기존 기록 수정 금지) |
 
-- 수정 금지: `db/`, `docs/contracts/db_contract.*`, `frontend/`, 루트 `.env`, `CLAUDE.md`.
+- 수정 금지: `db/`, `docs/contracts/db_contract.*`, `frontend/`, 루트 `.env`, `CLAUDE.md`, `backend/src/collector/*`, `backend/src/cli/collect.ts`.
 - 변경 02(15명 400 조사, L1~L5, 프리셋 250, 계약 문구 2건)도 위 표와 같은 경로를 쓴다. 조사(02-1)는 읽기만(`SELECT`, 로그 읽기), 결정 1번이 "삭제"면 `ranked_players` DELETE는 사용자 승인 후에만.
+- 변경 03(전적 검색)도 위 표와 같은 경로를 쓴다. 범위는 `backend/src/riot/*`, `backend/src/api/*`, `backend/src/config/*`, `backend/src/server.ts`, `backend/test/*`이고, `docs/contracts/api_contract.md`는 승인된 2-5만 고친다. `collector/*`·`cli/collect.ts`는 수정하지 않는다.
 - DB 쓰기: 통합 테스트는 ROLLBACK만. 실제 저장은 Review 소량 수집과 `aggregate` 시험뿐. **`purge --yes`, 표본 삭제, 그 밖의 되돌릴 수 없는 SQL은 메인 에이전트를 통해 사용자 승인 후에만.**
-- Riot 호출: Build·Review는 확인용 소량(수십 회)만. fixture는 이미 있어 새로 받지 않는다. 전체 테스트 수집은 사용자가 직접 실행한다.
+- Riot 호출: Build·Review는 확인용 소량(수십 회)만. fixture는 이미 있어 새로 받지 않는다. 전체 테스트 수집은 사용자가 직접 실행한다. 전적 검색도 테스트 계정으로 소량만 부른다. 429가 나면 즉시 멈추고 보고.
 - 비밀값: `.env` 값은 읽어 써도 되지만 문서·로그·커밋·응답에 출력하지 않는다. 잘못된 키 시험은 프로세스 환경에만 넣고 `.env`를 고치지 않는다.
 
