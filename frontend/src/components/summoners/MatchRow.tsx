@@ -2,21 +2,21 @@ import Image from "next/image";
 import Tooltip from "@/components/common/Tooltip";
 import type { MatchView, ParticipantView, SlotView } from "@/lib/view/summoner";
 
-/** 2026-10-27: 리스트 크기 안에서 아이템·스펠·룬 아이콘을 size-6(24px)에서 size-7(28px)로 키움 */
+/** 2026-10-27: 리스트 크기 안에서 아이템·스펠·룬 아이콘을 두 차례 키움 (24px→28px→32px) */
 function ItemSlot({ item }: { item: SlotView }) {
   if (!item) {
     return (
       <span
         aria-hidden="true"
-        className="size-7 shrink-0 rounded border border-dashed border-border"
+        className="size-8 shrink-0 rounded border border-dashed border-border"
       />
     );
   }
   return (
     <Tooltip content={item.description}>
-      <span className="relative block size-7 shrink-0 overflow-hidden rounded bg-surface-2">
+      <span className="relative block size-8 shrink-0 overflow-hidden rounded bg-surface-2">
         {item.iconUrl ? (
-          <Image src={item.iconUrl} alt={item.name} fill sizes="28px" className="object-cover" />
+          <Image src={item.iconUrl} alt={item.name} fill sizes="32px" className="object-cover" />
         ) : (
           <span className="sr-only">{item.name}</span>
         )}
@@ -32,9 +32,9 @@ function SpellSlot({
 }) {
   return (
     <Tooltip content={spell.description}>
-      <span className="relative block size-7 shrink-0 overflow-hidden rounded bg-surface-2">
+      <span className="relative block size-8 shrink-0 overflow-hidden rounded bg-surface-2">
         {spell.iconUrl ? (
-          <Image src={spell.iconUrl} alt={spell.name} fill sizes="28px" className="object-cover" />
+          <Image src={spell.iconUrl} alt={spell.name} fill sizes="32px" className="object-cover" />
         ) : (
           <span className="sr-only">{spell.name}</span>
         )}
@@ -60,9 +60,9 @@ function RuneSlot({
 }) {
   return (
     <Tooltip content={description} align={align}>
-      <span className="relative block size-7 shrink-0 overflow-hidden rounded bg-surface-2">
+      <span className="relative block size-8 shrink-0 overflow-hidden rounded bg-surface-2">
         {iconUrl ? (
-          <Image src={iconUrl} alt={name} fill sizes="28px" className="object-contain p-0.5" />
+          <Image src={iconUrl} alt={name} fill sizes="32px" className="object-contain p-0.5" />
         ) : (
           <span className="sr-only">{name}</span>
         )}
@@ -133,10 +133,10 @@ export default function MatchRow({ match }: { match: MatchView }) {
     // 모든 칸을 위쪽(items-start)으로 통일해 높이가 들쭉날쭉해 보이지 않게 한다(2026-10-27).
     // 참가자 칸(5줄+딜량 막대)이 가장 길어 기준이 되고, 나머지 칸은 그 위쪽에 맞춰 시작한다.
     <div className={`flex flex-wrap items-start gap-3 rounded-lg border-l-4 bg-surface p-3 ${borderClass}`}>
-      {/* 결과·포지션·조회시간·플레이타임은 챔피언 초상화보다 왼쪽(2026-10-27) */}
+      {/* 결과·큐 종류·조회시간·플레이타임은 챔피언 초상화보다 왼쪽(2026-10-27). 큐 종류는 포지션 줄을 대신함 */}
       <div className="w-20 shrink-0 text-xs text-muted">
         <p className={`font-bold ${resultClass}`}>{match.win ? "승리" : "패배"}</p>
-        {match.positionLabel ? <p>{match.positionLabel}</p> : null}
+        <p>{match.queueLabel}</p>
         <p>{match.relativeTime}</p>
         <p>{match.duration}</p>
       </div>
@@ -144,13 +144,13 @@ export default function MatchRow({ match }: { match: MatchView }) {
       {/* 챔피언(+레벨 배지)+주문·룬(위) + 아이템 6칸+장신구 한 줄(아래, 초상화 밑) 묶음. 너비는 아이템 한 줄(7칸)에 맞춰 늘어난다 */}
       <div className="flex shrink-0 flex-col gap-1">
         <div className="flex items-center gap-2">
-          <span className="relative block size-12 shrink-0 overflow-hidden rounded-md bg-surface-2">
+          <span className="relative block size-14 shrink-0 overflow-hidden rounded-md bg-surface-2">
             {match.champion.iconUrl ? (
               <Image
                 src={match.champion.iconUrl}
                 alt={match.champion.name}
                 fill
-                sizes="48px"
+                sizes="56px"
                 className="object-cover"
               />
             ) : (

@@ -177,6 +177,8 @@ export type MatchSummary = {
   matchId: string;
   gameStartAt: string;
   gameDurationSec: number;
+  /** Riot 큐 ID (420=솔로/듀오, 440=자유랭크 등, 2026-10-27 추가) */
+  queueId: number;
   win: boolean;
   championId: number;
   /** 그 게임에서 도달한 챔피언 레벨 (소환사 레벨과 다름, 2026-10-27 추가) */
