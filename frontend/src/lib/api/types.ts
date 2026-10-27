@@ -168,6 +168,8 @@ export type MatchParticipant = {
   win: boolean;
   gameName: string | null;
   tagLine: string | null;
+  /** 챔피언 대상 딜량 (2026-10-27 추가) */
+  damage: number;
 };
 
 /** match-v5 매치 1건 */

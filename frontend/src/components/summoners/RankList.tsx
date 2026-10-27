@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { LeagueView } from "@/lib/view/summoner";
 
 function RankCard({ league }: { league: LeagueView }) {
@@ -5,12 +6,24 @@ function RankCard({ league }: { league: LeagueView }) {
     <div className="rounded-lg border border-border bg-surface p-4">
       <p className="mb-2 text-xs font-semibold text-muted">{league.queueLabel}</p>
       <div className="flex items-center gap-3">
-        <div
-          aria-hidden="true"
-          className="flex size-12 shrink-0 items-center justify-center rounded-full border border-border bg-surface-2 text-xs font-bold text-muted"
-        >
-          {league.tierLabel.charAt(0)}
-        </div>
+        {league.tierEmblemUrl ? (
+          <span className="relative block size-12 shrink-0">
+            <Image
+              src={league.tierEmblemUrl}
+              alt=""
+              fill
+              sizes="48px"
+              className="object-contain"
+            />
+          </span>
+        ) : (
+          <div
+            aria-hidden="true"
+            className="flex size-12 shrink-0 items-center justify-center rounded-full border border-border bg-surface-2 text-xs font-bold text-muted"
+          >
+            {league.tierLabel.charAt(0)}
+          </div>
+        )}
         <div className="min-w-0">
           <p className="font-bold">
             {league.tierLabel} <span className="font-normal text-muted">{league.leaguePoints} LP</span>

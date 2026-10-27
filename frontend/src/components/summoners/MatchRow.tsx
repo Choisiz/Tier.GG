@@ -2,20 +2,21 @@ import Image from "next/image";
 import Tooltip from "@/components/common/Tooltip";
 import type { MatchView, ParticipantView, SlotView } from "@/lib/view/summoner";
 
+/** 2026-10-27: 리스트 크기 안에서 아이템·스펠·룬 아이콘을 size-6(24px)에서 size-7(28px)로 키움 */
 function ItemSlot({ item }: { item: SlotView }) {
   if (!item) {
     return (
       <span
         aria-hidden="true"
-        className="size-6 shrink-0 rounded border border-dashed border-border"
+        className="size-7 shrink-0 rounded border border-dashed border-border"
       />
     );
   }
   return (
     <Tooltip content={item.description}>
-      <span className="relative block size-6 shrink-0 overflow-hidden rounded bg-surface-2">
+      <span className="relative block size-7 shrink-0 overflow-hidden rounded bg-surface-2">
         {item.iconUrl ? (
-          <Image src={item.iconUrl} alt={item.name} fill sizes="24px" className="object-cover" />
+          <Image src={item.iconUrl} alt={item.name} fill sizes="28px" className="object-cover" />
         ) : (
           <span className="sr-only">{item.name}</span>
         )}
@@ -31,9 +32,9 @@ function SpellSlot({
 }) {
   return (
     <Tooltip content={spell.description}>
-      <span className="relative block size-6 shrink-0 overflow-hidden rounded bg-surface-2">
+      <span className="relative block size-7 shrink-0 overflow-hidden rounded bg-surface-2">
         {spell.iconUrl ? (
-          <Image src={spell.iconUrl} alt={spell.name} fill sizes="24px" className="object-cover" />
+          <Image src={spell.iconUrl} alt={spell.name} fill sizes="28px" className="object-cover" />
         ) : (
           <span className="sr-only">{spell.name}</span>
         )}
@@ -43,8 +44,8 @@ function SpellSlot({
 }
 
 /**
- * 키스톤 룬 + 소속 트리 아이콘. 2026-10-27 사용자 요청으로 스펠과 같은 모양(사각, size-6)으로
- * 바꾸고 스펠과 같은 열에 함께 쌓는다(이전엔 원형+겹친 작은 배지였음).
+ * 키스톤 룬 + 소속 트리 아이콘. 2026-10-27 사용자 요청으로 스펠과 같은 모양(사각)으로
+ * 바꾸고 스펠과 같은 크기로 쌓는다(이전엔 원형+겹친 작은 배지였음).
  */
 function RuneSlot({
   iconUrl,
@@ -59,9 +60,9 @@ function RuneSlot({
 }) {
   return (
     <Tooltip content={description} align={align}>
-      <span className="relative block size-6 shrink-0 overflow-hidden rounded bg-surface-2">
+      <span className="relative block size-7 shrink-0 overflow-hidden rounded bg-surface-2">
         {iconUrl ? (
-          <Image src={iconUrl} alt={name} fill sizes="24px" className="object-contain p-0.5" />
+          <Image src={iconUrl} alt={name} fill sizes="28px" className="object-contain p-0.5" />
         ) : (
           <span className="sr-only">{name}</span>
         )}
@@ -70,34 +71,49 @@ function RuneSlot({
   );
 }
 
-/** 참가자 5명 세로 1열 (왼쪽=같은 팀, 오른쪽=상대 팀으로 나란히 두기 위함). 닉네임이 있으면 아이콘 옆에 표시 */
+/**
+ * 참가자 5명 세로 1열 (왼쪽=같은 팀, 오른쪽=상대 팀으로 나란히 두기 위함). 닉네임이 있으면 아이콘 옆에 표시.
+ * 초상화+이름 아래 얇은 딜량 막대그래프: 같은 팀은 파랑(`--win`), 상대 팀은 빨강(`--lose`) (2026-10-27 추가)
+ */
 function ParticipantIcons({
   label,
   participants,
+  side,
 }: {
   label: string;
   participants: ParticipantView[];
+  side: "team" | "enemy";
 }) {
+  const barClass = side === "team" ? "bg-win" : "bg-lose";
   return (
-    <div className="flex flex-col gap-0.5" aria-label={label}>
+    <div className="flex flex-col gap-1" aria-label={label}>
       {participants.map((participant, index) => (
-        <div key={`${participant.championId}-${index}`} className="flex items-center gap-1">
-          <span className="relative block size-5 shrink-0 overflow-hidden rounded-full border border-border bg-surface-2">
-            {participant.iconUrl ? (
-              <Image
-                src={participant.iconUrl}
-                alt={participant.name}
-                fill
-                sizes="20px"
-                className="object-cover"
-              />
-            ) : (
-              <span className="sr-only">{participant.name}</span>
-            )}
-          </span>
-          {participant.displayName ? (
-            <span className="max-w-20 truncate text-[11px] text-muted">{participant.displayName}</span>
-          ) : null}
+        <div key={`${participant.championId}-${index}`} className="w-20">
+          <div className="flex items-center gap-1">
+            <span className="relative block size-5 shrink-0 overflow-hidden rounded-full border border-border bg-surface-2">
+              {participant.iconUrl ? (
+                <Image
+                  src={participant.iconUrl}
+                  alt={participant.name}
+                  fill
+                  sizes="20px"
+                  className="object-cover"
+                />
+              ) : (
+                <span className="sr-only">{participant.name}</span>
+              )}
+            </span>
+            {participant.displayName ? (
+              <span className="max-w-14 truncate text-[11px] text-muted">{participant.displayName}</span>
+            ) : null}
+          </div>
+          <div
+            className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-surface-2"
+            role="img"
+            aria-label={`딜량 ${participant.damagePercent}%`}
+          >
+            <div className={`h-full ${barClass}`} style={{ width: `${participant.damagePercent}%` }} />
+          </div>
         </div>
       ))}
     </div>
@@ -122,13 +138,13 @@ export default function MatchRow({ match }: { match: MatchView }) {
       {/* 챔피언(+레벨 배지)+주문·룬(위) + 아이템 6칸+장신구 한 줄(아래, 초상화 밑) 묶음. 너비는 아이템 한 줄(7칸)에 맞춰 늘어난다 */}
       <div className="flex shrink-0 flex-col gap-1">
         <div className="flex items-center gap-2">
-          <span className="relative block size-10 shrink-0 overflow-hidden rounded-md bg-surface-2">
+          <span className="relative block size-12 shrink-0 overflow-hidden rounded-md bg-surface-2">
             {match.champion.iconUrl ? (
               <Image
                 src={match.champion.iconUrl}
                 alt={match.champion.name}
                 fill
-                sizes="40px"
+                sizes="48px"
                 className="object-cover"
               />
             ) : (
@@ -188,11 +204,11 @@ export default function MatchRow({ match }: { match: MatchView }) {
 
       {/* 왼쪽 5(같은 팀) - 오른쪽 5(상대 팀) 세로 두 열로 나란히 */}
       <div className="ml-auto flex items-start gap-2 text-xs">
-        <ParticipantIcons label="같은 팀 챔피언" participants={match.team} />
+        <ParticipantIcons label="같은 팀 챔피언" participants={match.team} side="team" />
         <span aria-hidden="true" className="self-center text-muted">
           vs
         </span>
-        <ParticipantIcons label="상대 팀 챔피언" participants={match.enemy} />
+        <ParticipantIcons label="상대 팀 챔피언" participants={match.enemy} side="enemy" />
       </div>
     </div>
   );

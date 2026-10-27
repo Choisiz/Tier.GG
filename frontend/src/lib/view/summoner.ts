@@ -47,9 +47,19 @@ function tierLabel(league: League): string {
   return `${tier} ${rank}`;
 }
 
+/**
+ * 2026-10-27: D34를 뒤집음 — 사용자가 직접 마련한 랭크 엠블럼 이미지(`public/rank-emblems/`,
+ * 10개 티어)를 쓴다. Data Dragon에는 정식 엠블럼이 없어서 로컬 정적 파일로 둔다.
+ */
+function tierEmblemUrl(tier: string): string | undefined {
+  if (!TIER_LABELS[tier]) return undefined;
+  return `/rank-emblems/${tier.toLowerCase()}.png`;
+}
+
 export type LeagueView = {
   queueLabel: string;
   tierLabel: string;
+  tierEmblemUrl?: string;
   leaguePoints: number;
   wins: number;
   losses: number;
@@ -62,6 +72,7 @@ function toLeagueView(league: League): LeagueView {
   return {
     queueLabel: queueLabel(league.queueType),
     tierLabel: tierLabel(league),
+    tierEmblemUrl: tierEmblemUrl(league.tier),
     leaguePoints: league.leaguePoints,
     wins: league.wins,
     losses: league.losses,
@@ -165,15 +176,20 @@ function toChampionIconView(
   };
 }
 
-/** 같은 팀/상대팀 참가자 1명. 챔피언 아이콘 + (있으면) 닉네임. 목록에선 태그(#...)는 빼고 이름만(2026-10-27) */
-export type ParticipantView = ChampionIconView & { displayName?: string };
+/**
+ * 같은 팀/상대팀 참가자 1명. 챔피언 아이콘 + (있으면) 닉네임. 목록에선 태그(#...)는 빼고 이름만(2026-10-27).
+ * `damagePercent`는 그 매치 10명 중 최댓값 대비 비율(0~100) — 초상화·이름 아래 딜량 막대그래프용(2026-10-27 추가).
+ */
+export type ParticipantView = ChampionIconView & { displayName?: string; damagePercent: number };
 
 function toParticipantView(
   participant: MatchParticipant,
   champions: Map<string, ChampionSummary>,
+  maxDamage: number,
 ): ParticipantView {
   const icon = toChampionIconView(participant.championId, champions);
-  return { ...icon, displayName: participant.gameName ?? undefined };
+  const damagePercent = maxDamage > 0 ? Math.round((participant.damage / maxDamage) * 100) : 0;
+  return { ...icon, displayName: participant.gameName ?? undefined, damagePercent };
 }
 
 /* ───────── 매치 ───────── */
@@ -217,6 +233,8 @@ const POSITION_KO: Record<string, string> = {
 };
 
 function toMatchView(match: MatchSummary, ctx: MatchContext): MatchView {
+  const allDamage = [...match.participants.team, ...match.participants.enemy].map((p) => p.damage);
+  const maxDamage = Math.max(0, ...allDamage);
   return {
     matchId: match.matchId,
     win: match.win,
@@ -235,8 +253,8 @@ function toMatchView(match: MatchSummary, ctx: MatchContext): MatchView {
     trinket: toSlotView(match.trinket, ctx.items),
     summonerSpells: match.summonerSpells.map((id) => toSpellView(id, ctx.spells)),
     keystone: toKeystoneView(match.keystone, ctx.keystones),
-    team: match.participants.team.map((p) => toParticipantView(p, ctx.champions)),
-    enemy: match.participants.enemy.map((p) => toParticipantView(p, ctx.champions)),
+    team: match.participants.team.map((p) => toParticipantView(p, ctx.champions, maxDamage)),
+    enemy: match.participants.enemy.map((p) => toParticipantView(p, ctx.champions, maxDamage)),
   };
 }
 
@@ -260,7 +278,8 @@ export function toSummonerPageView(
       level: response.summoner.summonerLevel,
       iconUrl: profileIconUrl(version, response.summoner.profileIconId),
     },
-    leagues: response.leagues.map(toLeagueView),
+    // 2026-10-27: 자유랭크 카드 삭제, 솔로/듀오만 보여준다
+    leagues: response.leagues.filter((l) => l.queueType === "RANKED_SOLO_5x5").map(toLeagueView),
     matches: response.matches.map((match) => toMatchView(match, ctx)),
   };
 }
