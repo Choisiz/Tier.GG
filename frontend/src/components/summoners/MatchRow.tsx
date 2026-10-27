@@ -108,27 +108,35 @@ export default function MatchRow({ match }: { match: MatchView }) {
 
   return (
     <div className={`flex flex-wrap items-center gap-3 rounded-lg border-l-4 bg-surface p-3 ${borderClass}`}>
-      {/* 챔피언 + 결과/시간, op.gg처럼 소환사 주문·룬을 바로 옆에 묶어서 둔다 */}
-      <div className="flex w-32 shrink-0 items-center gap-2">
-        <span className="relative block size-10 shrink-0 overflow-hidden rounded-md bg-surface-2">
-          {match.champion.iconUrl ? (
-            <Image
-              src={match.champion.iconUrl}
-              alt={match.champion.name}
-              fill
-              sizes="40px"
-              className="object-cover"
-            />
-          ) : (
-            <span className="sr-only">{match.champion.name}</span>
-          )}
-        </span>
-        <div className="flex shrink-0 flex-col gap-0.5">
-          {match.summonerSpells.map((spell) => (
-            <SpellSlot key={spell.id} spell={spell} />
-          ))}
+      {/* 챔피언+주문·룬(위) + 아이템(아래, 초상화 밑) 묶음 */}
+      <div className="flex w-32 shrink-0 flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <span className="relative block size-10 shrink-0 overflow-hidden rounded-md bg-surface-2">
+            {match.champion.iconUrl ? (
+              <Image
+                src={match.champion.iconUrl}
+                alt={match.champion.name}
+                fill
+                sizes="40px"
+                className="object-cover"
+              />
+            ) : (
+              <span className="sr-only">{match.champion.name}</span>
+            )}
+          </span>
+          <div className="flex shrink-0 flex-col gap-0.5">
+            {match.summonerSpells.map((spell) => (
+              <SpellSlot key={spell.id} spell={spell} />
+            ))}
+          </div>
+          <KeystoneSlot keystone={match.keystone} />
         </div>
-        <KeystoneSlot keystone={match.keystone} />
+        <div className="flex flex-wrap items-center gap-0.5">
+          {match.items.map((item, index) => (
+            <ItemSlot key={index} item={item} />
+          ))}
+          <ItemSlot item={match.trinket} />
+        </div>
       </div>
 
       <div className="w-20 shrink-0 text-xs text-muted">
@@ -148,13 +156,6 @@ export default function MatchRow({ match }: { match: MatchView }) {
       <div className="w-24 shrink-0 text-sm">
         <p>{match.cs} CS</p>
         <p className="text-xs text-muted">{match.csPerMinute} /분</p>
-      </div>
-
-      <div className="flex shrink-0 items-center gap-0.5">
-        {match.items.map((item, index) => (
-          <ItemSlot key={index} item={item} />
-        ))}
-        <ItemSlot item={match.trinket} />
       </div>
 
       <div className="ml-auto flex items-center gap-2 text-xs">
