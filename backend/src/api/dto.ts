@@ -68,8 +68,19 @@ export const skillDto = (r: SkillRow) => ({ skillOrder: r.skillOrder, ...rates(r
 
 // 전적 검색 (api_contract 2-5, back_spec 변경 03 W-8)
 
+/**
+ * 2026-10-27 작은 추가: `riotIdGameName`/`riotIdTagline`은 Riot이 match-v5 응답에 이미 포함해서
+ * 주는 필드라(추가 호출 없음), 같은 팀/상대팀 참가자의 닉네임을 그대로 노출한다. 둘 다 없으면
+ * `gameName`을 null로 둬 프론트가 "알 수 없는 소환사"로 처리하게 한다 (아주 오래된 게임 등).
+ */
 function sideDto(p: ParticipantDto) {
-  return { puuid: p.puuid, championId: p.championId, win: p.win };
+  return {
+    puuid: p.puuid,
+    championId: p.championId,
+    win: p.win,
+    gameName: p.riotIdGameName || null,
+    tagLine: p.riotIdTagline || null,
+  };
 }
 
 /** 그 매치 1건을 검색한 소환사(puuid) 관점으로 요약한다. 타임라인은 부르지 않는다(스킬 순서는 이번 범위 밖) */
