@@ -1,4 +1,5 @@
 import Image from "next/image";
+import MatchExpandToggle from "@/components/summoners/MatchExpandToggle";
 import Tooltip from "@/components/common/Tooltip";
 import type { MatchView, ParticipantView, SlotView } from "@/lib/view/summoner";
 
@@ -216,6 +217,9 @@ export default function MatchRow({ match }: { match: MatchView }) {
         </span>
         <ParticipantIcons label="상대 팀 챔피언" participants={match.enemy} side="enemy" />
       </div>
+
+      {/* 리스트 가장 오른쪽 수직형 아코디언 토글. 펼침 데이터는 아직 없음(2026-10-27) */}
+      <MatchExpandToggle />
     </div>
   );
 }
