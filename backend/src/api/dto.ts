@@ -97,6 +97,7 @@ export function matchListItem(match: MatchDto, puuid: string) {
     gameDurationSec: match.info.gameDuration,
     win: me.win,
     championId: me.championId,
+    champLevel: me.champLevel,
     individualPosition: me.individualPosition ?? null,
     kills: me.kills,
     deaths: me.deaths,
