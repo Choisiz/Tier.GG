@@ -5,11 +5,19 @@ import type { ApiErrorBody } from "./types";
 /**
  * 백엔드 호출 결과.
  * - `not_ready`: 503 STATS_NOT_READY (첫 집계 전, 정상 상태로 그린다)
- * - `not_found`: 404 STATS_NOT_FOUND (그 챔피언·포지션 통계 없음)
+ * - `not_found`: 404 STATS_NOT_FOUND / SUMMONER_NOT_FOUND (그 챔피언·포지션 통계, 또는 소환사가 없음)
  * - `invalid`: 400 INVALID_PARAMETER, 404 NOT_FOUND — 프론트 버그. 화면은 `unavailable`과 같게
  * - `unavailable`: 연결 실패, 시간 초과, 503 DB_UNAVAILABLE, 500, JSON 아님, `API_BASE_URL` 없음
+ * - `riot_unavailable`: 502 RIOT_UNAVAILABLE (전적 검색, 계약 2-5)
+ * - `riot_key_expired`: 503 RIOT_KEY_EXPIRED (전적 검색, 계약 2-5)
  */
-export type ApiFailureKind = "not_ready" | "not_found" | "invalid" | "unavailable";
+export type ApiFailureKind =
+  | "not_ready"
+  | "not_found"
+  | "invalid"
+  | "unavailable"
+  | "riot_unavailable"
+  | "riot_key_expired";
 
 export type ApiResult<T> =
   | { ok: true; data: T }
@@ -32,19 +40,33 @@ function isErrorBody(value: unknown): value is ApiErrorBody {
 /** HTTP 상태 + 오류 `code` → 결과 종류 (분기는 `code`로만, 계약 3장) */
 function classifyError(status: number, code: string | null): ApiFailureKind {
   if (status === 503 && code === "STATS_NOT_READY") return "not_ready";
-  if (status === 404 && code === "STATS_NOT_FOUND") return "not_found";
+  if (status === 404 && (code === "STATS_NOT_FOUND" || code === "SUMMONER_NOT_FOUND")) {
+    return "not_found";
+  }
   if ((status === 400 && code === "INVALID_PARAMETER") || (status === 404 && code === "NOT_FOUND")) {
     return "invalid";
   }
+  if (status === 502 && code === "RIOT_UNAVAILABLE") return "riot_unavailable";
+  if (status === 503 && code === "RIOT_KEY_EXPIRED") return "riot_key_expired";
   return "unavailable";
 }
+
+/** 호출별 캐시 옵션. 기본은 기존 그대로(`revalidate: 3600`), 변경 06은 `"no-store"`만 추가한다 (D36) */
+export type FetchApiOptions = {
+  /** `"no-store"`면 캐시하지 않고 매번 새로 부른다 (전적 검색, 계약 2-5) */
+  cache?: "no-store";
+};
 
 /**
  * 백엔드 GET 호출. 예외를 던지지 않고 결과 종류로 돌려준다.
  * 로그에는 경로·상태·`code`만 남긴다 (기본 URL은 남기지 않는다).
  * @param path `/champions?position=TOP`처럼 `/api/v1` 뒤 경로
+ * @param options 생략하면 기존 통계 화면과 같은 `revalidate: 3600` 캐시를 쓴다
  */
-export async function fetchApi<T>(path: string): Promise<ApiResult<T>> {
+export async function fetchApi<T>(
+  path: string,
+  options?: FetchApiOptions,
+): Promise<ApiResult<T>> {
   const baseUrl = getApiBaseUrl();
   if (!baseUrl) {
     if (!missingBaseUrlLogged) {
@@ -56,10 +78,15 @@ export async function fetchApi<T>(path: string): Promise<ApiResult<T>> {
 
   let res: Response;
   try {
-    res = await fetch(`${baseUrl}${path}`, {
-      next: { revalidate: API_REVALIDATE_SECONDS },
-      signal: AbortSignal.timeout(API_TIMEOUT_MS),
-    });
+    res = await fetch(
+      `${baseUrl}${path}`,
+      options?.cache === "no-store"
+        ? { cache: "no-store", signal: AbortSignal.timeout(API_TIMEOUT_MS) }
+        : {
+            next: { revalidate: API_REVALIDATE_SECONDS },
+            signal: AbortSignal.timeout(API_TIMEOUT_MS),
+          },
+    );
   } catch (error) {
     const reason = error instanceof Error ? error.name : "unknown";
     reportUnavailable(path, `연결 실패(${reason})`);

@@ -55,6 +55,52 @@ export type WindowInfoView = {
   isStale: boolean;
 };
 
+/* ───────── 전적 검색 (변경 06) ───────── */
+
+/**
+ * 상대 시각 "12분 전" / "3시간 전" / "5일 전". 30일 넘으면 KST 날짜("10월 15일")로 바꾼다.
+ * 요청 시점(`Date.now()`) 기준이라 동적 렌더링(`force-dynamic`)에서만 쓴다.
+ */
+export function formatRelativeKo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (diffMs < minute) return "방금 전";
+  if (diffMs < hour) return `${Math.floor(diffMs / minute)}분 전`;
+  if (diffMs < day) return `${Math.floor(diffMs / hour)}시간 전`;
+  if (diffMs < 30 * day) return `${Math.floor(diffMs / day)}일 전`;
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("ko-KR", {
+      timeZone: "Asia/Seoul",
+      month: "numeric",
+      day: "numeric",
+    })
+      .formatToParts(new Date(iso))
+      .map((part) => [part.type, part.value]),
+  );
+  return `${parts.month}월 ${parts.day}일`;
+}
+
+/** 1584 → "26분 24초" */
+export function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remain = seconds % 60;
+  return `${minutes}분 ${String(remain).padStart(2, "0")}초`;
+}
+
+/** KDA 비율. (킬+어시) / 데스(0이면 1로 나눔). 소수 2자리 "4.00" */
+export function formatKda(kills: number, deaths: number, assists: number): string {
+  return ((kills + assists) / Math.max(1, deaths)).toFixed(2);
+}
+
+/** 분당 CS. "6.4" */
+export function formatCsPerMinute(cs: number, gameDurationSec: number): string {
+  const minutes = gameDurationSec / 60;
+  if (minutes <= 0) return "0.0";
+  return (cs / minutes).toFixed(1);
+}
+
 export function toWindowInfoView(window: StatsWindow): WindowInfoView {
   return {
     days: window.days,

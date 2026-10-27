@@ -10,6 +10,9 @@
   --muted: #a4adc6; /* 보조 텍스트 (배경 대비 약 8:1) */
   --accent: #e3b456; /* 포인트 색: 골드 (배경 대비 약 9:1) */
   --accent-foreground: #1a1405; /* 포인트 배경 위 텍스트 */
+  /* 승/패 의미색 (변경 06, D35). 배경·표면 대비 모두 4.5:1 이상 실측(배경 6.82·6.12 / 표면 6.16·5.53) */
+  --win: #5a9bff;
+  --lose: #f16565;
   color-scheme: dark;
 }
 
@@ -22,6 +25,8 @@
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-win: var(--win);
+  --color-lose: var(--lose);
   --font-sans:
     -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic",
     "Noto Sans KR", "Segoe UI", Roboto, sans-serif;

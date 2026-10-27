@@ -139,6 +139,70 @@ export type ChampionStatsResponse = {
   };
 };
 
+/* ───────── 전적 검색 (계약 2-5, v3). `window` 객체가 없다 ───────── */
+
+/** account-v1 + summoner-v4 */
+export type SummonerProfile = {
+  puuid: string;
+  gameName: string;
+  tagLine: string;
+  profileIconId: number;
+  summonerLevel: number;
+};
+
+/** league-v4 그대로. 큐 종류는 Riot이 주는 대로 (보통 RANKED_SOLO_5x5, RANKED_FLEX_SR) */
+export type League = {
+  queueType: string;
+  tier: string;
+  rank: string;
+  leaguePoints: number;
+  wins: number;
+  losses: number;
+  hotStreak: boolean;
+};
+
+/** 같은 팀 / 상대팀 참가자 1명. 이름은 없다 (puuid만, D31) */
+export type MatchParticipant = {
+  puuid: string;
+  championId: number;
+  win: boolean;
+};
+
+/** match-v5 매치 1건 */
+export type MatchSummary = {
+  matchId: string;
+  gameStartAt: string;
+  gameDurationSec: number;
+  win: boolean;
+  championId: number;
+  /** 빈 값일 수 있다 (아레나 등) */
+  individualPosition: string;
+  kills: number;
+  deaths: number;
+  assists: number;
+  cs: number;
+  goldEarned: number;
+  /** item0~5, 빈 칸 0 */
+  items: number[];
+  /** item6 */
+  trinket: number;
+  /** [작은 번호, 큰 번호]. D/F 위치 정보 없음 */
+  summonerSpells: number[];
+  /** 핵심 룬 1개 (트리는 안 줌) */
+  keystone: number;
+  participants: {
+    team: MatchParticipant[];
+    enemy: MatchParticipant[];
+  };
+};
+
+/** GET /summoners/:region/:riotId (계약 2-5) */
+export type SummonerResponse = {
+  summoner: SummonerProfile;
+  leagues: League[];
+  matches: MatchSummary[];
+};
+
 /** 오류 응답 (계약 3장). 분기는 `code`로만 한다 */
 export type ApiErrorBody = {
   error: {
