@@ -108,7 +108,8 @@ export default function MatchRow({ match }: { match: MatchView }) {
 
   return (
     <div className={`flex flex-wrap items-center gap-3 rounded-lg border-l-4 bg-surface p-3 ${borderClass}`}>
-      <div className="flex w-28 shrink-0 items-center gap-2">
+      {/* 챔피언 + 결과/시간, op.gg처럼 소환사 주문·룬을 바로 옆에 묶어서 둔다 */}
+      <div className="flex w-32 shrink-0 items-center gap-2">
         <span className="relative block size-10 shrink-0 overflow-hidden rounded-md bg-surface-2">
           {match.champion.iconUrl ? (
             <Image
@@ -122,13 +123,17 @@ export default function MatchRow({ match }: { match: MatchView }) {
             <span className="sr-only">{match.champion.name}</span>
           )}
         </span>
-        <div className="text-xs text-muted">
-          <p className={`font-bold ${resultClass}`}>{match.win ? "승리" : "패배"}</p>
-          {match.positionLabel ? <p>{match.positionLabel}</p> : null}
+        <div className="flex shrink-0 flex-col gap-0.5">
+          {match.summonerSpells.map((spell) => (
+            <SpellSlot key={spell.id} spell={spell} />
+          ))}
         </div>
+        <KeystoneSlot keystone={match.keystone} />
       </div>
 
       <div className="w-20 shrink-0 text-xs text-muted">
+        <p className={`font-bold ${resultClass}`}>{match.win ? "승리" : "패배"}</p>
+        {match.positionLabel ? <p>{match.positionLabel}</p> : null}
         <p>{match.relativeTime}</p>
         <p>{match.duration}</p>
       </div>
@@ -143,13 +148,6 @@ export default function MatchRow({ match }: { match: MatchView }) {
       <div className="w-24 shrink-0 text-sm">
         <p>{match.cs} CS</p>
         <p className="text-xs text-muted">{match.csPerMinute} /분</p>
-      </div>
-
-      <div className="flex shrink-0 items-center gap-1">
-        {match.summonerSpells.map((spell) => (
-          <SpellSlot key={spell.id} spell={spell} />
-        ))}
-        <KeystoneSlot keystone={match.keystone} />
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5">
