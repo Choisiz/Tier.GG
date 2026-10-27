@@ -484,8 +484,8 @@ GET /api/v1/summoners/kr/너희는개다-KR1
       "summonerSpells": [4, 12],
       "keystone": 8010,
       "participants": {
-        "team": [{ "puuid": "…", "championId": 23, "win": true, "gameName": "너희는개다", "tagLine": "KR1" }],
-        "enemy": [{ "puuid": "…", "championId": 54, "win": false, "gameName": "눈보라속커피한잔", "tagLine": "KR1" }]
+        "team": [{ "puuid": "…", "championId": 23, "win": true, "gameName": "너희는개다", "tagLine": "KR1", "damage": 12601 }],
+        "enemy": [{ "puuid": "…", "championId": 54, "win": false, "gameName": "눈보라속커피한잔", "tagLine": "KR1", "damage": 19023 }]
       }
     }
   ]
@@ -506,6 +506,7 @@ GET /api/v1/summoners/kr/너희는개다-KR1
 | `matches[].keystone` | int | 아니오 | `perks.styles[0].selections[0].perk` (핵심 룬 1개만, 트리는 안 줌) |
 | `matches[].participants.team`/`enemy` | array[5] | 아니오 | 같은 팀/상대팀. 챔피언 아이콘은 프론트가 Data Dragon |
 | `…team[]`/`enemy[].gameName`/`tagLine` | string | **예** | Riot 닉네임#태그 (match-v5 응답에 포함된 `riotIdGameName`/`riotIdTagline`을 그대로 줌, 추가 호출 없음, 2026-10-27 추가). 아주 오래된 매치 등 Riot이 안 주면 둘 다 `null` — 프론트는 "알 수 없는 소환사"로 처리 |
+| `…team[]`/`enemy[].damage` | int | 아니오 | 챔피언 대상 딜량(`totalDamageDealtToChampions`). 참가자 목록의 딜량 막대그래프용(2026-10-27 추가, 추가 호출 없음) |
 
 - 캐시: `Cache-Control: no-store` (검색 결과는 거의 실시간이어야 하므로. 2·4장의 `public, max-age=600`은 챔피언 통계 3개에만 해당).
 - 타임라인은 부르지 않는다. 스킬 순서는 이 엔드포인트에 없다 (이번 범위 밖).
@@ -621,3 +622,4 @@ GET /api/v1/summoners/kr/너희는개다-KR1
 | 2026-10-27 | v3 | 2-5 `GET /summoners/:region/:riotId` 추가(전적 검색: 프로필+랭크+최근 매치 20건). `window` 없는 첫 엔드포인트, 캐시 `no-store`. 오류 코드 `SUMMONER_NOT_FOUND`·`RIOT_UNAVAILABLE`·`RIOT_KEY_EXPIRED` 추가 (back_spec 변경 03) |
 | 2026-10-27 | v3 (작은 추가) | 2-5 `matches[].participants.team`/`enemy`에 `gameName`/`tagLine`(닉네임#태그) 추가. match-v5 응답에 이미 포함된 `riotIdGameName`/`riotIdTagline`을 그대로 노출(추가 Riot 호출 없음). 사용자 요청("참가자 닉네임 표시 가능한지 확인") |
 | 2026-10-27 | v3 (작은 추가) | 2-5 `matches[].champLevel`(그 게임에서 도달한 챔피언 레벨) 추가. `ParticipantDto`에 이미 있던 `champLevel`을 검색한 소환사 쪽에 노출(추가 Riot 호출 없음). 사용자 요청("챔피언 초상화 옆에 레벨 표시") |
+| 2026-10-27 | v3 (작은 추가) | 2-5 `matches[].participants.team`/`enemy[].damage`(챔피언 대상 딜량) 추가. 참가자 목록 딜량 막대그래프용, 추가 Riot 호출 없음. 사용자 요청("초상화·이름 하단에 얇은 딜량 그래프") |
