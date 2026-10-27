@@ -108,7 +108,7 @@ function ParticipantIcons({
             ) : null}
           </div>
           <div
-            className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-surface-2"
+            className="mt-0.5 h-0.5 w-full overflow-hidden rounded-full bg-surface-2"
             role="img"
             aria-label={`딜량 ${participant.damagePercent}%`}
           >
@@ -126,9 +126,11 @@ export default function MatchRow({ match }: { match: MatchView }) {
   const resultClass = match.win ? "text-win" : "text-lose";
 
   return (
-    <div className={`flex flex-wrap items-center gap-3 rounded-lg border-l-4 bg-surface p-3 ${borderClass}`}>
+    // 모든 칸을 위쪽(items-start)으로 통일해 높이가 들쭉날쭉해 보이지 않게 한다(2026-10-27).
+    // 참가자 칸(5줄+딜량 막대)이 가장 길어 기준이 되고, 나머지 칸은 그 위쪽에 맞춰 시작한다.
+    <div className={`flex flex-wrap items-start gap-3 rounded-lg border-l-4 bg-surface p-3 ${borderClass}`}>
       {/* 결과·포지션·조회시간·플레이타임은 챔피언 초상화보다 왼쪽(2026-10-27) */}
-      <div className="w-20 shrink-0 self-start text-xs text-muted">
+      <div className="w-20 shrink-0 text-xs text-muted">
         <p className={`font-bold ${resultClass}`}>{match.win ? "승리" : "패배"}</p>
         {match.positionLabel ? <p>{match.positionLabel}</p> : null}
         <p>{match.relativeTime}</p>
