@@ -124,6 +124,41 @@ describe('riot client (가짜 fetch)', () => {
     await assert.rejects(b.client.getMatch('KR_1'), RiotBadRequestError);
   });
 
+  // 전적 검색용 메서드 4개 (back_spec 변경 03 W-2)
+  it('getAccountByRiotId: 지역 라우팅, gameName/tagLine이 경로에 인코딩됨', async () => {
+    const { client, calls } = setup([json(200, { puuid: 'P1', gameName: '너 희', tagLine: 'KR1' })]);
+    const account = await client.getAccountByRiotId('너 희', 'KR1');
+    assert.deepEqual(account, { puuid: 'P1', gameName: '너 희', tagLine: 'KR1' });
+    assert.equal(calls.length, 1);
+    assert.equal(
+      calls[0]!.url,
+      `https://asia.example/riot/account/v1/accounts/by-riot-id/${encodeURIComponent('너 희')}/KR1`,
+    );
+  });
+
+  it('getSummonerByPuuid: 플랫폼 라우팅', async () => {
+    const { client, calls } = setup([json(200, { profileIconId: 1, summonerLevel: 300 })]);
+    assert.deepEqual(await client.getSummonerByPuuid('PUUID_X'), { profileIconId: 1, summonerLevel: 300 });
+    assert.equal(calls[0]!.url, 'https://kr.example/lol/summoner/v4/summoners/by-puuid/PUUID_X');
+  });
+
+  it('getLeagueEntriesByPuuid: 플랫폼 라우팅, 언랭크면 빈 배열', async () => {
+    const { client, calls } = setup([json(200, [])]);
+    assert.deepEqual(await client.getLeagueEntriesByPuuid('PUUID_X'), []);
+    assert.equal(calls[0]!.url, 'https://kr.example/lol/league/v4/entries/by-puuid/PUUID_X');
+  });
+
+  it('getRecentMatchIds: 지역 라우팅, 큐 필터 없음', async () => {
+    const { client, calls } = setup([json(200, ['KR_1', 'KR_2'])]);
+    assert.deepEqual(await client.getRecentMatchIds('PUUID_X', { start: 0, count: 20 }), ['KR_1', 'KR_2']);
+    assert.equal(calls[0]!.url, 'https://asia.example/lol/match/v5/matches/by-puuid/PUUID_X/ids?start=0&count=20');
+  });
+
+  it('account-v1 404 → RiotNotFoundError', async () => {
+    const { client } = setup([json(404, {})]);
+    await assert.rejects(client.getAccountByRiotId('없음', 'KR1'), RiotNotFoundError);
+  });
+
   it('오류 path에 puuid 전체가 남지 않는다', async () => {
     const { client } = setup([json(404, {})]);
     const puuid = 'A'.repeat(78);

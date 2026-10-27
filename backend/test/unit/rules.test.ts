@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { mainPositions } from '../../src/api/mainPositions.js';
-import { parseChampionIdParam, parsePositionParam } from '../../src/api/validate.js';
+import { parseChampionIdParam, parsePositionParam, parseRegionParam, parseRiotIdParam } from '../../src/api/validate.js';
 import { divisionQuota, buildCollectionConfig, windowStart } from '../../src/config/collection.js';
 import { eligibleEntries, pickRandom, seededRandom } from '../../src/collector/sample.js';
 import { sortIdsNewestFirst } from '../../src/collector/matches.js';
@@ -63,6 +63,24 @@ describe('validate', () => {
     assert.deepEqual(parseChampionIdParam('99999'), { ok: true, value: 99999 });
     for (const bad of ['0', '023', '100000', '-1', 'Aatrox', '1.5', '']) {
       assert.equal(parseChampionIdParam(bad).ok, false, bad);
+    }
+  });
+
+  it('region은 kr만 허용 (변경 03, 결정 S1)', () => {
+    assert.deepEqual(parseRegionParam('kr'), { ok: true, value: 'kr' });
+    for (const bad of ['KR', 'na', 'asia', '', undefined]) {
+      assert.equal(parseRegionParam(bad).ok, false, String(bad));
+    }
+  });
+
+  it('riotId는 마지막 "-"에서 gameName/tagLine으로 자른다 (변경 03, 결정 S2)', () => {
+    assert.deepEqual(parseRiotIdParam('너희는개다-KR1'), { ok: true, value: { gameName: '너희는개다', tagLine: 'KR1' } });
+    // gameName에 '-'가 있어도 마지막 '-'에서 자른다
+    assert.deepEqual(parseRiotIdParam('Hide-on-bush-KR1'), { ok: true, value: { gameName: 'Hide-on-bush', tagLine: 'KR1' } });
+    assert.deepEqual(parseRiotIdParam('a-12'), { ok: true, value: { gameName: 'a', tagLine: '12' } });
+    assert.deepEqual(parseRiotIdParam('a-abcde'), { ok: true, value: { gameName: 'a', tagLine: 'abcde' } });
+    for (const bad of ['noDash', '-KR1', 'name-', 'name-abcdef', 'name-a', 'name-한글1', 123]) {
+      assert.equal(parseRiotIdParam(bad).ok, false, String(bad));
     }
   });
 });

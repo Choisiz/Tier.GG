@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { after, before, describe, it } from 'node:test';
 import type { Server } from 'node:http';
 import { createApp, type ApiDb } from '../../src/api/app.js';
+import type { SummonerSearchFn } from '../../src/api/summonerSearch.js';
 import type { Queryable } from '../../src/db/tx.js';
 import { silentLogger, type Logger } from '../../src/lib/logger.js';
 
@@ -256,5 +257,74 @@ describe('API 스냅숏·window (가짜 ApiDb, 집계 있음)', () => {
     const r = await fetch(s.base + '/champions/64');
     assert.equal(r.status, 404);
     assert.deepEqual(((await r.json()) as { error: { details: unknown } }).error.details, { championId: 64 });
+  });
+});
+
+describe('GET /summoners/:region/:riotId (변경 03, 가짜 summonerSearch)', () => {
+  async function serveSummoner(summonerSearch?: SummonerSearchFn): Promise<{ base: string; server: Server }> {
+    const db = fakeDb(() => []);
+    const app = createApp(db, silentLogger, { summonerSearch });
+    const server = app.listen(0);
+    await new Promise<void>((r) => server.once('listening', () => r()));
+    return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`, server };
+  }
+
+  it('summonerSearch에 파싱된 region/gameName/tagLine을 넘기고, no-store로 응답', async () => {
+    const calls: { region: string; gameName: string; tagLine: string }[] = [];
+    const s = await serveSummoner(async (region, gameName, tagLine) => {
+      calls.push({ region, gameName, tagLine });
+      return { summoner: { puuid: 'P1', gameName, tagLine, profileIconId: 1, summonerLevel: 1 }, leagues: [], matches: [] };
+    });
+    try {
+      const r = await fetch(`${s.base}/summoners/kr/${encodeURIComponent('너희는개다-KR1')}`);
+      assert.equal(r.status, 200);
+      assert.equal(r.headers.get('cache-control'), 'no-store');
+      assert.deepEqual(calls, [{ region: 'kr', gameName: '너희는개다', tagLine: 'KR1' }]);
+      const body = (await r.json()) as { summoner: { gameName: string; tagLine: string } };
+      assert.equal(body.summoner.gameName, '너희는개다');
+      assert.equal(body.summoner.tagLine, 'KR1');
+    } finally {
+      close(s);
+    }
+  });
+
+  const stubDto = () => ({ summoner: { puuid: 'P1', gameName: 'x', tagLine: 'KR1', profileIconId: 1, summonerLevel: 1 }, leagues: [], matches: [] });
+
+  it('region이 kr이 아니면 400 INVALID_PARAMETER (summonerSearch를 부르지 않음)', async () => {
+    let called = false;
+    const s = await serveSummoner(async () => {
+      called = true;
+      return stubDto();
+    });
+    try {
+      const r = await fetch(`${s.base}/summoners/na/foo-KR1`);
+      assert.equal(r.status, 400);
+      assert.equal(((await r.json()) as { error: { code: string } }).error.code, 'INVALID_PARAMETER');
+      assert.equal(called, false);
+    } finally {
+      close(s);
+    }
+  });
+
+  it('riotId 형식 오류(태그 없음) → 400 INVALID_PARAMETER', async () => {
+    const s = await serveSummoner(async () => stubDto());
+    try {
+      const r = await fetch(`${s.base}/summoners/kr/noDash`);
+      assert.equal(r.status, 400);
+      assert.equal(((await r.json()) as { error: { code: string } }).error.code, 'INVALID_PARAMETER');
+    } finally {
+      close(s);
+    }
+  });
+
+  it('summonerSearch를 넘기지 않은 createApp에서는 500 INTERNAL_ERROR (기존 테스트가 깨지지 않음)', async () => {
+    const s = await serveSummoner(undefined);
+    try {
+      const r = await fetch(`${s.base}/summoners/kr/foo-KR1`);
+      assert.equal(r.status, 500);
+      assert.equal(((await r.json()) as { error: { code: string } }).error.code, 'INTERNAL_ERROR');
+    } finally {
+      close(s);
+    }
   });
 });
