@@ -3,11 +3,21 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-/** "이름#태그" → { gameName, tagLine }. 마지막 "#"에서 자르고, tagLine 형식(계약 2-5)을 검사한다 */
+/** 태그를 안 적으면 KR 서버 기본 태그로 간주한다 */
+const DEFAULT_TAG_LINE = "KR1";
+
+/**
+ * "이름#태그" → { gameName, tagLine }. 마지막 "#"에서 자르고, tagLine 형식(계약 2-5)을 검사한다.
+ * "#"이 없으면 이름 전체를 gameName으로 보고 tagLine은 기본값(KR1)을 쓴다.
+ */
 function parseRiotIdInput(value: string): { gameName: string; tagLine: string } | null {
   const trimmed = value.trim();
   const hashIndex = trimmed.lastIndexOf("#");
-  if (hashIndex <= 0) return null;
+  if (hashIndex === -1) {
+    if (!trimmed) return null;
+    return { gameName: trimmed, tagLine: DEFAULT_TAG_LINE };
+  }
+  if (hashIndex === 0) return null;
   const gameName = trimmed.slice(0, hashIndex).trim();
   const tagLine = trimmed.slice(hashIndex + 1).trim();
   if (!gameName || !/^[0-9A-Za-z]{2,5}$/.test(tagLine)) return null;

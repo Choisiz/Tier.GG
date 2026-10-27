@@ -327,7 +327,7 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 | `src/lib/view/summoner.ts` (신규) | 큐 한글화(D33), 티어+단계 글자(D34), 승률 계산, `toKeystoneMap`(룬 트리 평탄화, D32), 상대 시각·게임 길이·KDA·분당 CS, 아이템/주문/키스톤/참가자 뷰 변환 | ✅ |
 | `src/lib/view/format.ts` | `formatRelativeKo`(상대 시각), `formatDuration`, `formatKda`, `formatCsPerMinute` 추가 | ✅ |
 | `src/app/globals.css` | `--win`(`#5a9bff`)·`--lose`(`#f16565`) 토큰 + `@theme inline` 등록 (D35) | ✅ |
-| `src/components/layout/SummonerSearchForm.tsx` (신규, client) | 헤더 전역 검색 폼. "이름#태그" 파싱(`parseRiotIdInput`), 형식 오류 시 서버 요청 없이 안내, `router.push("/summoners/kr/{riotId}")` | ✅ |
+| `src/components/layout/SummonerSearchForm.tsx` (신규, client) | 헤더 전역 검색 폼. "이름#태그" 파싱(`parseRiotIdInput`), 형식 오류 시 서버 요청 없이 안내, `router.push("/summoners/kr/{riotId}")`. "#" 없이 이름만 입력하면 `tagLine`을 기본값 `KR1`로 채움(2026-10-27 사용자 요청, 작은 수정이라 Review 생략·`lint`+`tsc`+실제 브라우저 검색으로 직접 검증: "너희는개다" → `/summoners/kr/너희는개다-KR1` 정상 이동, 매치 20건 표시 확인) | ✅ |
 | `src/components/layout/Header.tsx` | `SummonerSearchForm` 추가, 로고·nav에 `shrink-0` 적용해 좁은 화면에서 검색창이 줄어들게 함 | ✅ |
 | `src/components/summoners/ProfileHeader.tsx` (신규) | 프로필 아이콘·이름#태그·레벨. 재검색 폼 없음(2026-10-27 사용자 교정) | ✅ |
 | `src/components/summoners/RankList.tsx` (신규) | 랭크 카드 세로 목록 / 빈 상태 "랭크 정보가 없습니다" | ✅ |
