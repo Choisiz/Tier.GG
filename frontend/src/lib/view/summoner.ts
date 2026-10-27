@@ -199,8 +199,8 @@ export type MatchView = {
   win: boolean;
   champion: ChampionIconView;
   champLevel: number;
-  /** POSITION_LABELS에 없는 값(빈 문자열 등)은 undefined */
-  positionLabel?: string;
+  /** "솔랭" 등, 승리/패배 아래 표시 (2026-10-27 추가, 포지션 줄을 대신함) */
+  queueLabel: string;
   relativeTime: string;
   duration: string;
   kills: number;
@@ -224,13 +224,28 @@ type MatchContext = {
   keystones: KeystoneMap;
 };
 
-const POSITION_KO: Record<string, string> = {
-  TOP: "탑",
-  JUNGLE: "정글",
-  MIDDLE: "미드",
-  BOTTOM: "원딜",
-  UTILITY: "서폿",
+/**
+ * 매치 1건의 Riot 큐 ID → 짧은 한글 이름. "승리" 아래 자리라 짧게(2026-10-27 추가, 포지션 줄을 대신함).
+ * 모르는 큐는 숨기지 않고 "기타"로 표시해 정보가 사라지지 않게 한다(D33과 같은 원칙).
+ */
+const QUEUE_ID_KO: Record<number, string> = {
+  420: "솔랭",
+  440: "자유랭크",
+  430: "일반",
+  400: "일반",
+  490: "일반",
+  450: "칼바람",
+  900: "URF",
+  1700: "아레나",
+  720: "칼바람 격전",
+  830: "AI 상대",
+  840: "AI 상대",
+  850: "AI 상대",
 };
+
+function queueIdLabel(queueId: number): string {
+  return QUEUE_ID_KO[queueId] ?? "기타";
+}
 
 function toMatchView(match: MatchSummary, ctx: MatchContext): MatchView {
   const allDamage = [...match.participants.team, ...match.participants.enemy].map((p) => p.damage);
@@ -240,7 +255,7 @@ function toMatchView(match: MatchSummary, ctx: MatchContext): MatchView {
     win: match.win,
     champion: toChampionIconView(match.championId, ctx.champions),
     champLevel: match.champLevel,
-    positionLabel: POSITION_KO[match.individualPosition],
+    queueLabel: queueIdLabel(match.queueId),
     relativeTime: formatRelativeKo(match.gameStartAt),
     duration: formatDuration(match.gameDurationSec),
     kills: match.kills,
