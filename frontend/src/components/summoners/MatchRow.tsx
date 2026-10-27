@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Tooltip from "@/components/common/Tooltip";
-import type { ChampionIconView, KeystoneView, MatchView, SlotView } from "@/lib/view/summoner";
+import type { MatchView, ParticipantView, SlotView } from "@/lib/view/summoner";
 
 function ItemSlot({ item }: { item: SlotView }) {
   if (!item) {
@@ -42,61 +42,63 @@ function SpellSlot({
   );
 }
 
-/** 키스톤 룬 + 소속 트리 아이콘(겹쳐서, D32 (b)) */
-function KeystoneSlot({ keystone }: { keystone: KeystoneView }) {
+/**
+ * 키스톤 룬 + 소속 트리 아이콘. 2026-10-27 사용자 요청으로 스펠과 같은 모양(사각, size-6)으로
+ * 바꾸고 스펠과 같은 열에 함께 쌓는다(이전엔 원형+겹친 작은 배지였음).
+ */
+function RuneSlot({
+  iconUrl,
+  name,
+  description,
+  align,
+}: {
+  iconUrl?: string;
+  name: string;
+  description?: string;
+  align?: "left" | "right";
+}) {
   return (
-    <Tooltip content={keystone.description} align="right">
-      <span className="relative ml-1 inline-flex size-6 shrink-0">
-        <span className="relative block size-6 overflow-hidden rounded-full border border-border bg-surface-2">
-          {keystone.iconUrl ? (
-            <Image
-              src={keystone.iconUrl}
-              alt={keystone.name}
-              fill
-              sizes="24px"
-              className="object-contain p-0.5"
-            />
-          ) : (
-            <span className="sr-only">{keystone.name}</span>
-          )}
-        </span>
-        {keystone.treeIconUrl ? (
-          <span className="absolute -right-1 -bottom-1 block size-3 overflow-hidden rounded-full border border-border bg-surface">
-            <Image src={keystone.treeIconUrl} alt="" fill sizes="12px" className="object-contain" />
-          </span>
-        ) : null}
+    <Tooltip content={description} align={align}>
+      <span className="relative block size-6 shrink-0 overflow-hidden rounded bg-surface-2">
+        {iconUrl ? (
+          <Image src={iconUrl} alt={name} fill sizes="24px" className="object-contain p-0.5" />
+        ) : (
+          <span className="sr-only">{name}</span>
+        )}
       </span>
     </Tooltip>
   );
 }
 
-/** 참가자 5명 세로 1열 (왼쪽=같은 팀, 오른쪽=상대 팀으로 나란히 두기 위함) */
+/** 참가자 5명 세로 1열 (왼쪽=같은 팀, 오른쪽=상대 팀으로 나란히 두기 위함). 닉네임이 있으면 아이콘 옆에 표시 */
 function ParticipantIcons({
   label,
   participants,
 }: {
   label: string;
-  participants: ChampionIconView[];
+  participants: ParticipantView[];
 }) {
   return (
     <div className="flex flex-col gap-0.5" aria-label={label}>
       {participants.map((participant, index) => (
-        <span
-          key={`${participant.championId}-${index}`}
-          className="relative block size-5 shrink-0 overflow-hidden rounded-full border border-border bg-surface-2"
-        >
-          {participant.iconUrl ? (
-            <Image
-              src={participant.iconUrl}
-              alt={participant.name}
-              fill
-              sizes="20px"
-              className="object-cover"
-            />
-          ) : (
-            <span className="sr-only">{participant.name}</span>
-          )}
-        </span>
+        <div key={`${participant.championId}-${index}`} className="flex items-center gap-1">
+          <span className="relative block size-5 shrink-0 overflow-hidden rounded-full border border-border bg-surface-2">
+            {participant.iconUrl ? (
+              <Image
+                src={participant.iconUrl}
+                alt={participant.name}
+                fill
+                sizes="20px"
+                className="object-cover"
+              />
+            ) : (
+              <span className="sr-only">{participant.name}</span>
+            )}
+          </span>
+          {participant.displayName ? (
+            <span className="max-w-20 truncate text-[11px] text-muted">{participant.displayName}</span>
+          ) : null}
+        </div>
       ))}
     </div>
   );
@@ -129,8 +131,19 @@ export default function MatchRow({ match }: { match: MatchView }) {
             {match.summonerSpells.map((spell) => (
               <SpellSlot key={spell.id} spell={spell} />
             ))}
+            <RuneSlot
+              iconUrl={match.keystone.iconUrl}
+              name={match.keystone.name}
+              description={match.keystone.description}
+            />
+            {match.keystone.treeIconUrl ? (
+              <RuneSlot
+                iconUrl={match.keystone.treeIconUrl}
+                name={`${match.keystone.name} 트리`}
+                align="right"
+              />
+            ) : null}
           </div>
-          <KeystoneSlot keystone={match.keystone} />
         </div>
         <div className="flex items-center gap-0.5">
           {match.items.map((item, index) => (
@@ -140,7 +153,8 @@ export default function MatchRow({ match }: { match: MatchView }) {
         </div>
       </div>
 
-      <div className="w-20 shrink-0 text-xs text-muted">
+      {/* 아이템 줄로 키가 커진 행에서 세로 가운데 대신 위쪽에 붙인다 (2026-10-27) */}
+      <div className="w-20 shrink-0 self-start text-xs text-muted">
         <p className={`font-bold ${resultClass}`}>{match.win ? "승리" : "패배"}</p>
         {match.positionLabel ? <p>{match.positionLabel}</p> : null}
         <p>{match.relativeTime}</p>

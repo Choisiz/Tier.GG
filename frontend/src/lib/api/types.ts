@@ -161,11 +161,13 @@ export type League = {
   hotStreak: boolean;
 };
 
-/** 같은 팀 / 상대팀 참가자 1명. 이름은 없다 (puuid만, D31) */
+/** 같은 팀 / 상대팀 참가자 1명. 닉네임은 Riot이 줄 때만(2026-10-27 추가), 없으면 둘 다 null */
 export type MatchParticipant = {
   puuid: string;
   championId: number;
   win: boolean;
+  gameName: string | null;
+  tagLine: string | null;
 };
 
 /** match-v5 매치 1건 */

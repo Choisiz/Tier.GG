@@ -165,11 +165,19 @@ function toChampionIconView(
   };
 }
 
+/** 같은 팀/상대팀 참가자 1명. 챔피언 아이콘 + (있으면) 닉네임#태그 */
+export type ParticipantView = ChampionIconView & { displayName?: string };
+
 function toParticipantView(
   participant: MatchParticipant,
   champions: Map<string, ChampionSummary>,
-): ChampionIconView {
-  return toChampionIconView(participant.championId, champions);
+): ParticipantView {
+  const icon = toChampionIconView(participant.championId, champions);
+  const displayName =
+    participant.gameName && participant.tagLine
+      ? `${participant.gameName}#${participant.tagLine}`
+      : undefined;
+  return { ...icon, displayName };
 }
 
 /* ───────── 매치 ───────── */
@@ -192,8 +200,8 @@ export type MatchView = {
   trinket: SlotView;
   summonerSpells: ReturnType<typeof toSpellView>[];
   keystone: KeystoneView;
-  team: ChampionIconView[];
-  enemy: ChampionIconView[];
+  team: ParticipantView[];
+  enemy: ParticipantView[];
 };
 
 type MatchContext = {
