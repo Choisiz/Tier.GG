@@ -177,6 +177,8 @@ export type MatchSummary = {
   gameDurationSec: number;
   win: boolean;
   championId: number;
+  /** 그 게임에서 도달한 챔피언 레벨 (소환사 레벨과 다름, 2026-10-27 추가) */
+  champLevel: number;
   /** 빈 값일 수 있다 (아레나 등) */
   individualPosition: string;
   kills: number;

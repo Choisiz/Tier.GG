@@ -182,6 +182,7 @@ export type MatchView = {
   matchId: string;
   win: boolean;
   champion: ChampionIconView;
+  champLevel: number;
   /** POSITION_LABELS에 없는 값(빈 문자열 등)은 undefined */
   positionLabel?: string;
   relativeTime: string;
@@ -220,6 +221,7 @@ function toMatchView(match: MatchSummary, ctx: MatchContext): MatchView {
     matchId: match.matchId,
     win: match.win,
     champion: toChampionIconView(match.championId, ctx.champions),
+    champLevel: match.champLevel,
     positionLabel: POSITION_KO[match.individualPosition],
     relativeTime: formatRelativeKo(match.gameStartAt),
     duration: formatDuration(match.gameDurationSec),

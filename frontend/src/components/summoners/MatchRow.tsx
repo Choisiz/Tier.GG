@@ -111,7 +111,15 @@ export default function MatchRow({ match }: { match: MatchView }) {
 
   return (
     <div className={`flex flex-wrap items-center gap-3 rounded-lg border-l-4 bg-surface p-3 ${borderClass}`}>
-      {/* 챔피언+주문·룬(위) + 아이템 6칸+장신구 한 줄(아래, 초상화 밑) 묶음. 너비는 아이템 한 줄(7칸)에 맞춰 늘어난다 */}
+      {/* 결과·포지션·조회시간·플레이타임은 챔피언 초상화보다 왼쪽(2026-10-27) */}
+      <div className="w-20 shrink-0 self-start text-xs text-muted">
+        <p className={`font-bold ${resultClass}`}>{match.win ? "승리" : "패배"}</p>
+        {match.positionLabel ? <p>{match.positionLabel}</p> : null}
+        <p>{match.relativeTime}</p>
+        <p>{match.duration}</p>
+      </div>
+
+      {/* 챔피언(+레벨 배지)+주문·룬(위) + 아이템 6칸+장신구 한 줄(아래, 초상화 밑) 묶음. 너비는 아이템 한 줄(7칸)에 맞춰 늘어난다 */}
       <div className="flex shrink-0 flex-col gap-1">
         <div className="flex items-center gap-2">
           <span className="relative block size-10 shrink-0 overflow-hidden rounded-md bg-surface-2">
@@ -126,7 +134,15 @@ export default function MatchRow({ match }: { match: MatchView }) {
             ) : (
               <span className="sr-only">{match.champion.name}</span>
             )}
+            {/* 챔피언 레벨(소환사 레벨과 다름, 2026-10-27 추가) */}
+            <span
+              aria-hidden="true"
+              className="absolute right-0 bottom-0 rounded-tl-md bg-background/90 px-1 text-[10px] leading-4 font-bold text-accent"
+            >
+              {match.champLevel}
+            </span>
           </span>
+          <span className="sr-only">{match.champLevel}레벨</span>
           {/* 좌: 소환사 주문 2칸(세로) / 우: 룬 2칸(세로), 2026-10-27 */}
           <div className="flex shrink-0 items-start gap-0.5">
             <div className="flex flex-col gap-0.5">
@@ -156,14 +172,6 @@ export default function MatchRow({ match }: { match: MatchView }) {
           ))}
           <ItemSlot item={match.trinket} />
         </div>
-      </div>
-
-      {/* 아이템 줄로 키가 커진 행에서 세로 가운데 대신 위쪽에 붙인다 (2026-10-27) */}
-      <div className="w-20 shrink-0 self-start text-xs text-muted">
-        <p className={`font-bold ${resultClass}`}>{match.win ? "승리" : "패배"}</p>
-        {match.positionLabel ? <p>{match.positionLabel}</p> : null}
-        <p>{match.relativeTime}</p>
-        <p>{match.duration}</p>
       </div>
 
       <div className="w-24 shrink-0 text-sm">
