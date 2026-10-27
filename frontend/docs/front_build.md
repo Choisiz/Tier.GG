@@ -331,7 +331,7 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 | `src/components/layout/Header.tsx` | `SummonerSearchForm` 추가, 로고·nav에 `shrink-0` 적용해 좁은 화면에서 검색창이 줄어들게 함 | ✅ |
 | `src/components/summoners/ProfileHeader.tsx` (신규) | 프로필 아이콘·이름#태그·레벨. 재검색 폼 없음(2026-10-27 사용자 교정) | ✅ |
 | `src/components/summoners/RankList.tsx` (신규) | 랭크 카드 세로 목록 / 빈 상태 "랭크 정보가 없습니다" | ✅ |
-| `src/components/summoners/MatchList.tsx`, `MatchRow.tsx` (신규) | 매치 20건 목록 / 매치 1건(챔피언·시간·KDA·CS·주문·키스톤·아이템·참가자). 아이템·주문·키스톤 아이콘에 기존 `Tooltip` 재사용 | ✅ |
+| `src/components/summoners/MatchList.tsx`, `MatchRow.tsx` (신규) | 매치 20건 목록 / 매치 1건(챔피언·시간·KDA·CS·주문·키스톤·아이템·참가자). 아이템·주문·키스톤 아이콘에 기존 `Tooltip` 재사용. 2026-10-27 사용자 피드백("op.gg와 정보 배치/순서가 다르다")으로 열 순서를 op.gg와 맞춰 교정: 소환사 주문·키스톤 룬을 챔피언 아이콘 바로 옆으로 옮기고(그전엔 CS 뒤 별도 칸), 결과·포지션·경과시간·게임길이를 한 칸에 모음. 최종 순서: 챔피언+주문+룬(결과/시간 칸과 나란히) → KDA → CS → 아이템 → 참가자. 작은 수정이라 Review 생략, lint/tsc + 실제 브라우저(데스크톱·360px)로 직접 검증 | ✅ |
 | `src/components/summoners/SummonerStatus.tsx`, `RetryButton.tsx` (신규) | Riot 502/503·백엔드 연결 실패 안내(서버) + [다시 시도] 새로고침 버튼(client) | ✅ |
 | `src/app/summoners/[region]/[riotId]/page.tsx` (신규) | `dynamic = "force-dynamic"`, `region !== "kr"` → `notFound()`, `riotId` 디코딩(D38), 상태별 분기(404/Riot 오류/정상), Data Dragon 병렬 호출 | ✅ |
 | `src/app/summoners/[region]/[riotId]/loading.tsx` (신규) | 프로필·랭크·매치 스켈레톤 | ✅ |
