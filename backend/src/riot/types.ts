@@ -76,6 +76,8 @@ export interface ParticipantDto {
   riotIdGameName?: string;
   riotIdTagline?: string;
   gameEndedInEarlySurrender?: boolean;
+  /** 변경 04: 킬관여(0~1 비율). 오래된 게임·특수 큐에서는 challenges 전체가 빠질 수 있다 */
+  challenges?: { killParticipation?: number };
 }
 
 export interface BanDto {
@@ -113,6 +115,11 @@ export interface TimelineDto {
   metadata: { matchId: string };
   info: {
     participants: { participantId: number; puuid: string }[];
-    frames: { timestamp?: number; events: TimelineEventDto[] }[];
+    frames: {
+      timestamp?: number;
+      events: TimelineEventDto[];
+      /** 변경 04: 키는 문자열 participantId("1"~"10"). 수집기는 쓰지 않는다 */
+      participantFrames?: Record<string, { totalGold?: number }>;
+    }[];
   };
 }

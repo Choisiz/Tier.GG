@@ -168,3 +168,12 @@ describe('riot client (가짜 fetch)', () => {
     });
   });
 });
+
+describe('RiotClient.limiterWaitMs (변경 04)', () => {
+  it('제한기에 여유가 있으면 0, 1초 한도를 다 쓰면 다음 창까지 남은 ms', async () => {
+    const { client } = setup(Array.from({ length: 19 }, () => json(200, {})));
+    assert.equal(client.limiterWaitMs(), 0);
+    for (let i = 0; i < 19; i++) await client.getMatch('KR_1');
+    assert.ok(client.limiterWaitMs() > 0);
+  });
+});

@@ -2,9 +2,9 @@
 
 > 이 문서는 `!백엔드`가 작성하고 `!프론트`가 읽는 계약 문서다. 엔드포인트, 파라미터, 응답 형식, 오류 형식을 정한다. (CLAUDE.md 9장)
 
-- 상태: **v3 (구현 반영)** — `backend/docs/back_spec.md` "변경 03"과 함께 승인 (2026-10-27). 2-5 전적 검색 추가. 나머지(1~4·6장, 2-0~2-4)는 v2(변경 02)와 같다.
+- 상태: **v3 (구현 반영)** — `backend/docs/back_spec.md` "변경 03"과 함께 승인 (2026-10-27). 2-5 전적 검색 추가. 2026-10-30 "변경 04"로 2-5에 `killParticipation` 추가, 2-6 라인전 15분 골드 추가(작은 추가, additive). 나머지(1~4·6장, 2-0~2-4)는 v2(변경 02)와 같다.
 - 근거: `docs/contracts/db_contract.md` **v8**. 2-5(전적 검색)는 DB를 쓰지 않고 Riot API를 그대로 중계한다 (back_spec 변경 03 W-6, 계약 변경 요청 없음).
-- 범위: 챔피언 티어리스트(포지션별) + 챔피언 상세(포지션, 빌드) + **전적 검색**(프로필·랭크·최근 매치 20건, 2-5). 통계(2-0~2-4)는 **최근 14일에 시작한 게임** 기준. SSE·과거 매치 더보기·스킬 순서(전적 검색)는 포함하지 않는다.
+- 범위: 챔피언 티어리스트(포지션별) + 챔피언 상세(포지션, 빌드) + **전적 검색**(프로필·랭크·최근 매치 20건, 2-5) + **라인전 15분 골드**(지연 로딩, 2-6). 통계(2-0~2-4)는 **최근 14일에 시작한 게임** 기준. SSE·과거 매치 더보기·스킬 순서(전적 검색)는 포함하지 않는다.
 
 ### v1 → v2 변경 (2026-10-15, 백엔드 변경 01)
 
@@ -478,6 +478,7 @@ GET /api/v1/summoners/kr/너희는개다-KR1
       "kills": 7,
       "deaths": 3,
       "assists": 5,
+      "killParticipation": 52,
       "cs": 182,
       "goldEarned": 13500,
       "items": [3006, 3046, 1036, 3031, 1018, 3074],
@@ -502,6 +503,7 @@ GET /api/v1/summoners/kr/너희는개다-KR1
 | `matches[]` | array | 아니오 | match-v5 최근 20건(큐 필터 없음), 최신 먼저. 최근 게임이 없으면 `[]`. 일부 매치 상세만 실패해도 나머지로 응답 |
 | `matches[].queueId` | int | 아니오 | Riot 큐 ID 그대로(`420`=솔로/듀오, `440`=자유랭크 등, 2026-10-27 추가). 이름표로 바꾸는 건 프론트 몫 |
 | `matches[].champLevel` | int | 아니오 | 그 게임에서 도달한 챔피언 레벨(`champLevel`, 2026-10-27 추가). 소환사 레벨(`summoner.summonerLevel`)과는 다름 |
+| `matches[].killParticipation` | int(0~) | **예** | 내 킬관여 %(2026-10-30 추가). `challenges.killParticipation`(0~1)×100 반올림, 없으면 `(kills+assists)÷내 팀 킬 합`, 팀 킬 합이 0이면 `null`(프론트는 `-`). 100을 넘는 값이 와도 자르지 않는다. 추가 Riot 호출 없음 |
 | `matches[].cs` | int | 아니오 | `totalMinionsKilled + neutralMinionsKilled` (백엔드가 더해서 줌) |
 | `matches[].items` | int[6] | 아니오 | `item0~5`. 빈 칸 0 |
 | `matches[].trinket` | int | 아니오 | `item6` |
@@ -511,7 +513,7 @@ GET /api/v1/summoners/kr/너희는개다-KR1
 | `…team[]`/`enemy[].damage` | int | 아니오 | 챔피언 대상 딜량(`totalDamageDealtToChampions`). 참가자 목록의 딜량 막대그래프용(2026-10-27 추가, 추가 호출 없음) |
 
 - 캐시: `Cache-Control: no-store` (검색 결과는 거의 실시간이어야 하므로. 2·4장의 `public, max-age=600`은 챔피언 통계 3개에만 해당).
-- 타임라인은 부르지 않는다. 스킬 순서는 이 엔드포인트에 없다 (이번 범위 밖).
+- 타임라인은 부르지 않는다. 스킬 순서는 이 엔드포인트에 없다 (이번 범위 밖). 라인전 15분 골드는 timeline이 필요해 2-6으로 분리했다.
 
 #### 오류 (3장 형식 그대로)
 
@@ -525,6 +527,56 @@ GET /api/v1/summoners/kr/너희는개다-KR1
 ```json
 { "error": { "code": "SUMMONER_NOT_FOUND", "message": "해당 소환사를 찾을 수 없습니다." } }
 ```
+
+---
+
+### 2-6. `GET /api/v1/matches/lane-gold` — 라인전 15분 골드 (지연 로딩)
+
+> 요약: 전적 검색(2-5)이 준 `matchId`들에 대해, 검색한 소환사(`puuid`)의 **15분 시점 골드 격차 비율**을 따로 돌려준다. 첫 화면을 느리게 하지 않으려고 2-5와 분리했다(프론트가 화면을 먼저 그린 뒤 채운다). **`window` 객체 없음**, 캐시 헤더 `no-store`(서버가 경기별로 6시간 캐시한다). DB를 쓰지 않는다(back_spec 변경 04).
+
+#### 파라미터
+
+| 이름 | 위치 | 필수 | 형식 | 검사 |
+|------|------|------|------|------|
+| `puuid` | 쿼리 | 예 | 2-5의 `summoner.puuid` | 영숫자·`-`·`_`, 1~100자. 아니면 400 |
+| `matchIds` | 쿼리 | 예 | 쉼표로 구분한 `matchId` 1~10개 (2-5의 `matches[].matchId`) | 각 `^KR_[0-9]{1,15}$`. 11개 이상·형식 오류·빈 항목은 400. 같은 ID를 반복해도 400이 아니며 응답에 반복한 만큼 항목이 나온다(Riot 호출은 1번) |
+
+```http
+GET /api/v1/matches/lane-gold?puuid=abcd1234…&matchIds=KR_8437852704,KR_8437852001
+```
+
+```json
+{
+  "results": [
+    { "matchId": "KR_8437852704", "state": "ready", "myPercent": 46, "myGold": 3958, "enemyGold": 4661 },
+    { "matchId": "KR_8437852001", "state": "unavailable", "myPercent": null, "myGold": null, "enemyGold": null },
+    { "matchId": "KR_8437851900", "state": "pending", "myPercent": null, "myGold": null, "enemyGold": null }
+  ],
+  "retryAfterSec": 4
+}
+```
+
+#### 필드
+
+| 필드 | 타입 | null | 의미 |
+|------|------|------|------|
+| `results[]` | array | 아니오 | 요청한 `matchIds`와 **같은 순서·같은 개수** |
+| `results[].state` | `"ready"` \| `"unavailable"` \| `"pending"` | 아니오 | `ready`: 값 있음. `unavailable`: 15분 미만 게임·포지션 없음(칼바람·URF 등)·적 팀에 같은 포지션이 0명 또는 2명 이상·`puuid`가 그 경기 참가자가 아님·timeline 없음 등 **다시 요청해도 같음**(프론트 `-`). `pending`: Riot 호출 한도 때문에 이번에 못 채움(다시 요청) |
+| `results[].myPercent` | int(0~100) | `ready`가 아니면 null | `round(내 골드 ÷ (내 + 상대) × 100)`. 상대 = 적 팀의 같은 `individualPosition`(정글·서폿 포함). 표시는 `myPercent:(100−myPercent)` 예: `46:54` |
+| `results[].myGold`·`enemyGold` | int | `ready`가 아니면 null | 15:00 시점 `totalGold` (툴팁 등에 사용) |
+| `retryAfterSec` | int \| null | 예 | `pending`이 하나라도 있으면 몇 초 뒤 그 ID만 다시 요청할지(1~120). 없으면 `null` |
+
+- **HTTP는 `pending`이 있어도 200이다**(429를 프론트에 넘기지 않는다).
+- 프론트 규칙: `pending`은 `retryAfterSec` 뒤 **그 ID만** 재요청, 최대 3번. `unavailable`·`ready`는 재요청하지 않는다. 20게임이면 10개씩 2번 요청한다.
+- 캐시: `Cache-Control: no-store`. 서버는 `matchId`별로 6시간 메모리 캐시하므로 같은 요청을 반복하면 Riot을 다시 부르지 않는다(응답에 표시는 하지 않는다).
+
+#### 오류 (3장 형식 그대로)
+
+| HTTP | `code` | 언제 |
+|------|--------|------|
+| 400 | `INVALID_PARAMETER` | `puuid`·`matchIds` 형식 오류, 11개 이상, 누락 |
+| 502 | `RIOT_UNAVAILABLE` | Riot API 429·5xx 재시도 소진 (이미 채운 결과는 서버 캐시에 남으니 나중에 다시 요청하면 이어서 채워짐) |
+| 503 | `RIOT_KEY_EXPIRED` | Riot API 키 만료(401/403). **이 요청만** 실패하고 서버는 계속 응답한다. 프론트는 재시도하지 않고 `-`를 유지한다 |
 
 ---
 
@@ -557,8 +609,8 @@ GET /api/v1/summoners/kr/너희는개다-KR1
 | 503 | `DB_UNAVAILABLE` | DB 연결 실패 |
 | 500 | `INTERNAL_ERROR` | 그 밖의 서버 오류. 내부 내용은 응답에 넣지 않음 |
 | 404 | `SUMMONER_NOT_FOUND` | 전적 검색(2-5): 그 소환사가 없음 |
-| 502 | `RIOT_UNAVAILABLE` | 전적 검색(2-5): Riot API 재시도 소진 |
-| 503 | `RIOT_KEY_EXPIRED` | 전적 검색(2-5): Riot API 키 만료. 이 요청만 실패 |
+| 502 | `RIOT_UNAVAILABLE` | 전적 검색(2-5)·라인전(2-6): Riot API 재시도 소진 |
+| 503 | `RIOT_KEY_EXPIRED` | 전적 검색(2-5)·라인전(2-6): Riot API 키 만료. 이 요청만 실패 |
 
 집계 전 응답 예:
 
@@ -626,3 +678,4 @@ GET /api/v1/summoners/kr/너희는개다-KR1
 | 2026-10-27 | v3 (작은 추가) | 2-5 `matches[].champLevel`(그 게임에서 도달한 챔피언 레벨) 추가. `ParticipantDto`에 이미 있던 `champLevel`을 검색한 소환사 쪽에 노출(추가 Riot 호출 없음). 사용자 요청("챔피언 초상화 옆에 레벨 표시") |
 | 2026-10-27 | v3 (작은 추가) | 2-5 `matches[].participants.team`/`enemy[].damage`(챔피언 대상 딜량) 추가. 참가자 목록 딜량 막대그래프용, 추가 Riot 호출 없음. 사용자 요청("초상화·이름 하단에 얇은 딜량 그래프") |
 | 2026-10-27 | v3 (작은 추가) | 2-5 `matches[].queueId`(Riot 큐 ID) 추가. match-v5 응답에 이미 있던 `info.queueId`를 그대로 노출(추가 Riot 호출 없음), 이름표는 프론트가 한글화. 사용자 요청("승리 하단에 큐 종류(솔랭 등) 표시") |
+| 2026-10-30 | v3 (작은 추가) | 2-5 `matches[].killParticipation`(정수 %, null 가능) 추가: match-v5 `challenges.killParticipation`을 그대로 쓰고 없으면 (킬+어시)÷팀 킬 합으로 계산, 추가 Riot 호출 없음. 2-6 `GET /matches/lane-gold` 신규(라인전 15분 골드 격차, 지연 로딩, `ready`/`unavailable`/`pending` + `retryAfterSec`, HTTP 200). 오류 코드 추가 없음 (back_spec 변경 04). 사용자 요청("킬관여·라인전 점수 표시") |

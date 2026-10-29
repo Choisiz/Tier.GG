@@ -4,6 +4,7 @@ import type { Logger } from '../lib/logger.js';
 import type { RiotClient } from '../riot/client.js';
 import { RiotKeyExpiredError, RiotNotFoundError, RiotRetryExhaustedError } from '../riot/errors.js';
 import type { MatchDto } from '../riot/types.js';
+import { laneInfoFromMatch, type MatchLaneCache } from './matchLaneCache.js';
 import type { SummonerCache } from './summonerCache.js';
 import { summonerSearchDto, type SummonerSearchDto } from './dto.js';
 import { ApiError } from './errors.js';
@@ -15,6 +16,8 @@ export interface SummonerSearchDeps {
   riot: RiotClient;
   cache: SummonerCache<SummonerSearchDto>;
   logger: Logger;
+  /** 경기 캐시(변경 04). 있으면 받은 매치 상세에서 라인전용 최소 정보를 넣어 둔다 (추가 호출 없음) */
+  laneCache?: MatchLaneCache;
   /** 지금 시각(ms). 캐시 키 만료 판단용, 테스트에서 고정 */
   now?: () => number;
 }
@@ -23,7 +26,7 @@ function cacheKey(region: string, gameName: string, tagLine: string): string {
   return `${region}:${gameName.toLowerCase()}#${tagLine.toLowerCase()}`;
 }
 
-export function createSummonerSearch({ riot, cache, logger, now = Date.now }: SummonerSearchDeps): SummonerSearchFn {
+export function createSummonerSearch({ riot, cache, logger, laneCache, now = Date.now }: SummonerSearchDeps): SummonerSearchFn {
   return async function summonerSearch(region, gameName, tagLine) {
     const key = cacheKey(region, gameName, tagLine);
     const hit = cache.get(key, now());
@@ -47,6 +50,13 @@ export function createSummonerSearch({ riot, cache, logger, now = Date.now }: Su
       const skipped = settled.length - matches.length;
       if (skipped > 0) {
         logger.warn('매치 상세 일부 실패, 나머지로 응답', { region, skipped, total: matchIds.length });
+      }
+
+      if (laneCache) {
+        // 이미 gold15까지 채운 항목은 덮어쓰지 않는다
+        for (const m of matches) {
+          if (!laneCache.get(m.metadata.matchId, now())) laneCache.set(m.metadata.matchId, laneInfoFromMatch(m), now());
+        }
       }
 
       const dto = summonerSearchDto(account, summoner, leagues, matches);

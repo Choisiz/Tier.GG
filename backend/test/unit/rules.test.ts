@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { mainPositions } from '../../src/api/mainPositions.js';
-import { parseChampionIdParam, parsePositionParam, parseRegionParam, parseRiotIdParam } from '../../src/api/validate.js';
+import { parseChampionIdParam, parseMatchIdsParam, parsePositionParam, parsePuuidParam, parseRegionParam, parseRiotIdParam } from '../../src/api/validate.js';
 import { divisionQuota, buildCollectionConfig, windowStart } from '../../src/config/collection.js';
 import { eligibleEntries, pickRandom, seededRandom } from '../../src/collector/sample.js';
 import { sortIdsNewestFirst } from '../../src/collector/matches.js';
@@ -81,6 +81,23 @@ describe('validate', () => {
     assert.deepEqual(parseRiotIdParam('a-abcde'), { ok: true, value: { gameName: 'a', tagLine: 'abcde' } });
     for (const bad of ['noDash', '-KR1', 'name-', 'name-abcdef', 'name-a', 'name-한글1', 123]) {
       assert.equal(parseRiotIdParam(bad).ok, false, String(bad));
+    }
+  });
+});
+
+describe('lane-gold 입력 검사 (변경 04)', () => {
+  it('puuid: 영숫자·-·_ 1~100자', () => {
+    assert.equal(parsePuuidParam('abc-DEF_123').ok, true);
+    assert.equal(parsePuuidParam('a'.repeat(100)).ok, true);
+    for (const bad of ['', 'a'.repeat(101), 'a/b', 'a b', 'a%b', undefined, ['a']]) assert.equal(parsePuuidParam(bad).ok, false, String(bad));
+  });
+
+  it('matchIds: KR_숫자 1~10개, 쉼표 구분', () => {
+    assert.deepEqual(parseMatchIdsParam('KR_1,KR_8437852704'), { ok: true, value: ['KR_1', 'KR_8437852704'] });
+    assert.equal(parseMatchIdsParam(Array.from({ length: 10 }, (_, i) => `KR_${i}`).join(',')).ok, true);
+    assert.equal(parseMatchIdsParam(Array.from({ length: 11 }, (_, i) => `KR_${i}`).join(',')).ok, false);
+    for (const bad of ['', 'KR_', 'kr_1', 'KR_1,', ',KR_1', 'KR_1,,KR_2', 'KR_1 ', 'KR_1/../x', 'KR_1234567890123456', ['KR_1']]) {
+      assert.equal(parseMatchIdsParam(bad).ok, false, String(bad));
     }
   });
 });

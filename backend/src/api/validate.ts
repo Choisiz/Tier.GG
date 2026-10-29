@@ -1,5 +1,6 @@
 // 쿼리·경로 파라미터 검사 (api_contract v2 2-3, 2-4). 대상은 position, championId만 (patch 쿼리는 무시). 결과 객체를 돌려주고, 라우트가 ApiError로 바꾼다.
 import { POSITIONS, type Position } from '../config/api.js';
+import { LANE_GOLD_MAX_IDS } from '../config/summoner.js';
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; message: string };
 
@@ -56,4 +57,31 @@ export function parseRiotIdParam(v: unknown): Parsed<RiotIdParts> {
     return { ok: false, message: 'tagLine은 영숫자 2~5자여야 합니다.' };
   }
   return { ok: true, value: { gameName, tagLine } };
+}
+
+// 라인전 15분 골드 (back_spec 변경 04, 04-9)
+
+const PUUID_RE = /^[0-9A-Za-z_-]{1,100}$/;
+const MATCH_ID_RE = /^KR_[0-9]{1,15}$/;
+
+export function parsePuuidParam(v: unknown): Parsed<string> {
+  if (typeof v !== 'string' || !PUUID_RE.test(v)) {
+    return { ok: false, message: 'puuid는 영숫자·-·_ 100자 이하여야 합니다.' };
+  }
+  return { ok: true, value: v };
+}
+
+/** 쉼표로 구분한 matchId 1~10개. 각각 ^KR_[0-9]{1,15}$ (빈 항목·배열 쿼리는 오류) */
+export function parseMatchIdsParam(v: unknown): Parsed<string[]> {
+  if (typeof v !== 'string' || v === '') {
+    return { ok: false, message: `matchIds는 쉼표로 구분한 matchId 1~${LANE_GOLD_MAX_IDS}개여야 합니다.` };
+  }
+  const ids = v.split(',');
+  if (ids.length > LANE_GOLD_MAX_IDS) {
+    return { ok: false, message: `matchIds는 한 번에 최대 ${LANE_GOLD_MAX_IDS}개입니다.` };
+  }
+  if (!ids.every((id) => MATCH_ID_RE.test(id))) {
+    return { ok: false, message: 'matchId는 KR_숫자 형식이어야 합니다.' };
+  }
+  return { ok: true, value: ids };
 }
