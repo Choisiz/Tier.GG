@@ -1,6 +1,6 @@
 # 백엔드 구현 기록 — 수집 워커 + 챔피언 통계 API
 
-> 기준: `backend/docs/back_spec.md` (승인됨, 변경 03 포함), `docs/contracts/api_contract.md` v3(전적 검색 추가, 2026-10-27), `docs/contracts/db_contract.md` v8
+> 기준: `backend/docs/back_spec.md` (승인됨, 변경 04 포함), `docs/contracts/api_contract.md` v3(전적 검색 2026-10-27, 킬관여·라인전 2026-10-30), `docs/contracts/db_contract.md` v8
 > 이 문서는 **지금 구현 상태만** 적는다. v1(패치 기준)·변경 01·02 구현 기록과 시도 과정은 git 기록에 남아 있다.
 > 상태 표기: ✅ 완료 / ⚠️ 부분 완료 / ❌ 실패 / ⏸️ 보류
 
@@ -15,6 +15,7 @@
   - [2-5. 읽기 API](#2-5-읽기-api)
   - [2-6. 전적 검색 (변경 03)](#2-6-전적-검색-변경-03)
   - [2-7. 테스트](#2-7-테스트)
+  - [2-8. 킬관여·라인전 15분 골드 (변경 04)](#2-8-킬관여라인전-15분-골드-변경-04)
 - [3. 사용자가 실행하는 명령](#3-사용자가-실행하는-명령)
 - [4. 검증 결과](#4-검증-결과)
   - [4-1. 실제 소량 수집](#4-1-실제-소량-수집)
@@ -23,6 +24,7 @@
   - [4-4. 예약 작업](#4-4-예약-작업)
   - [4-5. 의존성](#4-5-의존성)
   - [4-6. 전적 검색 실제 Riot 호출 (변경 03)](#4-6-전적-검색-실제-riot-호출-변경-03)
+  - [4-7. 킬관여·라인전 검증 (변경 04)](#4-7-킬관여라인전-검증-변경-04)
 - [5. 계획과 다른 점](#5-계획과-다른-점)
 - [6. 계약 변경 요청](#6-계약-변경-요청)
 - [7. 남은 문제](#7-남은-문제)
@@ -32,16 +34,20 @@
 ## 1. 요약
 
 > 요약: 계획서 2-1의 구조대로 API 서버와 수집 CLI가 동작한다. 최근 14일 창 수집기, 시험용 집계, API v3(통계 4개 + 전적 검색)이 들어가 있다. 변경 02의 내용은 그대로 유지된다. **변경 03**: `GET /api/v1/summoners/:region/:riotId`(전적 검색)을 새로 만들었다 — account-v1·summoner-v4·league-v4·match-v5를 호출해 프로필·랭크·최근 매치 20건을 주고, API 프로세스 메모리에 60초 캐시한다. 이 때문에 API 서버가 처음으로 `RIOT_API_KEY`를 읽는다(여전히 `collector/*`는 import하지 않음). 검사·테스트 모두 통과했고, 실제 테스트 계정(`너희는개다#KR1`)으로 호출해 20개 매치를 429 없이 받았다.
+>
+> **변경 04(킬관여·라인전 15분 골드)**: 2-5 각 매치에 `killParticipation`(정수 %, 추가 호출 0)을 합치고, 새 `GET /api/v1/matches/lane-gold`(2-6)를 만들었다. timeline에서 15분 골드만 뽑아 경기 ID별로 6시간 캐시(원본 미저장)하고, 제한기 대기가 1.5초를 넘으면 남은 ID를 `pending`(HTTP 200 + `retryAfterSec`)으로 남긴다. API 전용 제한기를 18/90으로 올렸다. 아래 표의 수치는 변경 04 기준이다.
 
 | 항목 | 결과 |
 |------|------|
 | `npm run typecheck` (`tsc --noEmit`) | 오류 0 |
 | `npm run lint` (eslint 9 + typescript-eslint 8) | 오류 0 |
-| `npm test` (단위, DB·네트워크 없음) | **117개** 통과 / 실패 0 (변경 03: `summonerCache` 5, `summonerSearch` 9, `validate`(region·riotId) 2, `client`(신규 메서드) 5, `app`(`/summoners` 라우트) 4 추가) |
-| `npm run test:integration` (실제 Supabase, 모두 ROLLBACK) | **17개** 통과 / 실패 0 (약 10초, 변경 03은 DB를 쓰지 않아 추가 없음). 끝난 뒤 테스트 데이터 0줄 |
+| `npm test` (단위, DB·네트워크 없음) | **164개** 통과 / 실패 0 (변경 03까지 117 + 변경 04 47: `laneGold` 34, `matchLaneCache` 3, `app`(lane-gold 라우트 4 + 로그 puuid 1) 5, `rules`(puuid·matchIds 검사) 2, `client`(`limiterWaitMs`) 1, `summonerSearch` 2) |
+| `npm run test:integration` (실제 Supabase, 모두 ROLLBACK) | **17개** 통과 / 실패 0 (약 10초, 변경 03·04는 DB를 쓰지 않아 추가 없음). 끝난 뒤 테스트 데이터 0줄 |
 | `npm audit` | **1건 발견(기존, 이 변경과 무관)**: `body-parser`(express 2.x 전이 의존성) DoS 권고. `package.json`·`package-lock.json`을 이번 변경에서 건드리지 않았고(계획 범위 밖), `npm audit fix --dry-run`으로 확인한 결과 수집 코드에 영향 없는 패치 범위 업데이트다. 조치는 메인 에이전트/사용자 판단에 맡김(4-6 참고) |
+| 빌드 | 해당 없음. `tsx`로 바로 실행하고 `tsc --noEmit`으로 검사하는 구조다 (결정 D1, `package.json`에 `build` 스크립트 없음). typecheck가 그 역할 |
+| 전적 검색+라인전 실제 호출 (변경 04, 4-7) | 검색 1회 + lane-gold 10개 `200 OK`, `ready` 9 / `unavailable` 1 / `pending` 0, 같은 요청 재호출 **Riot 0회**(1.2ms), 오류 경로 확인. Riot 호출 약 38회, **429 0회** |
 | 패치 기준 이름 `grep` (계획 10-1) | `src`·`test`에 0건 |
-| 비밀값 `grep` | `backend/`, 수집·API 로그(`/tmp/tiergg-server.log` 포함), `api_contract.md`, `.env.example`에 키·접속 문자열·비밀번호 값 0건 |
+| 비밀값 `grep` | `backend/`, 수집·API 로그(변경 03: `/tmp/tiergg-server.log`, 변경 04: 이번 시험 서버 로그 3개), `api_contract.md`, `.env.example`에 키·접속 문자열·비밀번호 값 0건 |
 | `collector/*` import, `RIOT_API_KEY` 읽는 곳 `grep` | `src/api`·`src/server.ts`에 `collector/` import 0건. `RIOT_API_KEY`는 `src/server.ts`(변경 03, `loadRiotEnv()`)와 `src/cli/collect.ts`·`src/config/env.ts`·`src/lib/logger.ts`(가리기용)에서만 참조 |
 | 테스트 수집 (`collection_logs` id 25, 기존) | 765명, **3,930게임**, Riot **8,722회**, **429 0회**, 약 3시간 |
 | 예약 작업 `tiergg_daily_refresh` (기존) | 2026-10-14·10-15 20:00 UTC 두 번 성공 |
@@ -179,6 +185,26 @@
 | `unit/client.test.ts` (+5, 변경 03) | `getAccountByRiotId`(경로 인코딩 확인)·`getSummonerByPuuid`·`getLeagueEntriesByPuuid`·`getRecentMatchIds`의 URL·라우팅 확인, account-v1 404→`RiotNotFoundError` | ✅ |
 | `unit/rules.test.ts` (+2, 변경 03) | `parseRegionParam`(`kr`만), `parseRiotIdParam`(마지막 `-`로 분리, gameName에 `-`가 있어도 안전, tagLine 2~5자 영숫자) | ✅ |
 | `unit/app.test.ts` (+4, 변경 03) | `/summoners/:region/:riotId`: 가짜 `summonerSearch`로 파싱된 값 전달·`no-store` 확인, `region≠kr`→400(summonerSearch 호출 안 함), `riotId` 형식 오류→400, `summonerSearch`를 안 넘긴 `createApp`에서는 500(기존 테스트가 깨지지 않음을 함께 확인) | ✅ |
+
+### 2-8. 킬관여·라인전 15분 골드 (변경 04)
+
+> 요약: 2-5 매치마다 `killParticipation`을 더하고, `GET /api/v1/matches/lane-gold`를 새로 만들었다. DB·`collector/*`·`cli/collect.ts`·db 계약은 건드리지 않았다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 킬관여 | `api/dto.ts` `killParticipationPercent`: `challenges.killParticipation`(숫자) × 100 반올림, 없으면 `(kills+assists)÷팀 킬 합`, 팀 킬 합 0이면 `null`, 100 초과도 자르지 않음. `matchListItem`이 `killParticipation`으로 싣는다. `ParticipantDto.challenges?` 선택 필드 추가. 추가 Riot 호출 0 | ✅ |
+| 타입 확장 | `riot/types.ts`: `ParticipantDto.challenges?`, `TimelineDto.frames[].participantFrames?`(선택 필드라 수집기 영향 없음) | ✅ |
+| 경기 캐시 | `api/matchLaneCache.ts`: `{ durationSec, players[10]{participantId,puuid,teamId,position}, gold15? }`, TTL 6시간·최대 5,000개(기존 `createSummonerCache` 재사용). `gold15`는 숫자 맵 또는 `null`(계산 불가 기억). timeline 원본은 저장하지 않음 | ✅ |
+| 검색 → 경기 캐시 | `summonerSearch`가 `laneCache`(선택 의존성)가 있으면 받은 매치 상세 20건의 최소 정보를 넣는다(이미 있는 항목은 덮어쓰지 않아 `gold15` 보존). 추가 호출 없음, 호출 수 24회 유지 | ✅ |
+| 라인전 계산·서비스 | `api/laneGold.ts`: 순수 함수 `pairForLane`(적 팀 같은 포지션 정확히 1명), `extractGold15`(frames[15], 16프레임 미만이면 null), `gold15Result`(반올림, 0/0·값 없음 → null). 서비스 `createLaneGold`: 경기 캐시 → getMatch(없을 때만) → 호출 생략 규칙(900초 미만·포지션 없음·대상 아님) → timeline 1회 → `gold15` 저장. 진행 중 Promise 공유(getMatch·timeline 각각), 한 요청 안 5경기 병렬 | ✅ |
+| 한도 정책 | `RiotClient.limiterWaitMs()`(제한기 `waitTime`을 0 이상으로)를 새 호출 시작 전에 본다. > 1.5초면 남은 새 호출은 `pending`, `retryAfterSec` = 올림(1~120). HTTP 200 | ✅ |
+| 오류 매핑 | 401/403 → 503 `RIOT_KEY_EXPIRED`(매 요청 로그), 소진 → 502 `RIOT_UNAVAILABLE`, timeline/match 404 → `unavailable`(+`gold15=null` 캐시), 그 밖은 500 | ✅ |
+| 라우트·검증 | `api/routes/matches.ts` `GET /matches/lane-gold`, `validate.ts` `parsePuuidParam`(`^[0-9A-Za-z_-]{1,100}$`), `parseMatchIdsParam`(1~10개 `^KR_[0-9]{1,15}$`). `no-store`. `app.ts`에 `ApiDeps.laneGold`·`opts.laneGold` 추가(안 넘기면 500, 기존 테스트 영향 없음) | ✅ |
+| 조립 | `server.ts` `buildRiotServices()`가 하나의 `RiotClient`·`RateLimiter`·경기 캐시를 `summonerSearch`와 `laneGold`가 함께 쓰게 주입. 키가 없으면 두 함수 모두 503 `RIOT_KEY_EXPIRED` | ✅ |
+| 제한기 값 | `config/summoner.ts` `API_RIOT_RATE_LIMIT` 10/50 → **18/90** (결정 X1). 라인전 상수 추가. 새 환경 변수 없음(`.env.example` 변경 없음) | ✅ |
+| 요청 로그의 puuid | `app.ts` 요청 로그가 쿼리의 `puuid=` 값을 앞 8자로 줄임(계획에 없던 보강, 5장 20번) | ✅ |
+| 운영 규칙 | 수집 CLI(19/98)와 API 서버(18/90)를 같은 키로 **동시에 돌리지 않는다**. `back_spec` 5-8·7-5에 명시 | ✅ |
+| 문서·계약 | `back_spec.md`(임시 절을 5-8·7-5·9-2·10-7·12장 X1~X7·13장에 합침), `api_contract.md` 2-5 `killParticipation`·신규 2-6·3장 오류 표 문구·6장 변경 기록 1줄 | ✅ |
 
 ---
 
@@ -319,11 +345,29 @@ npm run test:integration            # 실제 Supabase, 모두 ROLLBACK. 05:00 KS
 
 - Riot 호출은 이 확인 1회(캐시 미스 1건, 24회)뿐이다. 추가로 오류 경로 확인 3건은 모두 400/404라 Riot을 부르지 않거나(파라미터 오류) 캐시된 account-v1 404 결과(존재하지 않는 계정, 캐시 안 됨이라 매번 1회만 호출)라 Riot 호출 총량은 수십 회 이내다.
 
+### 4-7. 킬관여·라인전 검증 (변경 04)
+
+> 요약: 임시 포트 4100에 API 서버를 따로 띄워(기존 4000/3000 서버는 건드리지 않음) 실제 Riot으로 확인하고 종료했다. Riot 호출은 약 38회, 429는 0회.
+
+| 확인 | 결과 |
+|------|------|
+| 검색 `GET /summoners/kr/너희는개다-KR1` (캐시 미스) | **200**, 2.8초, 매치 20건. 모든 매치에 `killParticipation`. 70초·251초 게임은 팀 킬 0이라 `null`, 나머지는 14~73 정수 (예 KR_8437852704 = 50). 호출 24회 |
+| `GET /matches/lane-gold` 10개 (첫 호출) | **200**, 0.99초, `ready` 9 / `unavailable` 1(70초 게임, timeline 호출 생략) / `pending` 0, `retryAfterSec` null, `Cache-Control: no-store`. 로그 `riotCalls=9`(timeline 9, 검색이 경기 정보를 넣어 둬 getMatch 0) `cacheHits=1` |
+| 손계산 | KR_8437852704(서폿): 내 3,958 : 상대 4,661 → `3958×100÷8619 = 45.9` → **46**. 계획 04-3의 15분 `totalGold` 예시(참가자 5 = 3958, 참가자 10 = 4661)와 일치 |
+| 같은 요청 재호출 | **Riot 호출 0회** (`riotCalls=0 cacheHits=10`), 1.2ms, 응답 바이트 동일 |
+| 서버 재시작 후 2개 요청 (경기 정보 캐시 없음) | 200, 469ms, `riotCalls=4`(getMatch 2 + timeline 2), 값은 위와 같음 (46, 53) |
+| 입력 오류 | `matchIds=KR_1,NA_2` → 400, `matchIds` 누락 → 400 (`INVALID_PARAMETER`, details 포함) |
+| 잘못된 키(`RIOT_API_KEY`를 프로세스 환경에만 바꿈, `.env`는 그대로) | 503 `RIOT_KEY_EXPIRED`, 서버는 계속 동작, 오류 로그 1줄 |
+| 요청 로그 | `GET /api/v1/matches/lane-gold?puuid=8AcDYcY9…&matchIds=…` (puuid 앞 8자) |
+| 비밀값 | 서버 로그 3개에 `RGAPI-` + 16진수 패턴 0건 |
+| `pending` 경로 | 실제 Riot 한도를 일부러 넘길 수 없어 가짜 `limiterWaitMs`로만 확인(단위 테스트). 한도 18/90 아래의 실제 동작은 위 호출 규모에서는 대기가 없었다 |
+| 서버 종료 | 시험한 서버는 모두 종료(4100 포트 비어 있음). 기존 4000/3000은 건드리지 않았다. **기존 4000 서버는 코드 변경 반영을 위해 재시작이 필요하다** |
+
 ---
 
 ## 5. 계획과 다른 점
 
-> 요약: 1~14는 기존(변경 01·02)에서 Review가 받아들인 것들이다. 15~18은 변경 03에서 새로 생긴 것으로, **Review가 모두 타당하다고 확인했다**(`back_review.md` 4장, PASS with issues). 동작에 영향이 있는 것은 1번(표본 보충 방식)과 15·16·17(변경 03)이다.
+> 요약: 1~14는 기존(변경 01·02)에서 Review가 받아들인 것들이다. 15~18은 변경 03에서 새로 생긴 것으로, **Review가 모두 타당하다고 확인했다**(`back_review.md` 4장, PASS with issues). 동작에 영향이 있는 것은 1번(표본 보충 방식)과 15·16·17(변경 03)이다. 19~23은 변경 04에서 새로 생긴 것으로 Review 전이다.
 
 | # | 계획 | 구현 | 이유 |
 |---|------|------|------|
@@ -345,8 +389,13 @@ npm run test:integration            # 실제 Supabase, 모두 ROLLBACK. 05:00 KS
 | 16 (변경 03) | 오류 매핑 표에 없는 Riot 오류(예: `RiotBadRequestError`) | `summonerSearch`가 그대로 던져 오류 미들웨어가 500 `INTERNAL_ERROR`로 처리 | 계획 표(W-5)는 account-v1 404·401/403·429/5xx 소진만 다뤘다. 나머지는 "예상 못한 오류"로 보고 보수적으로 500 처리(서버가 죽지 않음) |
 | 17 (변경 03) | 서버가 `RIOT_API_KEY` 없이 켜질 때의 동작 | 계획에 명시되지 않아, 경고 로그만 남기고 전적 검색만 503 `RIOT_KEY_EXPIRED`로 응답하는 함수로 대체(서버는 계속 켜짐) | W-5의 "이 요청만 실패하고 서버는 멈추지 않는다" 원칙을 시작 시점에도 지키려는 판단. 개발 키가 24시간마다 만료되므로, 키가 없다고 챔피언 통계 API까지 막히면 안 된다고 봤다. 계획과 다른 선택이라 Review 확인 필요 |
 | 18 (변경 03) | account-v1 실제 경로 | `account/v1/…`가 아니라 **`riot/account/v1/…`** (Riot 실제 API 경로) | 계획 W-2 표의 경로 표기가 줄여 쓴 것으로 보여, 실제 Riot Account-V1 API 문서/호출 경로를 그대로 썼다. 실제 호출로 확인(4-6) |
+| 19 (변경 04) | `RiotClient`에 getter 1개 | `limiterWaitMs()`는 제한기 `waitTime`이 대기가 없을 때 음수(`blockedUntil − now`)를 돌려주는 것을 0으로 올려 반환 | 단위 테스트에서 걸러진 값. 호출자는 `> 1500`만 본다 |
+| 20 (변경 04) | 요청 로그 형식은 계획에 없음 | `app.ts` 요청 로그가 쿼리의 `puuid` 값을 앞 8자로 줄임 (결정 X7) | lane-gold는 puuid가 쿼리에 있어 기존 로그가 전체 puuid를 남겼다 (로그 규칙 위반) |
+| 21 (변경 04) | 호출 생략 시 `gold15`를 캐시하는지 불명확 | 생략(포지션 없음·참가자 아님)일 때는 `gold15`를 **캐시하지 않고**, 프레임 부족·404일 때만 `null`로 캐시 | 같은 경기의 다른 참가자는 라인전 대상일 수 있다 |
+| 22 (변경 04) | getMatch 404 처리 | 빈 정보 + `gold15=null`을 6시간 캐시 | 모르는 경기 ID를 반복 요청해도 Riot을 다시 부르지 않게 |
+| 23 (변경 04) | `puuid` 길이 | 계약 초안(100자)을 따름 (계획 본문 78자와 불일치) | 계약 문구가 기준 |
 
-- `docs/contracts/db_contract.*`, `db/`는 수정하지 않았다. `.env.example`에는 `API_PORT=`(값 없음, 비우면 4000)만 있다. 변경 03도 새 환경 변수가 없어 `.env.example`을 고치지 않았다.
+- `docs/contracts/db_contract.*`, `db/`는 수정하지 않았다. `.env.example`에는 `API_PORT=`(값 없음, 비우면 4000)만 있다. 변경 03·04도 새 환경 변수가 없어 `.env.example`을 고치지 않았다.
 
 ---
 
@@ -363,6 +412,12 @@ npm run test:integration            # 실제 Supabase, 모두 ROLLBACK. 05:00 KS
 - 변경 02에서 L1~L5(표본 보충, 요약 로그 표기, ② 연속 실패 상한, `/health` 로그, 연결 오류 리스너), `test` 프리셋 250명, API 계약 문구 2건을 모두 고쳤다.
 - 15명 400 플레이어: 원인을 조사해 "이전 만료 키 시기에 뽑히고 재확인 안 된 표본"으로 확인했고, 영향이 작아(② 호출 0.17%) 조치하지 않았다 (변경 02-1, 결정 V1).
 - 이 문서에서 ⚠️인 항목: ③~⑤ 연속 20개 실패를 실제 Riot 장애로 시험하지 않음(가짜 riot로는 확인함).
+- **(변경 04, Build 직후 — Review 전)**
+  1. 수집 CLI(19/98)와 API 서버(18/90)를 **같은 키로 동시에 돌리면** Riot 실제 한도(20/100)를 넘는다. 운영 규칙(동시에 돌리지 않음)으로만 막고 코드로 막지 않는다 (X1). `back_overview.md` 해결되지 않은 점 1번과 같은 문제.
+  2. `pending`(한도 초과) 경로와 Riot 429·5xx 소진 경로는 가짜 클라이언트로만 시험했다. 실제 한도를 일부러 넘기지 않았다.
+  3. 검색의 `getMatch` 상세 캐시(24회 → 4회)는 하지 않았다(X4). 같은 소환사를 60초 뒤 다시 검색하면 24회가 다시 든다 (라인전은 0회).
+  4. 기존에 떠 있는 4000 포트 API 서버는 이전 코드로 동작 중이다. 새 엔드포인트를 쓰려면 재시작이 필요하다.
+  5. 프론트는 이번 Build에서 건드리지 않았다. `pending` 재시도(최대 3번)·10개씩 2번 요청은 `!프론트` 몫이다.
 - **(변경 03, Review 확인 완료 — `back_review.md`, PASS with issues)**
   1. `npm audit` 1건(`body-parser` DoS, high). 이번 변경과 무관한 기존 전이 의존성 확인(Review도 재확인). `package.json`은 변경 03 작업 범위 밖이라 고치지 않았다. 사용자 승인 뒤 `npm audit fix` 실행을 권장한다.
   2. ③~⑤와 같이, 전적 검색의 Riot 오류 경로(429 소진, 5xx 소진, 매치 일부 실패)는 가짜 `RiotClient`로만 확인했다. 실제 Riot 429·5xx를 일부러 일으킬 수 없어서다.

@@ -56,6 +56,11 @@ export class RiotClient {
     return this.opts.limiter.waitedMs;
   }
 
+  /** 지금 호출하려면 제한기에서 몇 ms 기다려야 하는지 (변경 04: 라인전이 한도가 모자랄 때 pending으로 남기는 판단용) */
+  limiterWaitMs(): number {
+    return Math.max(0, this.opts.limiter.waitTime(this.clock.now()));
+  }
+
   getLeagueEntries(tier: string, division: string, page = 1): Promise<LeagueEntryDto[]> {
     return this.get(this.opts.platformUrl, `/lol/league/v4/entries/RANKED_SOLO_5x5/${tier}/${division}?page=${page}`);
   }

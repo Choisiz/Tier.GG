@@ -2,11 +2,13 @@
 // 읽기 전용 GET만. CORS 헤더는 주지 않는다 (결정 D6). 수집 코드를 부르지 않는다.
 import express, { type Express } from 'express';
 import type { Queryable } from '../db/tx.js';
-import { createLogger, type Logger } from '../lib/logger.js';
+import { createLogger, shortPuuid, type Logger } from '../lib/logger.js';
 import { ApiError, errorHandler, notFoundHandler } from './errors.js';
 import { championsRouter } from './routes/champions.js';
+import { matchesRouter } from './routes/matches.js';
 import { metaRouter } from './routes/meta.js';
 import { summonersRouter } from './routes/summoners.js';
+import type { LaneGoldFn } from './laneGold.js';
 import type { SummonerSearchFn } from './summonerSearch.js';
 import { createStaleWarner } from './window.js';
 
@@ -28,6 +30,8 @@ export interface ApiDeps {
   warnIfStale: (aggregatedAt: Date, nowMs: number) => void;
   /** 전적 검색(소환사 상세, 변경 03). server.ts가 실제 RiotClient로 만들어 넣는다 */
   summonerSearch: SummonerSearchFn;
+  /** 라인전 15분 골드(변경 04). server.ts가 실제 RiotClient로 만들어 넣는다 */
+  laneGold: LaneGoldFn;
 }
 
 /** summonerSearch를 넘기지 않은 createApp 호출(예: 기존 테스트)에서 /summoners를 부르면 500 */
@@ -35,10 +39,19 @@ const unavailableSummonerSearch: SummonerSearchFn = async () => {
   throw new ApiError(500, 'INTERNAL_ERROR', '소환사 검색이 설정되지 않았습니다.');
 };
 
+/** 로그에는 puuid 쿼리 값을 앞 8자만 남긴다 (변경 04: lane-gold는 puuid가 쿼리에 있다) */
+function shortenPuuidQuery(url: string): string {
+  return url.replace(/([?&]puuid=)([^&]*)/, (_m, k: string, v: string) => k + shortPuuid(v));
+}
+
+const unavailableLaneGold: LaneGoldFn = async () => {
+  throw new ApiError(500, 'INTERNAL_ERROR', '라인전 조회가 설정되지 않았습니다.');
+};
+
 export function createApp(
   db: ApiDb,
   logger: Logger = createLogger('api'),
-  opts: { now?: () => number; summonerSearch?: SummonerSearchFn } = {},
+  opts: { now?: () => number; summonerSearch?: SummonerSearchFn; laneGold?: LaneGoldFn } = {},
 ): Express {
   const deps: ApiDeps = {
     db,
@@ -46,6 +59,7 @@ export function createApp(
     now: opts.now ?? Date.now,
     warnIfStale: createStaleWarner(logger),
     summonerSearch: opts.summonerSearch ?? unavailableSummonerSearch,
+    laneGold: opts.laneGold ?? unavailableLaneGold,
   };
   const app = express();
   app.disable('x-powered-by');
@@ -56,7 +70,7 @@ export function createApp(
     const t0 = process.hrtime.bigint();
     res.on('finish', () => {
       const ms = Number(process.hrtime.bigint() - t0) / 1e6;
-      logger.info(`${req.method} ${req.originalUrl} ${res.statusCode} ${ms.toFixed(1)}ms`);
+      logger.info(`${req.method} ${shortenPuuidQuery(req.originalUrl)} ${res.statusCode} ${ms.toFixed(1)}ms`);
     });
     next();
   });
@@ -70,6 +84,7 @@ export function createApp(
   app.use('/api/v1', metaRouter(deps));
   app.use('/api/v1', championsRouter(deps));
   app.use('/api/v1', summonersRouter(deps));
+  app.use('/api/v1', matchesRouter(deps));
   app.use(notFoundHandler);
   app.use(errorHandler(logger));
   return app;

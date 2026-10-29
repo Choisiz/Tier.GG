@@ -1,8 +1,8 @@
 # 백엔드 현재 상태 (Overview)
 
 > 이 문서는 백엔드의 **지금 상태만** 적는다. 진행 기록(계획·구현·검토)은 `back_spec.md`, `back_build.md`, `back_review.md`에 있다.
-> 기준: 코드(`backend/src`, `test`, `package.json`), `docs/contracts/api_contract.md` **v3(전적 검색 추가, 2026-10-27)**, `docs/contracts/db_contract.md` **v8**, 수집 로그 `backend/logs/collect-2026-10-15.log`.
-> 최종 확인: 2026-10-27 (변경 03 Review). 다음 Review 에이전트가 덮어써서 최신으로 유지한다.
+> 기준: 코드(`backend/src`, `test`, `package.json`), `docs/contracts/api_contract.md` **v3(전적 검색 2026-10-27, 킬관여·라인전 2-6 2026-10-30)**, `docs/contracts/db_contract.md` **v8**, 수집 로그 `backend/logs/collect-2026-10-15.log`.
+> 최종 확인: 2026-10-30 (변경 04 Review). 다음 Review 에이전트가 덮어써서 최신으로 유지한다.
 
 ## 목차
 
@@ -35,7 +35,7 @@
 
 | 항목 | 내용 |
 |------|------|
-| 역할 | ① 수집기: Riot API → 원본 테이블(`ranked_players`, `matches`, `match_players`, `collection_logs`) 저장. ② API 서버: 집계 테이블을 읽어 프론트에 JSON으로 주고, **전적 검색(변경 03)은 Riot API를 그 자리에서 중계**한다 |
+| 역할 | ① 수집기: Riot API → 원본 테이블(`ranked_players`, `matches`, `match_players`, `collection_logs`) 저장. ② API 서버: 집계 테이블을 읽어 프론트에 JSON으로 주고, **전적 검색(변경 03)과 라인전 15분 골드(변경 04)는 Riot API를 그 자리에서 중계**한다 |
 | 집계 | 백엔드가 하지 않는다. DB 예약 작업 `tiergg_daily_refresh`가 **매일 05:00 KST(20:00 UTC)** 에 `refresh_window_stats(14)`를 실행한다 |
 | 통계 기준 | **최근 14일에 시작한 게임** 하나의 창 (패치 단위 아님). 전적 검색은 창과 무관하게 Riot에서 받은 값을 그대로 줌 |
 | 스택 | Node.js 24, TypeScript, Express 5, `pg` (ORM 없음), `tsx`로 실행 |
@@ -85,14 +85,17 @@
 | `src/api/routes/champions.ts` | `/champions`, `/champions/:championId` |
 | `src/api/window.ts` | `window` 객체, `displayName`(메이저 + 10), `share`, `isStale`(26시간), 503 `STATS_NOT_READY`, 오래됨 경고(1시간 1번) |
 | `src/api/mainPositions.ts` | 주 포지션 최대 2개 (2순위는 10% 이상) |
-| `src/api/dto.ts` | DB 줄 → 응답 필드, 전적 검색 DTO(변경 03) |
-| `src/api/validate.ts` | `position`, `championId`, `region`, `riotId` 검사 |
+| `src/api/dto.ts` | DB 줄 → 응답 필드, 전적 검색 DTO(변경 03), 킬관여 `killParticipationPercent`(변경 04) |
+| `src/api/validate.ts` | `position`, `championId`, `region`, `riotId`, `puuid`, `matchIds`(변경 04) 검사 |
 | `src/api/errors.ts` | 오류 형식, 404·오류 미들웨어 |
 | `src/api/cache.ts` | 성공 응답 `Cache-Control` |
 | `src/api/routes/summoners.ts` (변경 03) | `GET /summoners/:region/:riotId` |
 | `src/api/summonerSearch.ts` (변경 03) | account-v1→summoner-v4+league-v4(병렬)→match-v5 ids→상세(병렬), 캐시, 오류 매핑 |
 | `src/api/summonerCache.ts` (변경 03) | Map 기반 TTL 캐시, 최대 200개 |
-| `src/config/summoner.ts` (변경 03) | 캐시 TTL·크기, API 전용 Riot 제한기(1초 10회/120초 50회) 설정값 |
+| `src/config/summoner.ts` (변경 03·04) | 검색 캐시 TTL·크기, API 전용 Riot 제한기(1초 18회/120초 90회), 라인전 상수 |
+| `src/api/routes/matches.ts` (변경 04) | `GET /matches/lane-gold` (puuid·matchIds 검사 후 `laneGold` 호출, `no-store`) |
+| `src/api/laneGold.ts` (변경 04) | 라인전 15분 골드: 순수 함수(`pairForLane`, `extractGold15`, `gold15Result`) + 서비스(캐시, 진행 중 호출 공유, 한도 정책 pending, 오류 매핑) |
+| `src/api/matchLaneCache.ts` (변경 04) | 경기 캐시(TTL 6시간, 최대 5,000개): 길이·참가자 10명 정보·`gold15` 숫자만. 검색이 받은 매치 상세에서도 채움 |
 | `src/collector/sample.ts` | ① 표본 뽑기 (시드 난수, page 1에서 무작위) |
 | `src/collector/matches.ts` | ②~⑤ 게임 ID → 상세 → 타임라인 → 저장 |
 | `src/collector/transform.ts` | Riot JSON → DB 줄 (순수 함수), 건너뛰기 판단, 스킬 순서 |
@@ -220,7 +223,7 @@ npm run test:integration          # 통합 테스트 (실제 Supabase, 모두 RO
 
 ## 5. API
 
-요약: GET 5개(통계 4개 + 전적 검색), 기본 URL `http://localhost:4000/api/v1`. 자세한 필드는 [`api_contract.md`](../../docs/contracts/api_contract.md) v3을 본다.
+요약: GET 6개(통계 4개 + 전적 검색 + 라인전 15분 골드), 기본 URL `http://localhost:4000/api/v1`. 자세한 필드는 [`api_contract.md`](../../docs/contracts/api_contract.md) v3을 본다.
 
 ### 5-1. 엔드포인트
 
@@ -231,9 +234,11 @@ npm run test:integration          # 통합 테스트 (실제 Supabase, 모두 RO
 | `GET /champions?position=TOP` | 그 포지션이 주 포지션인 챔피언 목록. 정렬 `tier`(null 뒤) → `tierScore` 내림 → `championId` | `public, max-age=600` |
 | `GET /champions/:championId[?position=]` | 주 포지션 탭, 선택 포지션 통계, 빌드(아이템 전체, 룬·스펠·스킬 상위 2개) | `public, max-age=600` |
 | `GET /summoners/:region/:riotId` (변경 03) | `region=kr`만. `riotId`는 마지막 `-`로 `gameName-tagLine` 분리. Riot을 그 자리에서 호출(account→summoner+league 병렬→match ids→상세 20건 병렬)해 프로필·랭크·최근 매치 20건을 줌. `window` 없음. API 프로세스 메모리에 60초 캐시(최대 200개) | `no-store` |
+| `GET /matches/lane-gold?puuid=&matchIds=` (변경 04) | 전적 검색이 준 matchId 1~10개의 라인전 15분 골드 `n:m`을 지연 로딩으로 줌. `results[]`(`state` ready/unavailable/pending, `myPercent`·`myGold`·`enemyGold`)와 `retryAfterSec`. pending이어도 200. 경기별 메모리 캐시 약 6시간(최대 5,000개), 같은 요청 반복 시 Riot 호출 0회 | `no-store` |
 
+- 전적 검색 `matches[].killParticipation`(정수 %, null 가능, 변경 04): `challenges.killParticipation` 우선, 없으면 (킬+어시)÷팀 킬 합, 추가 Riot 호출 없음.
 - 옛 `patch` 쿼리와 모르는 쿼리는 무시한다. CORS 헤더·ETag는 없다.
-- 전적 검색은 DB를 쓰지 않고 Riot API를 그대로 중계한다. 오류: 400 `INVALID_PARAMETER`, 404 `SUMMONER_NOT_FOUND`, 502 `RIOT_UNAVAILABLE`(429·5xx 소진), 503 `RIOT_KEY_EXPIRED`(401/403, 이 요청만 실패).
+- 전적 검색은 DB를 쓰지 않고 Riot API를 그대로 중계한다. 오류: 400 `INVALID_PARAMETER`, 404 `SUMMONER_NOT_FOUND`, 502 `RIOT_UNAVAILABLE`(429·5xx 소진), 503 `RIOT_KEY_EXPIRED`(401/403, 이 요청만 실패). lane-gold도 같은 502·503을 쓰고 400은 `puuid`·`matchIds` 형식 오류(11개 이상, 형식, 누락)다.
 
 ### 5-2. 오류
 
@@ -319,13 +324,16 @@ npm run test:integration          # 통합 테스트 (실제 Supabase, 모두 RO
 | `SUMMONER_CACHE_TTL_MS` | 60,000 (60초) | 같은 소환사 반복 조회 줄이기 |
 | `SUMMONER_CACHE_MAX` | 200 | 넘치면 가장 오래 넣은 것부터 삭제 |
 | `RECENT_MATCH_COUNT` | 20 | match-v5 ids `count` |
-| `API_RIOT_RATE_LIMIT` | 1초 10회, 120초 50회 | 수집 CLI의 제한기(19/98)와 **별개 인스턴스**. ⚠️ 둘을 더하면 Riot 실제 한도(20/1초, 100/120초)를 넘는다 — 10장 1번 |
+| `API_RIOT_RATE_LIMIT` | 1초 18회, 120초 90회 (변경 04에서 10/50에서 올림, 결정 X1) | 수집 CLI의 제한기(19/98)와 **별개 인스턴스**. ⚠️ 둘을 더하면 Riot 실제 한도(20/1초, 100/120초)를 넘는다 → **수집 CLI와 API 서버를 같은 키로 동시에 돌리지 않는다** — 10장 1번 |
+| `MATCH_LANE_CACHE_TTL_MS` / `MATCH_LANE_CACHE_MAX` | 6시간 / 5,000개 | 경기 캐시(변경 04). 항목을 다시 `set`하면 TTL이 그 시점부터 다시 시작해 최대 약 12시간까지 살 수 있다(끝난 게임은 불변이라 무해) |
+| `LANE_GOLD_MAX_IDS` / `LANE_GOLD_MAX_WAIT_MS` / `LANE_GOLD_RETRY_MAX_SEC` | 10 / 1,500ms / 120초 | 한 번에 받는 ID 수 / 제한기 대기가 이보다 길면 남은 호출은 pending / `retryAfterSec` 상한 |
+| `LANE_GOLD_FRAME_INDEX` / `LANE_GOLD_MIN_DURATION_SEC` / `LANE_GOLD_CONCURRENCY` | 15 / 900초 / 5 | 15:00 프레임 index / 이보다 짧은 게임은 timeline을 안 부름 / 요청 안 동시 처리 경기 수 |
 
 ---
 
 ## 7. 테스트
 
-요약: 단위 **117개**(변경 03 전적 검색 25개 포함), 통합 17개. 통합 테스트는 실제 Supabase에 쓰지만 모두 ROLLBACK한다.
+요약: 단위 **164개**(변경 03 전적 검색 25개, 변경 04 킬관여·라인전 47개 포함), 통합 17개. 통합 테스트는 실제 Supabase에 쓰지만 모두 ROLLBACK한다.
 
 | 종류 | 파일 (개수) | 다루는 것 |
 |------|-------------|-----------|
@@ -345,6 +353,8 @@ npm run test:integration          # 통합 테스트 (실제 Supabase, 모두 RO
 | 단위 | `summonerSearch.test.ts` (9, 변경 03 신규) | 정상 흐름, 캐시 적중·키 정규화·TTL 만료, 404/401·403/429 소진 오류 매핑, 언랭크·매치 없음, 매치 상세 일부/전부 실패 |
 | 단위 | `client.test.ts` (+5, `validate.test.ts`류 +2, 변경 03) | account-v1/summoner-v4/league-v4/match-v5 ids 메서드, `parseRegionParam`·`parseRiotIdParam` |
 | 단위 | `app.test.ts` (+4, 변경 03) | `/summoners/:region/:riotId` 라우트, 400 분기, `summonerSearch` 미주입 시 500 |
+| 단위 | `laneGold.test.ts`, `matchLaneCache.test.ts` (변경 04 신규) | 킬관여 두 경로, 상대 매칭·15분 골드 계산, 서비스(캐시·진행 중 공유·호출 생략·pending·503/502), 경기 캐시 TTL·크기 |
+| 단위 | `app.test.ts`·`rules.test.ts`·`summonerSearch.test.ts`·`client.test.ts` (변경 04 추가분) | lane-gold 라우트 400/200/503/502, 로그 puuid 축약, `puuid`·`matchIds` 검사, 검색이 경기 캐시를 채움, `limiterWaitMs` |
 | fixture | `test/fixtures/KR_8408851980.{match,timeline}.json` | 실제 게임 1개 (riotId·소환사 이름은 가짜 값) |
 
 - 통합 테스트 데이터는 2021년 시각과 가짜 패치 `0.8`·`0.9`를 써서 실제 데이터와 섞이지 않는다. 05:00 KST(20:00 UTC)에는 돌리지 않는다.
@@ -356,11 +366,11 @@ npm run test:integration          # 통합 테스트 (실제 Supabase, 모두 RO
 
 | 문서 | 내용 |
 |------|------|
-| [`docs/contracts/api_contract.md`](../../docs/contracts/api_contract.md) | API 계약 v3, 전적 검색(2-5) 추가 2026-10-27 (이 백엔드가 작성) |
+| [`docs/contracts/api_contract.md`](../../docs/contracts/api_contract.md) | API 계약 v3, 전적 검색(2-5) 2026-10-27, 킬관여·라인전(2-5/2-6) 2026-10-30 (이 백엔드가 작성) |
 | [`docs/contracts/db_contract.md`](../../docs/contracts/db_contract.md), [`.dbml`](../../docs/contracts/db_contract.dbml) | DB 계약 v8 (이 백엔드가 읽음, 전적 검색은 읽지도 쓰지도 않음) |
 | [`back_spec.md`](./back_spec.md) | 현재 계획 (결정 사항 표 D·R·V·W 포함) |
 | [`back_build.md`](./back_build.md) | 현재 구현 상태 |
-| [`back_review.md`](./back_review.md) | 가장 최근 검토 (변경 03, PASS with issues) |
+| [`back_review.md`](./back_review.md) | 가장 최근 검토 (변경 04, PASS with issues) |
 | [`../logs/collect-2026-10-15.log`](../logs/collect-2026-10-15.log) | 최근 테스트 수집 로그 |
 | [`CLAUDE.md`](../../CLAUDE.md) | 작업 규칙 (3·6·9·11장) |
 
@@ -378,17 +388,21 @@ npm run test:integration          # 통합 테스트 (실제 Supabase, 모두 RO
 | 01 | 2026-10-15 | 최근 14일 창으로 전환: `startTime` 요청, `game_start_at` 저장, 수집 뒤 자동 집계 삭제(05:00 KST 예약 작업), `purge_old_games(21)`, API v2(`window`·`displayName`·`isStale`·요청당 `REPEATABLE READ` 스냅숏), `patch` 파라미터·대체 규칙 삭제 | DB v7이 패치 단위에서 14일 창 하나로 바뀌어 v1이 실제 DB에서 동작하지 않았다. 오래된 게임 상세 호출 낭비도 없애려고 | Review PASS with issues (M1 잠금 연결 끊김 고침). 단위 80·통합 17. 창 밖 버림 57% → 0%. 티어당 250명 테스트 수집 3,930게임·429 0회, 예약 작업 2회 성공 (커밋 `5c039fe`) |
 | 02 | 2026-10-16 | 15명 400 원인 조사(조치 없음, V1), 표본 보충을 모자란 만큼만으로 고침(L1), 요약 로그 `stoppedBy`에 `aborted`/`failed` 추가(L2), ② 게임 ID에도 ③~⑤와 같은 연속 20개 실패 상한 공유(L3), `/health` DB 오류를 서버 로그에 남김(L4), `withTransaction`·`readSnapshot`에 선택적 `logger`로 연결 오류 리스너(L5), `test` 프리셋을 250명으로(db 계약 v8과 맞춤), `api_contract.md` 2-4 문구·6장 날짜 순서 정정 | 변경 01 Review가 남긴 L1~L5·문구 문제를 정리하고, db 계약 v8(변경 04)이 확정한 "티어당 250명"에 코드를 맞추려고 | Review PASS (문제 없음). 단위 92·통합 17, 모두 통과. DB에 쓰기 없이 읽기로만 재확인(에메랄드 265명·400 15명 그대로, V1·V2와 일치) |
 | 03 | 2026-10-27 | 전적 검색 MVP: `GET /api/v1/summoners/:region/:riotId`(account-v1→summoner-v4+league-v4 병렬→match-v5 ids→상세 20건 병렬), API 서버 전용 메모리 캐시(TTL 60초, 최대 200개)와 API 전용 `RateLimiter`(1초 10회/120초 50회) 신설, API 서버가 처음으로 `RIOT_API_KEY`를 읽음(키 없어도 서버는 켜지고 전적 검색만 503), `api_contract.md` v3(2-5 추가) | 프론트 전적 검색 화면을 위한 1차 범위(검색→프로필→최근 매치 20건). DB 저장은 표본 편향 우려로 하지 않음(W-6) | Review **PASS with issues**. 단위 117·통합 17, typecheck·lint 0. 실제 Riot 호출(`너희는개다-KR1`) 200 OK·캐시 적중 1.6ms·429 0회로 계약과 일치 확인. **M1**: API 전용 제한기(10/120s:50)와 수집 CLI 제한기(19/120s:98)를 더하면 Riot 실제 한도(20/1초, 100/120초)를 넘음 — 동시 운용 시 운영 판단 필요. L1·L2(매치 1건 못 찾으면 500, 동시 요청 중복 호출)는 영향 작아 설계 변경 없이 기록만 |
+| 04 | 2026-10-30 | 전적 검색 `matches[].killParticipation` 추가, 신규 `GET /api/v1/matches/lane-gold`(15분 `totalGold` 격차, 지연 로딩), 경기 캐시(6시간·5,000개), API 제한기 10/50 → 18/90, 요청 로그 puuid 축약, 입력 검증(`^KR_[0-9]{1,15}$` 등) | 프론트 요약 카드의 킬관여·라인전 점수. 신규 검색에 timeline 20회를 더하면 호출 한도를 넘어, 합치기 대신 필요한 때만 부르는 지연 로딩과 캐시로 풂 | Review **PASS with issues**(치명 0·중요 0·경미 3). 단위 164·통합 17, typecheck·lint 0. 실제 Riot: 신규 검색 총 약 42회/90, 라인전 ID 10개 0.9초, 반복 요청 Riot 0회·1~2ms, 손계산 46%(3958:4661) 일치. 경미: 동시 요청 시 대기 1.5초 규칙 경쟁, 계약 "중복 ID 400" 문구 불일치, TTL 갱신 |
 
 ---
 
 ## 10. 해결되지 않은 점
 
-요약: 서버가 죽거나 데이터가 깨지는 문제는 없다. 변경 03(전적 검색) Review에서 운영 판단이 필요한 것 1건(1번)과 영향이 작은 코드 메모 2건(2·3번)이 새로 생겼다. 그 밖은 기존에 남아 있던 것들이다.
+요약: 서버가 죽거나 데이터가 깨지는 문제는 없다. 변경 04 Review의 경미 3건(1~3번)과, 변경 03에서 넘어온 운영 판단 1건(4번)·코드 메모 2건(5·6번)이 남아 있다. 그 밖은 기존 항목이다.
 
-1. **(변경 03, 운영 판단 필요) API 전용 Riot 제한기와 수집 CLI 제한기를 더하면 실제 한도를 넘는다.** API 서버(1초 10회/120초 50회)와 수집 CLI(1초 19회/120초 98회)는 같은 `RIOT_API_KEY`를 쓰는 별개 프로세스·별개 제한기 인스턴스다. 둘을 더하면 1초 29회(한도 20회), 120초 148회(한도 100회)로 Riot 실제 한도를 넘는다. "API 제한기가 한도의 절반이라 여유가 있다"는 설계 의도는 두 프로세스가 동시에 돌지 않는다는 전제에서만 맞다. 지금은 수집(하루 중 약 3시간, 사람이 직접 실행)과 전적 검색 사용(개발 단계 소수)이 겹칠 일이 거의 없어 실제 장애는 없었지만, 겹치면 429가 늘어 양쪽이 느려질 수 있다. 한도 재조정 또는 "동시 운용 안 함"을 문서에 명시하는 것을 권장한다.
-2. **(변경 03) 매치 20건 중 puuid를 찾지 못하는 매치가 하나라도 있으면 검색 요청 전체가 500으로 실패한다.** `dto.ts`의 `matchListItem`이 참가자 중 검색한 puuid를 못 찾으면 예외를 던지는데, 이미 있는 "매치 상세 일부 실패는 그 매치만 건너뛴다" 패턴과 다르게 처리된다. 실무에서 거의 발생하지 않지만(매치 ID 자체가 그 puuid로 조회한 것), 같은 방식으로 통일하는 것을 권장한다.
-3. **(변경 03) 같은 소환사를 거의 동시에 두 번 검색하면 캐시 미스 구간에서 Riot을 중복 호출할 수 있다.** 첫 요청이 끝나 `cache.set()`을 부르기 전까지는 두 번째 요청도 캐시 미스로 처리된다. 데이터가 깨지지는 않고, TTL 60초·개발 단계 동시 사용자가 적어 영향은 작다.
-4. **③~⑤ 게임 연속 20개 실패는 실제 Riot 장애로 시험하지 못했다.** 코드·분류 함수로만 확인했고, Riot 장애를 일부러 만들 수 없어서다. (②의 연속 실패는 가짜 Riot 클라이언트로 실제로 함수를 돌려 확인했다 — `matches.test.ts`.) 전적 검색의 429·5xx·매치 일부 실패 경로도 같은 이유로 가짜 클라이언트로만 확인했다.
-5. **`aggregate`(시험용) 명령의 연결에는 오류 리스너가 없다.** `withTransaction`·`readSnapshot`에는 변경 02에서 리스너를 붙였지만, `collector/aggregate.ts`의 `aggregateWindowOnPool`은 여전히 `pool.connect()`를 직접 쓴다. 사람이 직접 실행하는 짧은 명령이라 위험은 작다(자동 집계는 DB 예약 작업이 SQL로 직접 함). 다음에 연결 안전성을 더 손대게 되면 같이 본다.
-6. **`npm audit` 1건(`body-parser` DoS, high).** 이번 변경(03)과 무관한 기존 전이 의존성이다. `npm audit fix --dry-run`으로는 안전한 패치 범위 업데이트로 보인다. 사용자 승인 뒤 `npm audit fix` 실행을 권장한다.
-7. **기록만 해 둔 운영 메모.** Supabase 풀러가 `application_name`을 `Supavisor`로 바꿔 연결을 이름으로 찾을 수 없고, DB 시계가 로컬보다 약 2초 빠르다. 영향이 작아 조치 계획은 없다.
+1. **(변경 04) 동시 요청이 한도 직전에 몰리면 "대기 1.5초 초과분은 pending" 규칙이 깨진다.** 한도 검사가 `acquire()` 대기 중인 호출을 세지 않아, 여러 워커가 모두 "대기 0"을 보고 통과한 뒤 같은 한도 앞에 줄을 선다. 가짜 호출·실제 제한기로 시험하니 두 요청이 각각 8초 걸렸다(이상은 1.5초 이내). 실제 설정에서는 최대 약 120초까지 걸릴 수 있으나 소수 사용자 개발 단계에서는 발생하기 어렵다. 존재하지 않는 matchId를 계속 보내 한도·캐시를 소모하는 것도 막지 못한다(사용자별 속도 제한 없음). 공개 배포 전에 대기 중 호출 수를 반영하거나 "예약" 방식으로 바꾸고 요청 속도 제한을 둘 것을 권장한다.
+2. **(변경 04) 계약 2-6에는 "같은 이름 반복은 400"이라 적혀 있는데 구현은 중복 ID를 허용한다.** `KR_1,KR_1`은 200이고 같은 항목이 두 번 나온다(Riot은 1번만 호출). 계약 문구를 고치거나 검사를 추가해 맞춘다. 프론트는 중복 없는 ID를 보내므로 지금은 영향 없다.
+3. **(변경 04) 경기 캐시의 6시간은 마지막 저장 시점부터 센다.** 항목을 다시 저장하면 TTL이 새로 시작해 최대 약 12시간 산다. 끝난 게임은 안 변해서 무해하며 문서로만 남긴다.
+4. **(변경 03·04, 운영 판단 필요) API 전용 Riot 제한기와 수집 CLI 제한기를 더하면 실제 한도를 넘는다.** API 서버(변경 04에서 1초 18회/120초 90회로 올림)와 수집 CLI(19/98)를 더하면 1초 37회(한도 20), 120초 188회(한도 100)다. 변경 04는 "같은 키로 동시에 돌리지 않는다"를 운영 규칙으로 정해 설정 주석·이 문서에 적었다. 지금은 수집(사람이 직접, 하루 약 3시간)과 전적 검색 사용이 겹칠 일이 거의 없으나, 겹치면 429가 늘어 양쪽이 느려진다. 신규 검색 1회가 최대 44회를 쓰므로 120초 안에 2명 이상 연달아 검색하면 제한기 대기가 길어진다.
+5. **(변경 03) 매치 20건 중 puuid를 찾지 못하는 매치가 하나라도 있으면 검색 요청 전체가 500으로 실패한다.** `dto.ts`의 `matchListItem`이 참가자 중 검색한 puuid를 못 찾으면 예외를 던지는데, 이미 있는 "매치 상세 일부 실패는 그 매치만 건너뛴다" 패턴과 다르게 처리된다. 실무에서 거의 발생하지 않지만(매치 ID 자체가 그 puuid로 조회한 것), 같은 방식으로 통일하는 것을 권장한다.
+6. **(변경 03) 같은 소환사를 거의 동시에 두 번 검색하면 캐시 미스 구간에서 Riot을 중복 호출할 수 있다.** 첫 요청이 끝나 `cache.set()`을 부르기 전까지는 두 번째 요청도 캐시 미스로 처리된다. 데이터가 깨지지는 않고, TTL 60초·개발 단계 동시 사용자가 적어 영향은 작다.
+7. **③~⑤ 게임 연속 20개 실패는 실제 Riot 장애로 시험하지 못했다.** 코드·분류 함수로만 확인했고, Riot 장애를 일부러 만들 수 없어서다. (②의 연속 실패는 가짜 Riot 클라이언트로 실제로 함수를 돌려 확인했다 — `matches.test.ts`.) 전적 검색의 429·5xx·매치 일부 실패 경로도 같은 이유로 가짜 클라이언트로만 확인했다.
+8. **`aggregate`(시험용) 명령의 연결에는 오류 리스너가 없다.** `withTransaction`·`readSnapshot`에는 변경 02에서 리스너를 붙였지만, `collector/aggregate.ts`의 `aggregateWindowOnPool`은 여전히 `pool.connect()`를 직접 쓴다. 사람이 직접 실행하는 짧은 명령이라 위험은 작다(자동 집계는 DB 예약 작업이 SQL로 직접 함). 다음에 연결 안전성을 더 손대게 되면 같이 본다.
+9. **`npm audit` 1건(`body-parser` DoS, high).** 이번 변경(03)과 무관한 기존 전이 의존성이다. `npm audit fix --dry-run`으로는 안전한 패치 범위 업데이트로 보인다. 사용자 승인 뒤 `npm audit fix` 실행을 권장한다.
+10. **기록만 해 둔 운영 메모.** Supabase 풀러가 `application_name`을 `Supavisor`로 바꿔 연결을 이름으로 찾을 수 없고, DB 시계가 로컬보다 약 2초 빠르다. 영향이 작아 조치 계획은 없다.

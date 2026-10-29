@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { after, before, describe, it } from 'node:test';
 import type { Server } from 'node:http';
 import { createApp, type ApiDb } from '../../src/api/app.js';
+import type { LaneGoldFn } from '../../src/api/laneGold.js';
 import type { SummonerSearchFn } from '../../src/api/summonerSearch.js';
 import type { Queryable } from '../../src/db/tx.js';
 import { silentLogger, type Logger } from '../../src/lib/logger.js';
@@ -323,6 +324,118 @@ describe('GET /summoners/:region/:riotId (변경 03, 가짜 summonerSearch)', ()
       const r = await fetch(`${s.base}/summoners/kr/foo-KR1`);
       assert.equal(r.status, 500);
       assert.equal(((await r.json()) as { error: { code: string } }).error.code, 'INTERNAL_ERROR');
+    } finally {
+      close(s);
+    }
+  });
+});
+
+describe('GET /matches/lane-gold (변경 04, 가짜 laneGold)', () => {
+  async function serveLane(laneGold?: LaneGoldFn): Promise<{ base: string; server: Server }> {
+    const app = createApp(fakeDb(() => []), silentLogger, { laneGold });
+    const server = app.listen(0);
+    await new Promise<void>((r) => server.once('listening', () => r()));
+    return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`, server };
+  }
+  const item = (matchId: string, state: 'ready' | 'pending') => ({
+    matchId, state, myPercent: state === 'ready' ? 52 : null, myGold: state === 'ready' ? 5396 : null, enemyGold: state === 'ready' ? 4939 : null,
+  });
+
+  it('파싱된 puuid·matchIds를 넘기고, no-store로 200 (pending이어도 429가 아님)', async () => {
+    const calls: { puuid: string; ids: string[] }[] = [];
+    const s = await serveLane(async (puuid, ids) => {
+      calls.push({ puuid, ids });
+      return { results: [item(ids[0]!, 'ready'), item(ids[1]!, 'pending')], retryAfterSec: 4 };
+    });
+    try {
+      const r = await fetch(`${s.base}/matches/lane-gold?puuid=abc-DEF_12&matchIds=KR_8437852704,KR_8437852001`);
+      assert.equal(r.status, 200);
+      assert.equal(r.headers.get('cache-control'), 'no-store');
+      assert.deepEqual(calls, [{ puuid: 'abc-DEF_12', ids: ['KR_8437852704', 'KR_8437852001'] }]);
+      const body = (await r.json()) as { results: { state: string }[]; retryAfterSec: number };
+      assert.deepEqual(body.results.map((x) => x.state), ['ready', 'pending']);
+      assert.equal(body.retryAfterSec, 4);
+    } finally {
+      close(s);
+    }
+  });
+
+  it('입력 오류는 400 INVALID_PARAMETER이고 laneGold를 부르지 않는다 (11개, 형식, 누락, 빈 항목, 배열 쿼리)', async () => {
+    let called = 0;
+    const s = await serveLane(async () => {
+      called++;
+      return { results: [], retryAfterSec: null };
+    });
+    try {
+      const eleven = Array.from({ length: 11 }, (_, i) => `KR_${i + 1}`).join(',');
+      const bad = [
+        `puuid=p1&matchIds=${eleven}`,
+        'puuid=p1&matchIds=NA_123',
+        'puuid=p1&matchIds=KR_1,,KR_2',
+        'puuid=p1&matchIds=KR_1,',
+        'puuid=p1&matchIds=KR_1234567890123456',
+        'puuid=p1',
+        'matchIds=KR_1',
+        'puuid=p1&matchIds=',
+        'puuid=p1&puuid=p2&matchIds=KR_1',
+        'puuid=p1&matchIds=KR_1&matchIds=KR_2',
+        `puuid=${'a'.repeat(101)}&matchIds=KR_1`,
+        'puuid=a%2Fb&matchIds=KR_1',
+      ];
+      for (const q of bad) {
+        const r = await fetch(`${s.base}/matches/lane-gold?${q}`);
+        assert.equal(r.status, 400, q);
+        assert.equal(((await r.json()) as { error: { code: string } }).error.code, 'INVALID_PARAMETER', q);
+      }
+      assert.equal(called, 0);
+      // 정확히 10개는 통과
+      const ten = Array.from({ length: 10 }, (_, i) => `KR_${i + 1}`).join(',');
+      assert.equal((await fetch(`${s.base}/matches/lane-gold?puuid=p1&matchIds=${ten}`)).status, 200);
+    } finally {
+      close(s);
+    }
+  });
+
+  it('laneGold가 던진 ApiError(503 RIOT_KEY_EXPIRED, 502 RIOT_UNAVAILABLE)를 오류 형식으로 응답', async () => {
+    const { ApiError } = await import('../../src/api/errors.js');
+    for (const [status, code] of [[503, 'RIOT_KEY_EXPIRED'], [502, 'RIOT_UNAVAILABLE']] as const) {
+      const s = await serveLane(async () => {
+        throw new ApiError(status, code, 'x');
+      });
+      try {
+        const r = await fetch(`${s.base}/matches/lane-gold?puuid=p1&matchIds=KR_1`);
+        assert.equal(r.status, status);
+        assert.equal(r.headers.get('cache-control'), 'no-store');
+        assert.equal(((await r.json()) as { error: { code: string } }).error.code, code);
+      } finally {
+        close(s);
+      }
+    }
+  });
+
+  it('요청 로그에는 puuid 쿼리 값이 앞 8자만 남는다', async () => {
+    const lines: string[] = [];
+    const logger = { info: (m: string) => lines.push(m), warn: () => {}, error: () => {} };
+    const app = createApp(fakeDb(() => []), logger, { laneGold: async () => ({ results: [], retryAfterSec: null }) });
+    const server = app.listen(0);
+    await new Promise<void>((r) => server.once('listening', () => r()));
+    try {
+      const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1`;
+      await fetch(`${base}/matches/lane-gold?puuid=ABCDEFGH12345678&matchIds=KR_1`);
+      await new Promise((r) => setTimeout(r, 20));
+      const line = lines.find((l) => l.includes('lane-gold'))!;
+      assert.ok(line.includes('puuid=ABCDEFGH…'), line);
+      assert.equal(line.includes('12345678'), false);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('laneGold를 넘기지 않은 createApp에서는 500 INTERNAL_ERROR (기존 테스트가 깨지지 않음)', async () => {
+    const s = await serveLane(undefined);
+    try {
+      const r = await fetch(`${s.base}/matches/lane-gold?puuid=p1&matchIds=KR_1`);
+      assert.equal(r.status, 500);
     } finally {
       close(s);
     }

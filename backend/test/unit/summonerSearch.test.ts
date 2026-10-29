@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import type { RiotClient } from '../../src/riot/client.js';
 import { RiotKeyExpiredError, RiotNotFoundError, RiotRetryExhaustedError } from '../../src/riot/errors.js';
 import { createSummonerCache } from '../../src/api/summonerCache.js';
+import { createMatchLaneCache } from '../../src/api/matchLaneCache.js';
 import { createSummonerSearch } from '../../src/api/summonerSearch.js';
 import { ApiError } from '../../src/api/errors.js';
 import type { SummonerSearchDto } from '../../src/api/dto.js';
@@ -202,5 +203,31 @@ describe('summonerSearch', () => {
     const search2 = createSummonerSearch({ riot: allFail, cache: cache2, logger: silentLogger, now: () => 0 });
     const r2 = (await search2('kr', '너희는개다', 'KR1')) as { matches: unknown[] };
     assert.deepEqual(r2.matches, []);
+  });
+});
+
+describe('summonerSearch 변경 04', () => {
+  it('각 매치에 killParticipation이 실리고, 호출 수는 변경 03과 같다 (account 1 + summoner 1 + league 1 + ids 1 + match N)', async () => {
+    const { riot, calls } = fakeRiot();
+    const search = createSummonerSearch({ riot, cache: createSummonerCache<SummonerSearchDto>(60_000, 10), logger: silentLogger, now: () => 0 });
+    const r = await search('kr', '너희는개다', 'KR1');
+    assert.equal(r.matches[0]!.killParticipation, 21);
+    assert.equal(calls.account.length + calls.summoner.length + calls.leagues.length + calls.ids.length + calls.match.length, 5);
+  });
+
+  it('laneCache를 주면 받은 매치 상세로 경기 정보를 넣되, 이미 gold15가 있는 항목은 덮어쓰지 않는다 (추가 호출 없음)', async () => {
+    const { riot, calls } = fakeRiot();
+    const laneCache = createMatchLaneCache(6 * 3600_000, 100);
+    const search = createSummonerSearch({ riot, cache: createSummonerCache<SummonerSearchDto>(60_000, 10), laneCache, logger: silentLogger, now: () => 0 });
+    await search('kr', '너희는개다', 'KR1');
+    const info = laneCache.get('KR_8408851980', 0);
+    assert.equal(info?.players.length, 10);
+    assert.equal(info?.gold15, undefined);
+    assert.equal(calls.match.length, 1);
+    // gold15가 채워진 항목은 다시 검색해도 유지
+    laneCache.set('KR_8408851980', { ...info!, gold15: { 1: 1 } }, 0);
+    const search2 = createSummonerSearch({ riot, cache: createSummonerCache<SummonerSearchDto>(60_000, 10), laneCache, logger: silentLogger, now: () => 0 });
+    await search2('kr', '너희는개다', 'KR1');
+    assert.deepEqual(laneCache.get('KR_8408851980', 0)!.gold15, { 1: 1 });
   });
 });

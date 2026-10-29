@@ -1,9 +1,9 @@
 # 백엔드 계획서 — 수집 워커 + 챔피언 통계 API
 
-> 상태: **승인됨** (v1 2026-10-14, 변경 01 2026-10-15, 변경 02 2026-10-16, 변경 03 2026-10-27)
+> 상태: **승인됨** (v1 2026-10-14, 변경 01 2026-10-15, 변경 02 2026-10-16, 변경 03 2026-10-27, 변경 04 2026-10-30)
 > 읽는 계약: `docs/contracts/db_contract.md`, `docs/contracts/db_contract.dbml` **v8** (최근 14일 기준, 변경 04: 룬 보조 정렬·수집 범위 티어당 250명)
-> 작성하는 계약: `docs/contracts/api_contract.md` **v3** (전적 검색 추가, 2026-10-27)
-> 이 문서는 **지금 계획만** 적는다. 패치 기준이던 v1 계획과 변경 01·02·03 원문은 git 기록(`87cfc78`, 변경 02·03은 각 Build 커밋 이전)에 남아 있다.
+> 작성하는 계약: `docs/contracts/api_contract.md` **v3** (전적 검색 추가 2026-10-27, 킬관여·라인전 15분 골드 추가 2026-10-30)
+> 이 문서는 **지금 계획만** 적는다. 패치 기준이던 v1 계획과 변경 01·02·03·04 원문(04의 설계 비교·실측 근거 포함)은 git 기록(`87cfc78`, 변경 02~04는 각 Build 커밋 이전)에 남아 있다.
 
 ## 목차
 
@@ -33,6 +33,7 @@
   - [5-5. 집계 전 응답](#5-5-집계-전-응답)
   - [5-6. 프론트 사용 방식에 맞춘 점](#5-6-프론트-사용-방식에-맞춘-점)
   - [5-7. 전적 검색 (변경 03)](#5-7-전적-검색-변경-03)
+  - [5-8. 킬관여·라인전 15분 골드 (변경 04)](#5-8-킬관여라인전-15분-골드-변경-04)
 - [6. 오류 처리와 로깅](#6-오류-처리와-로깅)
 - [7. 설정값](#7-설정값)
 - [8. 의존성](#8-의존성)
@@ -40,6 +41,7 @@
 - [10. 완료 기준](#10-완료-기준)
   - [10-5. 변경 02 (L1~L5, 계약 문구, 프리셋)](#10-5-변경-02-l1l5-계약-문구-프리셋)
   - [10-6. 변경 03 (전적 검색)](#10-6-변경-03-전적-검색)
+  - [10-7. 변경 04 (킬관여·라인전 15분 골드)](#10-7-변경-04-킬관여라인전-15분-골드)
 - [11. 계약 변경 요청](#11-계약-변경-요청)
 - [12. 결정 사항](#12-결정-사항)
 - [13. 작업 범위](#13-작업-범위)
@@ -63,6 +65,7 @@
 | 7 | 테스트 | 변환·제한기·규칙 단위 테스트, 실제 Supabase에서 ROLLBACK하는 통합 테스트 |
 | 8 | 계약 | `docs/contracts/api_contract.md` v3 |
 | 9 | 전적 검색 (변경 03) | `GET /api/v1/summoners/kr/:riotId`: account-v1 → summoner-v4 + league-v4(병렬) → match-v5 ids → 상세 20건(병렬, 일부 실패 허용). DB 저장 없음, API 프로세스 메모리에 60초 캐시 |
+| 10 | 킬관여·라인전 (변경 04) | 2-5 각 매치에 `killParticipation`(추가 호출 없음) + `GET /api/v1/matches/lane-gold`(timeline에서 15분 골드 격차, 경기 ID별 6시간 캐시, 한도가 모자라면 `pending`). 5-8 참고 |
 
 ### 1-2. 하지 않는 것
 
@@ -102,14 +105,14 @@ backend/
 │   │   ├── env.ts              # 환경 변수 읽기·검사 (값은 출력하지 않음). loadRiotEnv()는 수집 CLI와 API 서버(변경 03)가 함께 쓴다
 │   │   ├── collection.ts       # 수집 프리셋(test, main), Riot 클라이언트 설정, windowStart()
 │   │   ├── api.ts              # API 규칙 상수 (WINDOW_DAYS, STALE_AFTER_HOURS 등)
-│   │   └── summoner.ts         # 전적 검색 설정: 캐시 TTL·크기, API 전용 Riot 제한기(변경 03)
+│   │   └── summoner.ts         # 전적 검색 설정: 캐시 TTL·크기, API 전용 Riot 제한기(변경 03, 18/90으로 변경 04), 라인전 상수(변경 04)
 │   ├── db/
 │   │   ├── pool.ts             # pg Pool, 연결 오류 판별, 오류 메시지 가리기
 │   │   ├── tx.ts               # withTransaction, inTransaction, Queryable 타입
 │   │   └── snapshot.ts         # readSnapshot: REPEATABLE READ READ ONLY 트랜잭션 1개
 │   ├── riot/
 │   │   ├── rateLimiter.ts      # 이중 창 제한기 (시계 주입 가능)
-│   │   ├── client.ts           # fetch + 제한기 + 재시도 + 오류 분류
+│   │   ├── client.ts           # fetch + 제한기 + 재시도 + 오류 분류, limiterWaitMs()(변경 04)
 │   │   ├── errors.ts           # RiotKeyExpiredError, RiotNotFoundError, RiotBadRequestError, RiotRetryExhaustedError
 │   │   └── types.ts            # 사용하는 필드만 정의한 응답 타입
 │   ├── collector/
@@ -124,18 +127,21 @@ backend/
 │   │   ├── logRepository.ts    # collection_logs
 │   │   └── statsRepository.ts  # readWindow, tierRows, tierRowsForChampion, champion_item/rune/spell/skill 읽기
 │   ├── api/
-│   │   ├── app.ts              # createApp(db, logger, { now, summonerSearch }) — 테스트에서 롤백 연결·고정 시계·가짜 summonerSearch를 넣을 수 있게
+│   │   ├── app.ts              # createApp(db, logger, { now, summonerSearch, laneGold }) — 테스트에서 롤백 연결·고정 시계·가짜 함수를 넣을 수 있게
 │   │   ├── routes/meta.ts      # GET /api/v1/health, /api/v1/meta
 │   │   ├── routes/champions.ts # GET /api/v1/champions, /api/v1/champions/:championId
 │   │   ├── routes/summoners.ts # GET /api/v1/summoners/:region/:riotId (변경 03, window 없음)
+│   │   ├── routes/matches.ts   # GET /api/v1/matches/lane-gold (변경 04, window 없음)
+│   │   ├── laneGold.ts         # 라인전 계산 순수 함수 + 서비스(캐시·진행 중 공유·한도·오류 매핑) (변경 04)
+│   │   ├── matchLaneCache.ts   # 경기 캐시: 경기 길이·참가자 10명 정보·gold15, TTL 6시간·5,000개 (변경 04)
 │   │   ├── summonerSearch.ts   # account-v1→summoner-v4+league-v4(병렬)→match-v5 ids→상세, 캐시, 오류 매핑 (변경 03)
 │   │   ├── summonerCache.ts    # Map 기반 TTL 캐시, 최대 200개 (변경 03)
 │   │   ├── window.ts           # window 객체, displayName, share, isStale, 503, 오래됨 경고
-│   │   ├── validate.ts         # position, championId, region, riotId 검사 (직접 작성)
+│   │   ├── validate.ts         # position, championId, region, riotId, puuid, matchIds 검사 (직접 작성)
 │   │   ├── errors.ts           # ApiError, 오류 응답 형식, 오류 미들웨어
 │   │   ├── mainPositions.ts    # 주 포지션 최대 2개 규칙
 │   │   ├── cache.ts            # Cache-Control 헤더 한 곳
-│   │   └── dto.ts              # DB 줄 → 응답 DTO, 소환사 검색 DTO(변경 03)
+│   │   └── dto.ts              # DB 줄 → 응답 DTO, 소환사 검색 DTO(변경 03), killParticipationPercent(변경 04)
 │   └── lib/logger.ts           # 한 줄 로그 + 비밀값 가리기, puuid 앞 8자
 └── test/
     ├── fixtures/               # KR_8408851980.match.json / .timeline.json (실제 게임, 개인 정보는 가짜 값)
@@ -486,14 +492,54 @@ backend/
 | `riotId` 파싱 | 마지막 `-`에서 `gameName`/`tagLine`으로 자른다 (결정 S2). `tagLine`은 `^[0-9A-Za-z]{2,5}$` |
 | Riot 호출 순서 | account-v1(지역) → summoner-v4 + league-v4 by-puuid(플랫폼, **병렬**) → match-v5 ids(지역, 큐 필터 없음 count=20) → match-v5 상세 × 최대 20(지역, **병렬**, 일부 실패는 그 매치만 빼고 응답) |
 | 새 클라이언트 메서드 | `getAccountByRiotId`, `getSummonerByPuuid`, `getLeagueEntriesByPuuid`, `getRecentMatchIds` (수집기 전용 `getMatchIds`와 별도). `getMatch`는 기존 메서드 재사용 |
-| 타임라인 | 부르지 않는다. 룬·스펠·아이템·KDA·CS는 `getMatch` 응답에 다 있다. 스킬 순서는 이번 범위 밖 |
+| 타임라인 | 검색 안에서는 부르지 않는다. 룬·스펠·아이템·KDA·CS·킬관여는 `getMatch` 응답에 다 있다. 스킬 순서는 범위 밖. 라인전용 timeline은 5-8의 별도 엔드포인트가 부른다 (변경 04) |
 | 캐시 | `src/api/summonerCache.ts`, Map 기반, 키 `region:소문자gameName#소문자tagLine`, TTL **60초**(결정 S4), 최대 **200개**(넘치면 가장 오래 넣은 것부터 지움), 실패 응답은 캐시하지 않음 |
-| API 전용 제한기 | Riot 실제 한도의 절반(1초 10회, 2분 50회, 결정 S3). 수집 CLI와 공유하지 않는다 (다른 프로세스) |
+| API 전용 제한기 | 1초 18회, 2분 90회 (변경 04 결정 X1로 10/50에서 올림). 수집 CLI와 공유하지 않는다 (다른 프로세스). **운영 규칙: 수집 CLI와 API 서버를 같은 키로 동시에 돌리지 않는다** (합이 Riot 실제 한도 20/100을 넘는다) |
 | `ApiDeps` 주입 | `summonerSearch(region, gameName, tagLine)` 함수 하나로 감싼다 (결정 S7). 라우트는 `RiotClient` 세부사항(캐시, 오류 매핑)을 모른다 |
 | 오류 매핑 | account-v1 404 → 404 `SUMMONER_NOT_FOUND`. 401/403 → 503 `RIOT_KEY_EXPIRED`(이 요청만 실패, 서버는 멈추지 않음, 매 요청 로그 — 결정 S5). 429·5xx 재시도 소진 → 502 `RIOT_UNAVAILABLE`. league 빈 배열·match ids 빈 배열은 오류 아님 |
 | 캐시 적중 표시 | 응답에 표시하지 않는다 (결정 S6). 서버 로그(캐시 적중/미스 1줄)로만 확인 |
 | 캐시 헤더 | `no-store` (검색 결과는 거의 실시간이어야 함. 통계 4개의 `public, max-age=600`과 다름) |
 | DB 영향 | 없음. 표본 수집 테이블(`ranked_players` 등)에 끼워 넣지 않는다 (W-6, 계약 변경 요청 없음) |
+
+### 5-8. 킬관여·라인전 15분 골드 (변경 04)
+
+> 요약: 매치 행에 **킬관여 %**와 `45:55` 같은 **라인전 점수**를 보여주기 위한 데이터다. 킬관여는 match-v5 상세에 이미 있어 2-5 응답에 그대로 합친다(추가 호출 0). 15분 골드는 timeline에만 있어 호출량이 커서 **별도 지연 로딩 엔드포인트**로 나눴다(첫 화면을 지킨다). DB·수집 워커·db 계약은 건드리지 않는다.
+
+**(1) 킬관여: `matches[].killParticipation`**
+
+| 항목 | 규칙 |
+|------|------|
+| 값 | 정수 %, `Math.round(비율 × 100)` |
+| 우선 출처 | `participants[].challenges.killParticipation`(0~1). 숫자면 그대로. 100 초과도 자르지 않는다 |
+| 대체 계산 | 필드가 없거나 숫자가 아니면 `(내 kills + assists) ÷ 내 팀 5명 kills 합` |
+| `null` | 대체 계산에서 팀 킬 합이 0 |
+| 호출 | 추가 Riot 호출 0회. `ParticipantDto.challenges?`를 선택 필드로 추가, `dto.ts`의 `killParticipationPercent`에서 계산 |
+
+**(2) 라인전: `GET /api/v1/matches/lane-gold?puuid=&matchIds=` (api_contract 2-6)**
+
+| 항목 | 규칙 |
+|------|------|
+| 값 | `myPercent = Math.round(내 totalGold × 100 ÷ (내 + 상대))`, `myGold`·`enemyGold`도 함께. 둘 다 0이면 `unavailable` |
+| 골드 출처 | timeline `info.frames[15].participantFrames["<participantId>"].totalGold` (프레임은 매분, index 15 = 15:00 근처). `participantId`는 match-v5 상세의 값으로 찾는다 |
+| 상대 | 내 `individualPosition`과 같은 값을 가진 **적 팀 참가자 정확히 1명**. 정글·서폿 포함 |
+| `unavailable` | ① `frames.length ≤ 15` ② 포지션이 비었음/`Invalid`/5개 밖 ③ 적 팀 같은 포지션이 0명 또는 2명 이상 ④ 내/상대 `totalGold` 없음 ⑤ timeline·match 404 ⑥ `puuid`가 참가자가 아님. 다시 요청해도 같으므로 프론트는 `-` |
+| 호출 생략 | `gameDuration < 900`이거나 ②·③·⑥이면 **timeline을 부르지 않고** 바로 `unavailable` (이 경우 `gold15`를 캐시하지 않는다: 같은 경기의 다른 참가자는 대상일 수 있다) |
+| 호출 순서 | 경기 캐시 → 없으면 getMatch 1회(검색이 넣어 둔 게 보통 있음) → 생략 규칙 → timeline 1회 → `gold15`(참가자별 숫자 최대 10개)만 저장. timeline 원본(약 0.6MB)은 저장하지 않는다 |
+| 경기 캐시 | `matchLaneCache.ts`. 키 `matchId`, 값 `{ durationSec, players[10]{participantId, puuid, teamId, position}, gold15? }`. TTL **6시간**, 최대 **5,000개**, 넘치면 가장 오래 넣은 것부터 지움. `gold15 = null`은 "계산 불가(프레임 부족/404)"를 기억해 다시 부르지 않음. `summonerSearch`가 매치 상세 20건을 받을 때 같은 값을 추가 호출 없이 넣어 두되, 이미 `gold15`가 있는 항목은 덮어쓰지 않는다 |
+| 소환사 캐시와 관계 | 기존 60초 소환사 캐시는 그대로. 라인전 값은 소환사 캐시에 넣지 않는다(60초 후 사라져 재호출되는 것을 막으려고) |
+| 입력 | `puuid` `^[0-9A-Za-z_-]{1,100}$`, `matchIds` 쉼표 구분 1~**10**개 각 `^KR_[0-9]{1,15}$`. 11개 이상·빈 항목·배열 쿼리는 400 `INVALID_PARAMETER`. 20게임이면 프론트가 10개씩 2번. Riot에 보내는 ID는 `encodeURIComponent`(기존 클라이언트) |
+| 중복 방지 | 같은 `matchId`를 동시에 두 요청이 가져가면 "진행 중 Promise"를 공유해 Riot을 한 번만 부른다(getMatch·timeline 각각) |
+| 한 요청 안 동시성 | 경기 5개씩 병렬 |
+| 한도 정책 | 새 Riot 호출을 시작하기 전 `RiotClient.limiterWaitMs()`(제한기 `waitTime`, 0 이상)를 본다. **대기 > 1.5초**면 그 호출부터 남은 ID는 `pending`(캐시로 되는 ID는 그대로 `ready`). 응답 `retryAfterSec` = 본 대기시간 중 최댓값을 올림(1~120). **HTTP는 200**(429를 프론트에 넘기지 않는다). 검색이 먼저 줄 서도록 라인전은 한도에 여유가 있을 때만 쓴다 |
+| 프론트 재시도 | `pending`은 `retryAfterSec` 뒤 그 ID만 다시, 최대 3번 (계약에 명시, 구현은 `!프론트` 몫) |
+| Riot 오류 | 401/403 → 503 `RIOT_KEY_EXPIRED`(이 요청만 실패, 서버는 계속 동작, 매 요청 로그). 429·5xx 재시도 소진 → 502 `RIOT_UNAVAILABLE`(이미 채운 결과는 캐시에 남음). timeline 404 → 그 게임 `unavailable`+`gold15=null` 캐시. getMatch 404 → `unavailable`(빈 정보 `gold15=null`로 캐시). 그 밖(`RiotBadRequestError` 등)은 500 |
+| 로그 | 요청 1줄: `ready/unavailable/pending` 수, `riotCalls`, `cacheHits`, puuid 앞 8자. 요청 로그(`app.ts`)도 쿼리의 `puuid`를 앞 8자로 줄인다 |
+| 캐시 헤더 | `no-store` (서버가 경기별로 6시간 캐시. pending 섞인 응답을 HTTP 캐시가 붙잡지 않게) |
+| 새 Riot 메서드 | 없음 (`getMatch`, `getTimeline` 재사용). 제한기 대기시간 getter `limiterWaitMs()` 1개만 `client.ts`에 추가. `TimelineDto.frames[].participantFrames?`는 선택 필드라 수집기는 영향 없음 |
+
+**호출량 (참고, 실측은 back_build 4-7)**: 검색 1회(캐시 미스) 24회 그대로. 라인전은 신규 경기당 최대 +1(timeline), 20게임이면 최대 +20. 짧은 게임·포지션 없는 게임(칼바람 등)은 호출이 줄어든다. 제한기는 18/90이라 신규 검색 1회(최대 44회) 뒤 같은 2분 안의 두 번째 소환사까지 무대기로 가능(88 ≤ 90). 같은 소환사 재검색은 라인전 0회.
+
+**하지 않기로 한 것**: (a) 라인전을 2-5 응답에 합치기(A안): 첫 화면이 약 2배 느려지고 한도를 즉시 소진한다. (b) 검색의 `getMatch` 상세를 경기 캐시에 통째로 넣어 24회를 4회로 줄이기: 상세 1개가 수십~백 KB라 메모리가 커지고 라인전과 별개의 최적화라 다음 변경으로 미룬다. (c) timeline 원본 캐시: 0.6MB라 5,000개면 3GB.
 
 ---
 
@@ -607,9 +653,17 @@ backend/
 | `SUMMONER_CACHE_TTL_MS` | 60,000 (60초) | 결정 S4 |
 | `SUMMONER_CACHE_MAX` | 200 | 메모리 무한 증가 방지 (개발 단계 동시 사용자 적음) |
 | `RECENT_MATCH_COUNT` | 20 | match-v5 ids `count` |
-| `API_RIOT_RATE_LIMIT` | 1초 10회, 2분 50회 | Riot 실제 한도(20/100)의 절반 (결정 S3) |
+| `API_RIOT_RATE_LIMIT` | 1초 **18**회, 2분 **90**회 | 변경 04 결정 X1 (변경 03은 10/50이었음). 신규 검색 1회 최대 44회라 2회 연속(88) 가능 |
+| `MATCH_LANE_CACHE_TTL_MS` | 21,600,000 (6시간) | 끝난 게임은 불변 (X2) |
+| `MATCH_LANE_CACHE_MAX` | 5,000 | 약 5MB 이내 (X2) |
+| `LANE_GOLD_MAX_IDS` | 10 | 요청 하나가 제한기 줄을 오래 점유하지 않게 (X3) |
+| `LANE_GOLD_MAX_WAIT_MS` | 1,500 | 이보다 오래 기다려야 하면 `pending` (X3) |
+| `LANE_GOLD_RETRY_MAX_SEC` | 120 | `retryAfterSec` 상한 (2분 창) |
+| `LANE_GOLD_FRAME_INDEX` | 15 | frames[15] = 15:00 근처 |
+| `LANE_GOLD_MIN_DURATION_SEC` | 900 | 이보다 짧은 게임은 timeline 생략 |
+| `LANE_GOLD_CONCURRENCY` | 5 | 한 요청 안의 병렬 경기 수 |
 
-- 수집 CLI의 `RateLimiter`(19/98)와는 **별개 인스턴스**다 (API 서버·수집 CLI가 다른 프로세스).
+- 수집 CLI의 `RateLimiter`(19/98)와는 **별개 인스턴스**다 (API 서버·수집 CLI가 다른 프로세스). 그래서 **같은 키로 둘을 동시에 돌리지 않는다**(18+19 > 20/초, 90+98 > 100/120초). 새 환경 변수는 없다.
 
 ---
 
@@ -660,6 +714,10 @@ backend/
 | `window` | `displayName`, `share`, 26시간 경계, `fresh/stale/empty`, 경고 1시간 1번 |
 | `app` (가짜 `ApiDb`) | 집계 전 3개 503 + `no-store`, `/health empty`, `?patch=` 무시, 통계 엔드포인트마다 `snapshot` 정확히 1번·첫 쿼리 `stats_window`, 오류 형식, 500에 내부 내용 없음, CORS 없음 |
 | `runLog` | 잠금 연결 끊김에 죽지 않고 `onLost` 1번, 잃은 잠금 release는 unlock 없이 버림 |
+| `killParticipationPercent` (변경 04) | `challenges` 값 사용(0.1667→17, 0.5833→58), 우선순위, 필드 없음/숫자 아님→직접 계산, 팀 킬 합 0→`null`, 100 초과 안 자름, fixture 실제 게임 10명 전원에서 challenges 값과 직접 계산이 같은 정수 % |
+| `laneGold` 순수 함수·서비스 (변경 04, 가짜 `getMatch`/`getTimeline`/`limiterWaitMs`) | 정상(5396:4939→52), 프레임 ≤15→`unavailable`+`gold15=null`, 포지션 Invalid/빈 값, 적 같은 포지션 0명·2명, `totalGold` 없음, 정글·서폿, 반올림 경계, 호출 생략(899초 vs 900초, 포지션 없음, 참가자 아님 → timeline 0회), 재요청 0회, 동시 2요청 1회, TTL 6시간 후 재호출, 404 처리, 캐시에 `frames` 없음, `pending`/`retryAfterSec`(올림, 상한 120, 1.5초 경계), 401/403→503, 소진→502 |
+| `matchLaneCache` (변경 04) | TTL 경계, 최대 5,000개(시험은 작은 값) 초과 시 오래된 것부터 삭제, 저장 값에 참가자 10명 최소 정보만 |
+| `app` lane-gold 라우트 (변경 04) | 파싱 값 전달·`no-store`·200+`pending`, 400(11개·형식·누락·빈 항목·배열·길이), 503/502 형식, 안 넘긴 `createApp`은 500, 요청 로그의 puuid 앞 8자 |
 
 ### 9-3. 통합 테스트 (npm run test:integration, 실제 Supabase)
 
@@ -763,6 +821,24 @@ backend/
 - 비밀값(`RIOT_API_KEY`)이 로그·응답에 그대로 나오지 않음. puuid는 응답 필드라 그대로 주는 게 맞음(서버 로그만 가림 규칙 적용)
 - 실제 테스트 계정(`너희는개다#KR1`)으로 최소 1회 실제 호출 확인 (호출 수·429 0회·형식이 `api_contract.md` 2-5와 일치)
 
+### 10-7. 변경 04 (킬관여·라인전 15분 골드)
+
+| # | 기준 | 확인 |
+|---|------|------|
+| 1 | 라인전 계산 순수 함수 단위 테스트(정상, ≤15프레임, 포지션 Invalid/빈 값, 적 0명·2명, `totalGold` 없음, 반올림 5396:4939→52, 정글·서폿) | `npm test` |
+| 2 | 호출 생략: 15분 미만 또는 포지션 없음이면 timeline 호출 0회 | 단위 테스트 |
+| 3 | 캐시: 재요청 0회, 동시 2요청 1회, TTL 6시간 후 재호출, `gold15=null`도 재호출 안 함, 최대 5,000개 초과 시 오래된 것부터 삭제 | 단위 테스트 |
+| 4 | 한도: 대기 > 1.5초면 남은 ID `pending`, `retryAfterSec`, HTTP 200 | 단위 테스트 |
+| 5 | 오류 매핑: 401/403→503, 429·5xx 소진→502, timeline 404→`unavailable`, 참가자 아님→`unavailable`, 11개→400 | 단위 + 라우트 테스트 |
+| 6 | 2-5는 `killParticipation` 추가 외 변하지 않음, 검색 1회 호출 수 24회 유지 | 기존 테스트 + 호출 수 단언 |
+| 6b | 킬관여: `challenges` 값, 필드 없음→직접 계산, 팀 킬 합 0→`null`, 반올림, fixture 실제 값 일치 | `npm test` |
+| 7 | 캐시 항목에 `frames` 없음(`gold15` 숫자만) | 단위 테스트 |
+| 8 | 실제 Riot 소량(수십 회): 검색 1회 + lane-gold, 값이 손계산과 일치, 429 0회, 같은 요청 재호출 시 Riot 호출 0회 | Build·Review 실호출 |
+| 9 | `typecheck`·`lint` 오류 0, `npm test` 전부 통과, `test:integration` 기존 17개 통과 | Build 기록 |
+| 10 | 비밀값·`.env` 값이 로그·응답에 없음, 요청 로그의 puuid는 앞 8자 | `grep` + 로그 확인 |
+
+- DB 계약 영향 없음, DB 쓰기 없음. 계약 버전은 v3의 "작은 추가".
+
 ---
 
 ## 11. 계약 변경 요청
@@ -776,6 +852,7 @@ backend/
   3. `matches.game_start_at` 인덱스는 필요 없다 (창 상한·`purge` 미리보기는 최대 약 3만 7천 줄 순차 스캔).
   4. 표본 삭제 기능이 생기면 `matches(puuid)` 인덱스가 필요하다 (db_review L3).
 - API 계약(백엔드가 작성 영역) 문구 2건은 변경 02에서 고쳤다 (2-4 아이템 거르기 설명, 6장 변경 기록 날짜 순서).
+- 변경 04(킬관여·라인전)도 DB 계약 변경 요청 없음. 읽지도 쓰지도 않는다. API 계약(작성 영역)은 2-5에 `killParticipation` 1개, 2-6 신규, 6장 변경 기록 1줄을 더했다(오류 코드 추가 없음).
 - 변경 03(전적 검색)도 DB 계약 변경 요청 없음. `ranked_players`·`matches`·`match_players` 등 표본 수집 테이블을 읽지도 쓰지도 않는다 (W-6). `api_contract.md`에는 2-5를 새로 추가했다(승인된 범위, 작성 영역이라 요청이 아님).
 
 ---
@@ -830,7 +907,15 @@ backend/
 | W8 | `api_contract.md`에 2-5로 추가한다(새 장으로 빼지 않음) | 기존 번호 체계 유지. `window`가 없는 유일한 엔드포인트임을 문서에 명시 | 2026-10-27 |
 | W9 | API 서버는 `RIOT_API_KEY`가 없거나 잘못돼도 계속 켜지고, 전적 검색만 503 `RIOT_KEY_EXPIRED`를 준다 | 개발 키가 24시간마다 만료된다. 키 문제로 챔피언 통계 API까지 막히면 안 된다 | 2026-10-27 |
 
-- D 번호는 계획의 결정 항목, B는 Build가 정하고 Review가 받아들인 것, U는 변경 01의 사용자 결정, R은 Review 추천을 사용자가 고른 것, V는 변경 02에서 사용자가 승인한 결정(02-9)이다. W는 변경 03(전적 검색)에서 사용자가 승인한 추천안(결정 S1~S8, Build가 보탠 W9)이다.
+| X1 | API 전용 제한기를 18/초·90/120초로 올린다. 수집 CLI와 API 서버를 같은 키로 동시에 돌리지 않는 것을 운영 규칙으로 문서화 | 라인전 timeline이 더해져 신규 검색 1회가 최대 44회. 10/50이면 같은 2분 안의 두 번째 소환사가 약 100초 대기한다. 상수 1곳이라 되돌리기 쉽다 | 2026-10-30 |
+| X2 | 경기 캐시 TTL 6시간, 최대 5,000개. 저장 값은 경기 정보 + `gold15` 숫자뿐 | 끝난 게임은 불변. timeline 원본 0.6MB는 저장하지 않는다(메모리 ~100B/게임 수준) | 2026-10-30 |
+| X3 | lane-gold 한 번에 최대 10개 ID, 제한기 대기 1.5초 초과분은 `pending` | 요청 하나가 줄을 오래 점유하지 않게. 첫 검색 응답이 먼저 나가도록 라인전은 한도에 여유가 있을 때만 쓴다 | 2026-10-30 |
+| X4 | 검색의 `getMatch` 상세를 경기 캐시에 통째로 넣지 않는다 | 상세 1개 수십~백 KB로 메모리가 커지고 라인전과 별개의 최적화. 다음 변경 후보 | 2026-10-30 |
+| X5 | `pending`일 때 HTTP 200 + `retryAfterSec` (429 아님) | 프론트가 429 처리를 따로 짜지 않아도 된다 | 2026-10-30 |
+| X6 | 킬관여는 2-5에 합침(추가 호출 0), 라인전만 별도 엔드포인트(B안) | 킬관여는 match-v5 상세에 있고, 라인전(timeline)은 첫 화면을 약 2배 느리게 하고 한도를 즉시 소진한다 | 2026-10-30 |
+| X7 | 요청 로그의 `puuid` 쿼리 값을 앞 8자로 줄인다 | lane-gold는 puuid가 쿼리에 있어 기존 요청 로그가 전체 puuid를 남긴다. 로그 규칙(puuid 앞 8자)을 지킨다 (Build가 보탠 결정) | 2026-10-30 |
+
+- D 번호는 계획의 결정 항목, B는 Build가 정하고 Review가 받아들인 것, U는 변경 01의 사용자 결정, R은 Review 추천을 사용자가 고른 것, V는 변경 02에서 사용자가 승인한 결정(02-9)이다. W는 변경 03(전적 검색)에서 사용자가 승인한 추천안(결정 S1~S8, Build가 보탠 W9)이다. X는 변경 04(킬관여·라인전)에서 사용자가 승인한 추천값(X1~X6)과 Build가 보탠 X7이다.
 
 ---
 
@@ -850,8 +935,8 @@ backend/
 
 - 수정 금지: `db/`, `docs/contracts/db_contract.*`, `frontend/`, 루트 `.env`, `CLAUDE.md`, `backend/src/collector/*`, `backend/src/cli/collect.ts`.
 - 변경 02(15명 400 조사, L1~L5, 프리셋 250, 계약 문구 2건)도 위 표와 같은 경로를 쓴다. 조사(02-1)는 읽기만(`SELECT`, 로그 읽기), 결정 1번이 "삭제"면 `ranked_players` DELETE는 사용자 승인 후에만.
+- 변경 04(킬관여·라인전)도 위 표와 같은 경로를 쓴다. 범위는 `backend/src/riot/types.ts`, `backend/src/riot/client.ts`(제한기 대기시간 getter만), `backend/src/api/*`, `backend/src/config/summoner.ts`, `backend/src/server.ts`, `backend/test/*`이고, `docs/contracts/api_contract.md`는 2-5의 `killParticipation`·2-6·6장 변경 기록만 고친다. 금지 경로는 위 "수정 금지"와 같다.
 - 변경 03(전적 검색)도 위 표와 같은 경로를 쓴다. 범위는 `backend/src/riot/*`, `backend/src/api/*`, `backend/src/config/*`, `backend/src/server.ts`, `backend/test/*`이고, `docs/contracts/api_contract.md`는 승인된 2-5만 고친다. `collector/*`·`cli/collect.ts`는 수정하지 않는다.
 - DB 쓰기: 통합 테스트는 ROLLBACK만. 실제 저장은 Review 소량 수집과 `aggregate` 시험뿐. **`purge --yes`, 표본 삭제, 그 밖의 되돌릴 수 없는 SQL은 메인 에이전트를 통해 사용자 승인 후에만.**
 - Riot 호출: Build·Review는 확인용 소량(수십 회)만. fixture는 이미 있어 새로 받지 않는다. 전체 테스트 수집은 사용자가 직접 실행한다. 전적 검색도 테스트 계정으로 소량만 부른다. 429가 나면 즉시 멈추고 보고.
 - 비밀값: `.env` 값은 읽어 써도 되지만 문서·로그·커밋·응답에 출력하지 않는다. 잘못된 키 시험은 프로세스 환경에만 넣고 `.env`를 고치지 않는다.
-

@@ -85,6 +85,18 @@ function sideDto(p: ParticipantDto) {
   };
 }
 
+/**
+ * 킬관여 %(정수). challenges.killParticipation(0~1)이 숫자면 그대로 반올림하고(100 초과도 자르지 않음),
+ * 없으면 (킬+어시)÷내 팀 킬 합. 팀 킬 합이 0이면 null (변경 04, 04-2b).
+ */
+export function killParticipationPercent(me: ParticipantDto, participants: ParticipantDto[]): number | null {
+  const v = me.challenges?.killParticipation;
+  if (typeof v === 'number' && Number.isFinite(v)) return Math.round(v * 100);
+  const teamKills = participants.filter((p) => p.teamId === me.teamId).reduce((sum, p) => sum + p.kills, 0);
+  if (teamKills <= 0) return null;
+  return Math.round(((me.kills + me.assists) * 100) / teamKills);
+}
+
 /** 그 매치 1건을 검색한 소환사(puuid) 관점으로 요약한다. 타임라인은 부르지 않는다(스킬 순서는 이번 범위 밖) */
 export function matchListItem(match: MatchDto, puuid: string) {
   const participants = match.info.participants;
@@ -106,6 +118,8 @@ export function matchListItem(match: MatchDto, puuid: string) {
     kills: me.kills,
     deaths: me.deaths,
     assists: me.assists,
+    /** 킬관여 % (정수, 계산 불가면 null, 변경 04) */
+    killParticipation: killParticipationPercent(me, participants),
     cs: me.totalMinionsKilled + me.neutralMinionsKilled,
     goldEarned: me.goldEarned,
     items: [me.item0, me.item1, me.item2, me.item3, me.item4, me.item5],
