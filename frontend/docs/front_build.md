@@ -1,6 +1,6 @@
 # 프론트엔드 구현 상태 — Tier.GG 챔피언 화면
 
-> 기준: `front_spec.md` (현재 계획), `docs/contracts/api_contract.md` v3. 코드 상태: 변경 06 Build 반영 후 (2026-10-27).
+> 기준: `front_spec.md` (현재 계획), `docs/contracts/api_contract.md` v3. 코드 상태: 변경 09 Build 반영 후 (2026-10-30).
 > 이 문서는 **지금 구현 상태**만 적는다. 이전 시도와 과정 기록은 git 커밋 `87cfc78`에 있다.
 > 상태 표기: ✅ 완료 / ⚠️ 부분 완료 / ❌ 실패 / ⏸️ 보류
 
@@ -20,6 +20,9 @@
 - [12. 실행 방법](#12-실행-방법)
 - [13. 남은 문제](#13-남은-문제)
 - [14. 전적 검색 (변경 06)](#14-전적-검색-변경-06)
+- [15. 최근 게임 요약 카드 (변경 07)](#15-최근-게임-요약-카드-변경-07)
+- [16. 킬관여·라인전 15분 골드 (변경 08)](#16-킬관여라인전-15분-골드-변경-08)
+- [17. 전적 화면 상단 보강 (변경 09)](#17-전적-화면-상단-보강-변경-09)
 
 ---
 
@@ -50,6 +53,7 @@
 | 없는 챔피언 | 목록에 id가 없으면 `notFound()` → `[championId]/not-found.tsx` | ✅ |
 | `generateMetadata` | "아트록스 - 다르킨의 검 \| Tier.GG". Data Dragon 실패 시 try/catch로 "챔피언 \| Tier.GG" | ✅ |
 | 전역 404 / 오류 | `app/not-found.tsx`(홈 링크), `app/error.tsx`·`champions/error.tsx`(`retry()` 다시 시도 + 목록 링크) | ✅ |
+| `/api/lane-gold` (변경 08) | Route Handler(GET), `dynamic = "force-dynamic"`, 응답 `Cache-Control: no-store`. 라인전 프록시 (16장) | ✅ |
 | 소문자 상세 주소 (macOS 로컬) | `next start`에서 `/champions/garen` 요청 시 404 결과가 `Garen.html`을 덮어쓴다. 사용자 결정으로 코드 수정 없이 보류 (13장) | ⏸️ |
 
 ## 3. 백엔드 API 모듈
@@ -95,7 +99,7 @@
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
-| `Header` / `NavLink` | sticky 56px, 로고, 메뉴 "챔피언". `NavLink`(client)가 `usePathname`으로 하위 경로까지 강조 + `aria-current="page"` | ✅ |
+| `Header` / `NavLink` | (변경 09) `sm`+ sticky 64px·한 줄, 모바일 2줄·sticky 없음(17장). 로고, 메뉴 "챔피언". `NavLink`(client)가 `usePathname`으로 하위 경로까지 강조 + `aria-current="page"` | ✅ |
 | `Footer` | `/meta`의 `patches[0].displayName` → "패치 26.20 · 데이터: Riot Data Dragon" + 고지문. 실패 시 "패치 정보 없음" (오류 안 던짐) | ✅ |
 | `WindowInfo` | 기간 줄 (좁은 화면 줄바꿈), `isStale`이면 `role="status"` 노란 상자 | ✅ |
 | `TierBadge` | 1~5티어(글자 + 색, 글자색 `zinc-950`) / `null` → 회색 "표본 부족" + `title`·sr 설명(`rules.minTierPick`, 없으면 50). 대비 주석을 실측값(최소 6.89:1)에 맞게 수정(변경 02) | ✅ |
@@ -328,9 +332,9 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 | `src/lib/view/format.ts` | `formatRelativeKo`(상대 시각), `formatDuration`, `formatKda`, `formatCsPerMinute` 추가 | ✅ |
 | `src/app/globals.css` | `--win`(`#5a9bff`)·`--lose`(`#f16565`) 토큰 + `@theme inline` 등록 (D35) | ✅ |
 | `src/components/layout/SummonerSearchForm.tsx` (신규, client) | 헤더 전역 검색 폼. "이름#태그" 파싱(`parseRiotIdInput`), 형식 오류 시 서버 요청 없이 안내, `router.push("/summoners/kr/{riotId}")`. "#" 없이 이름만 입력하면 `tagLine`을 기본값 `KR1`로 채움(2026-10-27 사용자 요청, 작은 수정이라 Review 생략·`lint`+`tsc`+실제 브라우저 검색으로 직접 검증: "너희는개다" → `/summoners/kr/너희는개다-KR1` 정상 이동, 매치 20건 표시 확인) | ✅ |
-| `src/components/layout/Header.tsx` | `SummonerSearchForm` 추가, 로고·nav에 `shrink-0` 적용해 좁은 화면에서 검색창이 줄어들게 함 | ✅ |
-| `src/components/summoners/ProfileHeader.tsx` (신규) | 프로필 아이콘·이름#태그·레벨. 재검색 폼 없음(2026-10-27 사용자 교정) | ✅ |
-| `src/components/summoners/RankList.tsx` (신규) | 랭크 카드 세로 목록 / 빈 상태 "랭크 정보가 없습니다". 2026-10-27 피드백 2건: ① "자유랭크는 없애" → `toSummonerPageView`에서 `RANKED_SOLO_5x5`만 남기고 필터링(자유랭크·5인 랭크 카드 삭제) ② "솔로랭크에서 티어 아이콘" → D34("정식 엠블럼 이미지는 Data Dragon에 없어 글자 배지만")를 뒤집음. 사용자가 직접 마련한 랭크 엠블럼 이미지 10개(`public/rank-emblems/*.png`, 티어별)를 추가 의존성 없이 로컬 정적 파일로 사용. 이미지가 없는 티어는 기존 글자 배지로 대체(없을 일은 없지만 방어 코드) | ✅ |
+| `src/components/layout/Header.tsx` | `SummonerSearchForm` 추가, 로고·nav에 `shrink-0`. (변경 09) 높이 `sm:h-16`·`sm:sticky`, 모바일 `flex-wrap` 2줄 | ✅ |
+| `src/components/summoners/ProfileHeader.tsx` (신규) | 프로필 아이콘·이름#태그·레벨. 재검색 폼 없음(2026-10-27 사용자 교정). (변경 09) 레벨 배지·티어 줄·갱신하기로 확장(17장) | ✅ |
+| `src/components/summoners/RankList.tsx` (신규) | 랭크 카드. 2026-10-27: 자유랭크 카드 삭제(솔로/듀오만), D34 뒤집어 엠블럼 이미지 10개(`public/rank-emblems/*.png`, 로컬 정적 파일) 사용·없는 티어는 글자 배지로 대체. **(변경 09, 2026-10-30) 자유랭크 카드를 되살려 항상 2장(솔로/듀오 → 자유랭크), 기록 없으면 Unranked 카드(17장)** | ✅ |
 | `src/components/summoners/MatchList.tsx`, `MatchRow.tsx` (신규) | 매치 20건 목록 / 매치 1건(챔피언·시간·KDA·CS·주문·키스톤·아이템·참가자). 아이템·주문·키스톤 아이콘에 기존 `Tooltip` 재사용. 2026-10-27 사용자 피드백 7건으로 열 순서·배치를 교정: ① "op.gg와 정보 배치/순서가 다르다" → 소환사 주문·키스톤 룬을 챔피언 아이콘 바로 옆으로(그전엔 CS 뒤 별도 칸), 결과·포지션·경과시간·게임길이를 한 칸에 모음 ② "아이템은 챔피언 초상화 아래" → 아이템을 챔피언+주문+룬 묶음 바로 아래로 이동 ③ "아이템은 6칸이고 한 줄" → 아이템 줄의 `flex-wrap`을 빼고 컨테이너 고정폭(`w-32`)도 없애 6개+장신구 7칸이 줄바꿈 없이 한 줄로 들어가게 함(컨테이너가 내용 폭만큼 자동으로 넓어짐) ④ "참가자는 한 줄이 아니라 왼쪽(5)-오른쪽(5)" → `ParticipantIcons`를 가로 1줄에서 세로 1열(5칸)로 바꾸고, 같은 팀 열과 상대 팀 열을 나란히 둠(가운데 "vs"는 세로 중앙 정렬) ⑤ "주요룬·보조룬 이미지·위치를 스펠처럼" → 원형+겹친 작은 트리 배지였던 `KeystoneSlot`을 없애고, 스펠과 같은 모양(사각 `size-6`)의 `RuneSlot`으로 바꿈. 처음엔 스펠 2칸과 룬 2칸을 한 열에 전부 쌓았다가, 이어진 피드백("좌 스펠 - 우 룬")으로 좌(스펠 2칸 세로)/우(룬 2칸 세로) 두 작은 열로 나란히 배치 ⑥ "참가자 옆 닉네임" → 백엔드가 `matches[].participants.team/enemy`에 `gameName`/`tagLine`을 추가 노출(Riot match-v5 응답에 이미 있던 `riotIdGameName`/`riotIdTagline`, 추가 호출 없음)한 것을 받아 `ParticipantIcons`가 아이콘 옆에 표시(없으면 생략). 처음엔 "이름#태그"였다가 이어진 피드백("리스트에선 태그 빼고 아이디만")으로 `tagLine`은 빼고 `gameName`만 표시(최대 폭 넘으면 말줄임) ⑦ "승리/포지션/시간 칸이 가운데" → 아이템 줄 때문에 행이 높아지며 `items-center`로 세로 가운데 정렬되던 문제라 그 칸만 `self-start`로 위쪽 고정. ⑧ "그래도 op.gg와 다르다. 결과·포지션·시간 칸은 챔피언 초상화보다 왼쪽" → 결과·시간 칸을 챔피언+주문·룬 묶음 **앞**(JSX 순서상 가장 왼쪽)으로 옮김 ⑨ "챔피언 초상화 오른쪽에 레벨도 표시" → 백엔드가 `matches[].champLevel`(그 게임 도달 레벨, `ParticipantDto.champLevel`을 노출, 추가 호출 없음)을 추가로 줘서, 챔피언 아이콘 우하단에 겹친 작은 배지로 표시(기존 상세 페이지 스킬 아이콘의 "Q/W/E/R" 배지와 같은 자리·스타일). ⑩ "각 참가자 초상화·이름 아래 얇은 딜량 막대그래프, 왼쪽 파랑·오른쪽 빨강" → 백엔드가 `matches[].participants.team/enemy[].damage`(챔피언 대상 딜량, 추가 호출 없음)를 추가로 줘서, `toMatchView`가 그 매치 10명 중 최댓값 대비 비율(`damagePercent`)을 계산. `ParticipantIcons`가 아이콘+이름 아래 `h-1` 막대그래프를 추가, 같은 팀은 `bg-win`(파랑), 상대 팀은 `bg-lose`(빨강) ⑪ "왼쪽 챔피언 초상화·아이템·룬·스펠 크기를 리스트 안에서 조금 늘리기" → 챔피언 아이콘 `size-10`(40px)→`size-12`(48px), 아이템·스펠·룬 아이콘 `size-6`(24px)→`size-7`(28px) ⑫ "그래프 얇게, 리스트 모든 콘텐츠는 높이가 일정해야" → 딜량 막대를 `h-1`(4px)→`h-0.5`(2px)로. 행 안 칸들이 일부는 `items-center`(세로 가운데, KDA·CS)·일부는 `self-start`(결과·시간)로 섞여 있어 참가자 칸(5줄+막대, 가장 긺)을 기준으로 다른 칸이 제각각 다른 높이에서 시작하던 문제라, 행 컨테이너를 `items-center`→`items-start`로 통일(개별 `self-start`는 더 필요 없어져 제거). 모든 칸이 같은 위쪽 기준선에서 시작해 높이가 가지런해짐(행 전체 높이 자체는 모든 매치에서 항상 동일했음 — 칸 사이 정렬 일관성 문제였음). ⑬ "딜량 바를 닉네임 하단에, 참가자 아이콘 높이 = 닉네임+딜량바" → `ParticipantIcons` 구조를 바꿔 아이콘은 `self-stretch`(고정 높이 없이 `items-stretch`인 부모 행의 높이를 그대로 따름)로, 이름+막대는 아이콘 오른쪽 세로 묶음으로 분리. 막대가 아이콘 밑이 아니라 이름 칸 바로 아래에만 위치하고, 아이콘 높이가 "이름+막대" 묶음 높이와 정확히 같아짐(실측 18.7px로 동일) ⑭ "아이템 줄 위 빈 공간(아이템 3개 분량)에 KDA 이동" → 챔피언+주문·룬 줄(약 124px)이 아이템 줄(7칸, 약 208px)보다 좁아 생기던 빈 공간에 KDA를 넣음. 그 뒤에 있던 별도 KDA 칸은 삭제, CS 칸만 챔피언 묶음 다음에 남음. ⑮ "챔피언 초상화·아이템·스펠·룬 크기 더 키우기" → 챔피언 아이콘 `size-12`(48px)→`size-14`(56px), 아이템·스펠·룬 아이콘 `size-7`(28px)→`size-8`(32px) ⑯ "승리 하단에 솔랭으로 변경" → 백엔드가 `matches[].queueId`(Riot 큐 ID, 추가 호출 없음)를 새로 줘서, `queueIdLabel()`로 "솔랭"/"자유랭크"/"칼바람" 등 짧은 한글 이름으로 바꿔 결과 칸의 둘째 줄(기존 포지션 라벨 자리)에 표시. 모르는 큐 ID는 숨기지 않고 "기타"로 표시(D33과 같은 원칙). 포지션 라벨(`individualPosition` → "원딜" 등)은 이 자리에서 빠짐(다른 곳에 쓰이지 않아 `MatchView.positionLabel` 필드 삭제). ⑰ "리스트 가장 오른쪽에 수직형 아코디언(펼친 데이터는 아직 구현 X)" → 신규 `components/summoners/MatchExpandToggle.tsx`(client, `useState`로 펼침 상태만 토글, 화살표 아이콘 180도 회전). 행 전체를 client로 만들지 않으려고 이 버튼만 작은 client 컴포넌트로 분리해 `MatchRow`(서버 컴포넌트) 맨 끝에 둠. 펼쳤을 때 보여줄 상세 정보 패널은 이번 범위 밖(다음 변경에서 추가), `aria-expanded`만 토글. 최종 순서: 결과·큐종류·시간(맨 왼쪽) → [챔피언(+레벨 배지)+주문·룬(4칸)+KDA / 그 아래 아이템 한 줄] → CS → [같은 팀 5열(아이콘+이름+딜량 막대) · vs · 상대 팀 5열] → 아코디언 토글(맨 오른쪽), 전부 위쪽 정렬. 모두 작은 수정이라 Review 생략, lint/tsc + 실제 브라우저(데스크톱·360px)로 직접 검증, 20개 행 모두 독립적으로 토글되는 것 확인 | ✅ |
 | `src/components/summoners/SummonerStatus.tsx`, `RetryButton.tsx` (신규) | Riot 502/503·백엔드 연결 실패 안내(서버) + [다시 시도] 새로고침 버튼(client) | ✅ |
 | `src/app/summoners/[region]/[riotId]/page.tsx` (신규) | `dynamic = "force-dynamic"`, `region !== "kr"` → `notFound()`, `riotId` 디코딩(D38), 상태별 분기(404/Riot 오류/정상), Data Dragon 병렬 호출 | ✅ |
@@ -368,3 +372,221 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 ### 14-4. 사용한 scratchpad 보조 파일 (저장소에 포함되지 않음)
 
 - `fake-summoner-api.js`: 포트 4099에서 `SUMMONER_NOT_FOUND`/`RIOT_UNAVAILABLE`/`RIOT_KEY_EXPIRED`/빈 랭크·매치 응답을 주는 최소 Node `http` 서버. 확인 후 종료, 프로젝트·DB 변경 없음.
+
+---
+
+## 15. 최근 게임 요약 카드 (변경 07)
+
+> 기준: `front_spec.md` 5-8·11장 D39~D44. 매치 목록 위에 "최근 N게임 요약" 카드. API·백엔드·DB·계약 변경 없음, 새 의존성 없음.
+
+### 15-1. 구현
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 집계 함수 | `src/lib/view/summoner.ts`에 `toMatchSummary(matches, champions)`, `MatchSummaryView`, `MostChampionView` 추가. `gameDurationSec >= 300`만 집계(D39), 승/패/승률 `round(100×승/N)`, 평균 K/D/A 합÷N 소수 1자리, KDA `formatKda(ΣK,ΣD,ΣA)`(데스 0은 1로 나눔), 모스트 3 = 게임 수 → 승 수 → 최근 플레이(안정 정렬 + Map 삽입 순서), `excludedCount`. `SummonerPageView.summary` 추가 | ✅ |
+| 카드 컴포넌트 | `src/components/summoners/MatchSummary.tsx`(신규, 서버). 전적 `N전 W승 L패`(글자+색), 승률 글자 + `role="img"` 승/패 막대(D41), 평균 K/D/A·KDA, 모스트 3(초상화·승률·KDA·게임 수, D42). 이름은 기존 `Tooltip` + 이미지 `alt`. 모스트 1~2종은 왼쪽 정렬(칸 `max-w-24`), 0종이면 블록 숨김. 집계 게임 0이면 "요약할 게임이 없습니다". 모바일 `전적 | KDA` 2열 + 구분선 + 모스트 가로 3등분, `sm` 이상 3열 | ✅ |
+| 페이지 배치 | `page.tsx`: "최근 매치" 제목 아래, `MatchList` 위에 렌더. 매치가 0건이면 카드를 그리지 않아 기존 빈 문구만 보임. sticky 아님(D40), 처음 받은 20게임 기준(D44) | ✅ |
+| `format.ts` | 변경 없음(기존 `formatKda` 재사용) | ✅ |
+| 하지 않은 것 | 킬관여, 평균 티어, 모스트 10, 과거 시즌 티어. 코드·화면에 빈 자리도 없음 | ✅ |
+
+### 15-2. 계획과 다르게 구현한 점
+
+- 매치가 0건일 때는 카드 대신 기존 "최근 플레이한 게임이 없습니다"만 보이게 했다(카드의 "요약할 게임이 없습니다"는 매치는 있으나 전부 5분 미만일 때 나타남). 계획의 "기존 빈 화면 흐름과 충돌하지 않게"를 따른 것.
+- 카드 높이: 계획의 "360px 약 150px"과 달리 실측 약 244px(데스크톱 폭 약 192px). 목업 구조(기준 줄 + 2열 + 모스트 라벨 + 아이콘/승률/KDA/게임 수 4줄)를 그대로 옮긴 결과로, 150px 추정은 목업에서 측정하지 않은 값이었다. 높이를 줄이려면 모스트 4줄 중 줄이는 별도 결정이 필요해 손대지 않았다.
+
+### 15-3. 검증 결과 (2026-10-29)
+
+| 항목 | 결과 |
+|------|------|
+| `npm run lint` | 통과 (오류·경고 0) |
+| `npx tsc --noEmit` | 통과 (오류 0) |
+| `npm run build` | 통과 (183 정적 페이지 + 동적 라우트 1개). 첫 시도는 Next.js 보안 업그레이드 안내로 멈췄고 재시도로 통과(업그레이드는 하지 않음) |
+| 집계 함수 경계 케이스 | 함수를 임시 스크립트로 추출해 `node --experimental-strip-types`로 실행(저장소 밖 scratchpad, 확인 후 파일 미포함): 매치 0, 전부 5분 미만(`count 0, excludedCount 2`), 데스 0(KDA 10.00), 모스트 동률(게임 수 → 승 수 → 최근 순서 3종 모두 기대대로), 299초 제외, 챔피언 1~2종 확인 |
+| 화면(데스크톱 1280) | scratchpad 가짜 API(`API_BASE_URL`만 바꿔 `next start` 포트 3999). 20게임 카드: 20전 12승 8패, 승률 60%, 6.0/3.5/7.5, 3.84 KDA, 모스트 3(86%·7게임 / 20%·5게임 / 100%·4게임). 가로 스크롤 없음, 카드 높이 약 192px |
+| 화면(360px) | 가로 스크롤 없음(scrollWidth 360), 모스트 3 가로 3등분, 카드 높이 약 244px(15-2 참고) |
+| 상태(가짜 API) | 3게임+5분 미만 1(`최근 3게임 기준 · 5분 미만 1게임 제외`, 손 계산과 일치: 4.3/3.3/4.0, 2.50 KDA, 아트록스 100%·5.00·2게임), 모스트 1종, 전부 5분 미만("요약할 게임이 없습니다"), 매치 0건(카드 없음) |
+
+못 한 확인:
+- 실제 백엔드·Riot 계정(`너희는개다#KR1`)으로는 확인하지 않았다. 가짜 API(실제 Data Dragon 이미지 사용)로만 확인했다. 실제 소환사 2~3명 표본 대조는 Review 몫이다.
+- 모스트 아이콘 툴팁(호버/탭)은 기존 `Tooltip` 컴포넌트를 그대로 써서 직접 동작을 확인하지 않았다. 768/1024px 폭도 확인하지 않았다.
+- 승률 막대·승/패 글자 대비는 기존 `--win`/`--lose` 토큰 재사용(변경 06에서 4.5:1 이상 계산)이며 새로 측정하지 않았다.
+- 서버(가짜 API, `next start`)는 모두 종료했다.
+
+### 15-4. Review 결과 반영 (2026-10-29)
+
+- Review가 실제 백엔드·계정 `너희는개다#KR1`로 카드 값(19전 11승 8패, 4.5/5.7/12.8, 3.04 KDA, 모스트 3)을 독립 계산과 대조해 모두 일치함을 확인했다. 위 "못 한 확인"의 실제 계정 대조는 1명 기준으로 해소됐다(`front_review.md` 4장). 코드는 고치지 않았고 상태 표기는 변경 없음(✅).
+- Review에서 새로 찾은 것: `sm` 이상에서 모스트 칸이 약 48px로 좁아져 KDA가 두 줄로 꺾인다(낮음, 미수정). 카드 높이 360px 243px 판단은 사용자 결정 대기(`front_review.md` 6·8장).
+
+### 15-4. 후속 작은 수정 (2026-10-29, Review 생략, 파일: `MatchSummary.tsx`만)
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 모스트 칸 줄바꿈 | `li`에 `max-w-28`, `sm:min-w-[5.5rem]`, 승률/KDA 줄에 `whitespace-nowrap`. `sm` 이상에서 "KDA"가 두 줄로 꺾여 칸 높이가 어긋나던 문제 수정 | ✅ |
+| 카드 높이 A안 | 승률과 게임 수를 한 줄로 합침("63% · 8게임", 게임 수는 `text-muted`). 칸이 4줄에서 3줄(이미지·승률/게임 수·KDA)로 줄어듦 | ✅ |
+| 매치 영역 제목 숨김 | `page.tsx`의 "최근 매치 (최대 20건)" 제목을 `sr-only` "최근 매치"로 변경. 사용자 요청(화면에서 불필요). `aria-labelledby` 영역 이름은 유지. 요약 카드가 "최근 N게임 기준"을 이미 표시 | ✅ |
+
+검증: `npm run lint` 통과, `npx tsc --noEmit` 통과, `npm run build` 통과(첫 시도 보안 업그레이드 안내로 멈춤, 재시도 통과, 업그레이드 안 함). 실제 계정 `너희는개다#KR1`(백엔드 4000·dev 3000, 이미 떠 있던 서버 사용):
+- 1280px: 카드 높이 160px(이전 가짜 API 기준 약 192px, 데이터가 달라 직접 비교는 아님), 모스트 세 칸 폭 88px·높이 81.75px로 동일, 텍스트 잘림 없음, 가로 스크롤 없음.
+- 360px: 카드 높이 225.75px(이전 243.5px, 목표 약 228px 달성), 세 칸 폭 95px·높이 77.75px 동일, 잘림·가로 스크롤 없음.
+- 못 한 확인: 모스트 1~2종 변형 재확인과 768/1024px는 하지 않았다(칸 최대 폭만 24→28rem 단위로 키움). 서버는 내가 띄운 것이 없어 종료할 것 없음, 뷰포트는 데스크톱으로 복원.
+
+### 15-5. 후속 작은 수정: 도넛 차트 + 카드 배경 (2026-10-29, Review 생략, 파일: `MatchSummary.tsx`만)
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 승률 도넛 | `WinRateDonut`(SVG `stroke-dasharray`, 둘레 100, 12시 시계 방향, 색 `var(--win)`/`var(--lose)`). 모바일 48px / `sm` 이상 64px, 가운데 승률 %. 막대와 "승률 N%" 줄 삭제. 래퍼 `role="img"` + `aria-label="20전 12승 8패, 승률 60%"`(실제 값), SVG·가운데 글자 `aria-hidden`, `N전 W승 L패` 글자 병기 | ✅ |
+| 카드 배경 | `CARD_CLASS` 상수: `bg-surface-2` + 테두리 + `border-t-4 border-t-accent`(D50 C안). 모스트 초상화 자리 `bg-background`. 집계 0게임 안내 카드는 기존 모양 유지 | ✅ |
+| 경계 | 0%는 승 호 미렌더, 100%는 `100 0`, 집계 0게임은 도넛 없음 | ✅ |
+
+검증: `npm run lint` 통과, `npx tsc --noEmit` 통과, `npm run build` 통과(첫 시도 보안 업그레이드 안내로 멈춤, 재시도 통과, 업그레이드 안 함). 실제 계정 `너희는개다#KR1`(이미 떠 있던 백엔드 4000·dev 3000 사용):
+
+| 폭 | 카드 높이 전 → 후 | 도넛 | 모스트 세 칸 | 잘림·가로 스크롤 |
+|----|-------------------|------|--------------|------------------|
+| 1280px | 160px → 163.25px | 64px | 높이 81.75px로 동일 | 없음 |
+| 360px | 225.75px → 228.75px | 48px, 가운데 "53%" 읽힘 | 높이 77.75px로 동일 | 없음 |
+
+가짜 API(scratchpad, `API_BASE_URL`만 바꿔 `next start` 포트 3999)로 HTML의 도넛 속성 확인: 60%(`60 40`), 67%, 50%, 100%(`100 0`), 0%(승 호 없음, 패 원만), 1게임 100%·0%, 모스트 1~2종, 전부 5분 미만("요약할 게임이 없습니다", 도넛 없음), 매치 0건(카드 없음) 모두 기대대로. aria-label은 모든 경우 실제 값.
+
+눈으로 본 느낌: 카드가 매치 행(`surface`, 왼쪽 승/패 띠)과 확실히 구분된다. 금색 띠는 눈에 띄지만 거슬리는 정도는 아니었고, 튀면 `CARD_CLASS`의 `border-t-4`만 바꾸면 된다. 도넛 안 퍼센트는 48px에서도 읽힌다.
+
+못 한 확인: 768/1024px, 도넛 호 색을 눈으로 본 것은 실제 계정(53%) 1건과 가짜 API 100% 화면 일부뿐(0%·60% 등은 SVG 속성으로만 확인), 새 배경 위 글자 대비는 Plan의 계산값을 재사용하고 다시 재지 않음. 내가 띄운 가짜 API와 `next start`는 종료했다.
+
+### 15-6. 후속 작은 수정 2: 기준 문구 삭제, 도넛·초상화 확대, 초상화 옆 KDA (2026-10-29, Review 생략, 파일: `MatchSummary.tsx`만)
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 기준 문구 삭제(D54) | 화면 글자 삭제. `sr-only` 문구와 `N전`의 `title`("모든 큐 기준 · 5분 미만 N게임 제외", 제외 0건이면 "모든 큐 기준") | ✅ |
+| 도넛 확대(D55) | 모바일 64px / `sm` 이상 88px, 가운데 글자 `text-base`/`sm:text-lg`. 88px로 좁아진 열에서 "10승 9패"가 두 줄로 꺾여 `whitespace-nowrap` 추가 | ✅ |
+| 모스트 초상화·배치(D56~D58) | 초상화 48/56px. 칸을 그리드로 바꿔 데스크톱 A(초상화 \| KDA 굵게 / 승률·게임), 모바일 M3(초상화 \| KDA 두 줄, 아래 승률·게임). M2로 후퇴하지 않음 | ✅ |
+
+검증: `npm run lint` 통과, `npx tsc --noEmit` 통과, `npm run build` 통과(빌드 안내 없이 통과). 실제 계정 `너희는개다#KR1`(이미 떠 있던 백엔드 4000·dev 3000):
+
+| 폭 | 카드 높이 전 → 후 | 도넛 | 초상화 | 모스트 세 칸 | 잘림·가로 스크롤 |
+|----|-------------------|------|--------|--------------|------------------|
+| 1280px | 163.25 → 125px | 88px | 56px | 높이 56px로 동일 | 없음 |
+| 360px | 228.75 → 207px | 64px | 48px | 높이 68.5px로 동일, 폭 98px | 없음 |
+
+화면에 기준 문구 글자 없음(DOM에는 `sr-only`와 `title`만 존재, 내용 확인). 가짜 API(scratchpad, `API_BASE_URL`만 바꿔 `next start` 포트 3999): 360px에서 모스트 1종(`11.00 KDA`, `50% · 2게임`)과 `100% · 4게임`, `4.07 KDA`가 칸 안에 들어가고 넘침 없음, 1280px 모스트 2종(제외 있음, 카드 125px) 정상. 360px에서 가장 오른쪽 초상화 호버 시 툴팁 패널("징크스")이 화면 안(240~289px / 폭 360)에 열림. 눈으로 본 느낌: 3칸이 균형 있고 KDA가 초상화 옆에 읽히며, 카드가 더 낮아져 목록이 위로 올라온다.
+
+못 한 확인: 768/1024px, 0게임 상태의 재확인(이번 변경이 건드리지 않은 분기라 생략), 도넛 가운데 글자 대비 재측정. 모스트 1종은 모바일에서 칸이 왼쪽에 붙는다(빈 칸 없음, 의도). 가짜 API와 `next start`는 종료했다.
+
+## 16. 킬관여·라인전 15분 골드 (변경 08)
+
+> 기준: `front_spec.md` 5-7·11장 D59~D65, `docs/contracts/api_contract.md` 2-5(`matches[].killParticipation`)·2-6(`GET /matches/lane-gold`). 매치 행 CS 칸에 킬관여(서버 값)와 라인전 15분 골드(화면 뒤 지연 로딩)를 더한다. 새 의존성·새 환경 변수 없음.
+
+### 16-1. 구현
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 타입·API | `types.ts`: `MatchSummary.killParticipation: number \| null`, `LaneGoldItem`·`LaneGoldResponse`. `api.ts`: `getLaneGold(puuid, matchIds)`(`server-only`, `cache: "no-store"`, `ApiResult` 그대로 반환). `client.ts`: 로그 경로의 `puuid` 값을 `***`로 가리는 `redactPath`만 추가 | ✅ |
+| 프록시 | `src/app/api/lane-gold/route.ts`(신규, GET). `puuid`(`^[0-9A-Za-z_-]{1,100}$`)·`matchIds`(1~10개, 각 `^KR_[0-9]{1,15}$`) 형식 검사 후 `getLaneGold`. 틀리면 400 `INVALID_PARAMETER`(백엔드 미호출), 성공이면 백엔드 JSON 그대로, `riot_unavailable`→502, `riot_key_expired`→503, 그 밖→500(`{ error: { code } }`). 모든 응답 `Cache-Control: no-store` | ✅ |
+| 순수 함수 | `src/lib/view/laneGold.ts`(신규, import 없음): 형식 검사, `chunkIds`(10개씩), `normalizeRetrySec`(1~120 아니면 2초, 30초 상한), `laneTone`(52↑/48~51/47↓), `formatLanePercent`, `formatKillParticipation`, `resolveLaneBatch`(묶음 처리·재시도·취소, `fetch`·`sleep`을 주입받아 테스트 가능) | ✅ |
+| 지연 로딩 | `LaneGoldProvider.tsx`(client): 마운트 뒤 10개씩 묶어 동시 요청, 결과를 `matchId`별로 보관, 언마운트 시 `AbortController`로 요청·대기 취소. 마운트 전(서버 렌더)은 `useSyncExternalStore`로 알아내 `-`를 그린다. `MatchList.tsx`가 `key={puuid}`로 감싼다 | ✅ |
+| 라인전 칸 | `LaneGoldCell.tsx`(client): 로딩=라벨 `라인전` + 회색 막대(`animate-pulse`, `motion-reduce`면 정지), ready=`45:55`(내 쪽 먼저, `tabular-nums`, 색 규칙 `text-win`/본문/`text-lose`), 없음=`-`. 값·`-`는 공용 `Tooltip`, 읽어주는 글은 `sr-only` 한 줄(`aria-live` 없음) | ✅ |
+| 킬관여 | `summoner.ts` `MatchView.killParticipation`(`"62%"` 또는 `"-"`). 서버 렌더 HTML에 이미 포함. `Tooltip` 설명 | ✅ |
+| 행 구성 | `MatchRow.tsx` CS 칸 `w-24` 유지, 4줄(킬관여 16px / 라인전 16px / CS 20px / 분당 CS 16px, 줄 높이 고정 = 합 68px). 1280·768·360px 모두 행 높이 증가 0px라 계획의 "3줄로 합치기"·`w-28` 확대는 쓰지 않았다 | ✅ |
+| 하지 않은 것 | 평균 티어, 골드 실수치 표시, 오류 시 자동 재시도·수동 버튼, 요약 카드 변경 | ✅ |
+
+### 16-2. 계획과 다르게 구현한 점
+
+1. 모바일(360px)의 "3줄 합침" 기본안은 쓰지 않았다. 4줄 구성이 데스크톱·모바일 모두 행 높이를 키우지 않아(아래 측정) 한 가지 모양으로 통일했다.
+2. `client.ts`에 계획에 없던 `redactPath`(로그의 `puuid` 가리기)를 넣었다. 계획 "프록시는 `puuid`를 로그에 남기지 않는다"를 지키려면 `fetchApi`의 오류 로그가 경로를 찍는 부분을 고쳐야 했다. 기존 통계 호출의 로그는 `puuid`가 없어 동일하다.
+3. 계약 2-5·2-6은 계획의 "계약 의존 값"과 어긋난 곳이 없었다(필드명, `state` 값, `retryAfterSec` 1~120/null, 오류 코드 모두 동일).
+
+### 16-3. 검증 결과 (2026-10-30)
+
+| 명령 | 결과 |
+|------|------|
+| `npx tsc --noEmit` (`next typegen` 뒤) | 통과 (오류 0) |
+| `npx eslint .` | 통과 (오류·경고 0) |
+| `next build` (`API_BASE_URL`=임시 백엔드) | 통과. 정적 183페이지 + 동적 `ƒ /api/lane-gold`, `ƒ /summoners/[region]/[riotId]`. 의존성 변화 없음 |
+| 순수 함수 (scratchpad 스크립트, `node --experimental-strip-types`) | 통과. 묶음 나누기, 재시도 대기 보정(2초 기본/30초 상한), 색 경계(47/48/51/52), 형식 검사, `pending→pending→ready`는 해당 ID만 재요청, 계속 `pending`이면 처음 1 + 재시도 3번 뒤 `-`, 요청 실패 시 전부 `-`·재시도 없음, 이상한 값(101, 소수) `-`, 취소 시 알림 없음 |
+
+화면 확인 (프로덕션 빌드 `next start`, 임시 백엔드 4100·프론트 3100, 실제 계정 `너희는개다#KR1`, 20게임):
+
+| 항목 | 결과 |
+|------|------|
+| 킬관여가 첫 HTML에 있음 | `curl`로 행 20개의 킬관여 값이 서버 HTML에 있고, API `killParticipation`과 일치(null 2건은 `-`) |
+| 첫 렌더에 라인전 요청 없음 | 서버 HTML에 라인전 값 없음. 마운트 뒤 `/api/lane-gold` 2번(각 10 ID)만 발생. 웜 TTFB 8~13ms |
+| 브라우저가 백엔드를 직접 부르지 않음 | 네트워크에 `:4100`·`:4000` 요청 없음, HTML·`.next/static`에 `API_BASE_URL`·`localhost:4100` 없음, 백엔드는 CORS 헤더 없음 |
+| 값 일치 | 20게임 전부 백엔드 `GET /matches/lane-gold` 직접 호출 결과와 `myPercent:(100-myPercent)` 일치. 짧은 게임·포지션 없음 `-` 2건 |
+| 행 높이 | 1280px 133.32px → 133.32px, 768px 133.32px, 360px 359.32px → 359.32px (모든 행 동일, 증가 0). 채워지는 동안에도 변화 없음 |
+| CS 칸 폭 | `w-24`(96px) 그대로. `킬관여 100%`·`라인전 100:0`는 글자 폭 약 69px로 줄바꿈 없음 |
+| 레이아웃 이동 | 행 CLS 0 (로딩→값 교체 중 `layout-shift` 없음). 페이지 전체 0.112는 변경 전(3000 포트 이전 코드)에도 똑같이 있는 `loading.tsx` → 본문 교체 때 푸터 이동이라 이번 변경과 무관 |
+| 360px | 가로 스크롤 없음(`scrollWidth` 360) |
+| 대비 | `--win` on 표면 6.16, `--lose` on 표면 5.53, 본문색 14.22, 보조색 7.63 (모두 4.5 이상). 값 옆에 숫자를 항상 병기 |
+| 가짜 서버 `pending` | scratchpad 가짜 백엔드: 묶음1 `ready 3 + pending 6`, 재요청 6·6·3개(해당 ID만, 간격 약 3.5초 = 응답 1.5초 + 대기 2초), 3번째 재요청에서 3개 `ready`, 나머지 3개는 총 4번 요청 뒤 `-` |
+| 가짜 서버 오류 | 묶음2가 502면 그 10칸만 `-`, 묶음1·킬관여·CS 정상, 재요청 없음. 프록시 직접 호출: 503(`RIOT_KEY_EXPIRED`)→503, 비JSON 500→500, 백엔드 없음→500, 형식 오류 5종·11개→400(백엔드 미호출), POST→405 |
+| 페이지 이탈 취소 | 헤더 링크로 이동(재시도 대기 중) 뒤 추가 요청 0건, 콘솔 오류 0 |
+| 새로고침 | 백엔드 로그 `riotCalls=0 cacheHits=10` (백엔드 캐시 그대로 사용) |
+| 툴팁 | 킬관여·라인전 값 모두 포커스 이벤트로 열림(문구는 계획과 같음) |
+| `puuid` 로그 | 프론트·백엔드 로그에 전체 `puuid` 없음 |
+
+못 본 것: 실제 키보드 Tab 조작(브라우저 창에 포커스가 없어 `focusin` 이벤트를 직접 보내 확인), Lighthouse(CLS·접근성 점수), 정글·서폿 등 `unavailable`이 될 다양한 포지션(짧은 게임 1건만 실제 확인).
+
+---
+
+## 17. 전적 화면 상단 보강 (변경 09)
+
+> 기준: `front_spec.md` 5-7 "변경 09"·11장 D66~D71, 목업 `frontend/docs/mockups/change09.html`. 백엔드·계약 변경 없음, 새 의존성·환경 변수 없음. 중간 변경이라 Review 대상(3장).
+
+### 17-1. 구현
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 화면용 매핑 | `src/lib/view/summoner.ts`: `LeagueView.hotStreak` 추가. `toSummonerPageView`가 `leagues` 대신 `soloLeague`·`flexLeague`(`queueType`으로 찾음, 없으면 `null`)와 `headline`(솔로 → 자유랭크 → `null`, `isFlex`)을 돌려준다. 솔로만 남기던 필터 제거 | ✅ |
+| 자유랭크 카드 | `RankList.tsx`: `solo`·`flex` props, 항상 2장. 기록 없으면 점선 원 `?` + "Unranked / 이번 시즌 기록 없음". 마스터 이상은 단계 없는 "마스터"·"그랜드마스터"(기존 규칙) | ✅ |
+| 프로필 줄 | `ProfileHeader.tsx`(server): 아이콘 72px(모바일)/96px(데스크톱)+`Lv.N` 배지, 이름 `text-xl`/`sm:text-2xl`, 티어 줄(엠블럼 28px·단계·LP·승패·승률, 자유랭크 기준이면 "자유랭크" 접두, `hotStreak`면 "연승 중" 알약), "KR" 표기 제거. CSS grid로 모바일 3줄/데스크톱 3열 배치 | ✅ |
+| 갱신하기 | `RefreshButton.tsx`(신규, client): `fetchedAt` 기준 60초 쿨다운, `useTransition`+`router.refresh()`, `useSyncExternalStore`(1초 구독, 서버 스냅샷=`fetchedAt`)로 시각 처리, "방금 전/N분 전/N시간 전 조회", 갱신 중 스피너·`aria-busy`, `aria-describedby` → sr-only `role="status"`(상태 전환 때만 문구 변경) | ✅ |
+| 렌더 시각 | `page.tsx`: 정상 응답 분기에서 `fetchedAt = new Date().toISOString()`을 만들어 `ProfileHeader`에 전달, `RankList`에 새 props | ✅ |
+| 검색바·헤더 | `Header.tsx`: `sm:sticky sm:top-0 sm:h-16`, 안쪽 `flex-wrap gap-y-3 py-3 sm:flex-nowrap sm:py-0`. `SummonerSearchForm.tsx`: 폼 `order-last w-full sm:order-none sm:ml-auto sm:max-w-[560px] sm:flex-1`, 입력·버튼 `h-11 text-base rounded-lg`. 동작·`id`·aria 그대로 | ✅ |
+| 하지 않은 것 | 백엔드 캐시 우회, 승급전 표시, 이름 복사 버튼, 지난 시즌 티어·조회수·즐겨찾기(API 없음) | ✅ |
+
+### 17-2. 계획과 다르게 구현한 점
+
+1. 360px에서 검색 **폼은 전체 너비 328px**이지만 **입력은 252px**(옆에 검색 버튼 68px+간격 8px)이다. 목업도 입력+버튼 한 줄 구성이라 같은 모양이다. 계획 완료 기준 2의 "입력 폭 328px 이상"은 "폼(입력+버튼) 328px"로 읽고 구현했다(변경 전 입력 159px → 252px). 입력 플레이스홀더("이름#태그 (예: 너희는개다#KR1)")가 252px에서 끝이 잘려 보인다.
+2. 모바일 헤더 높이는 109px(목업 설명 "약 100px"보다 약간 큼: 윗줄 로고 줄 + 검색창 44px + 위아래 여백).
+3. `RefreshButton`은 계획의 "마운트 때만 `setInterval`" 대신 `useSyncExternalStore`로 1초 구독한다(린트 규칙 `react-hooks/set-state-in-effect`를 피하고 하이드레이션 출력을 서버와 같게 하기 위해, D71).
+4. 쿨다운 길이와 상태 문구 외에 계획에 없던 것은 없다. 작업 범위 밖 파일 수정 없음.
+
+### 17-3. 검증 결과 (2026-10-30)
+
+| 명령 | 결과 |
+|------|------|
+| `npx tsc --noEmit` | 통과 (오류 0) |
+| `npx eslint src` | 통과 (오류·경고 0) |
+| `next build` (scratchpad 복사본, `API_BASE_URL`=임시 프록시) | 통과. 정적 183페이지 + 동적 `ƒ /api/lane-gold`, `ƒ /summoners/[region]/[riotId]`. 의존성 변화 없음 |
+| 순수 함수 (scratchpad `refresh_logic.mts`, `node`) | 통과. `cooldownLeft`(60/59/1/0 경계, 0 아래로 안 내려감), `fetchedLabel`(방금 전/59분/1시간, 시계가 앞서도 0으로 보정) |
+
+환경: 새 코드의 백엔드를 임시 포트 4100(키는 `.env` 자동 로드), 프론트는 scratchpad 복사본 `next dev -p 3100`(이후 프로덕션 빌드 `next start -p 3101`). 기존 3000·4000 서버는 건드리지 않았고 임시 서버는 모두 종료했다. 실제 계정 `너희는개다#KR1`(응답이 자유랭크 먼저 → 큐로 찾는 것도 확인). 내장 브라우저 확인.
+
+| 항목 | 변경 전 | 변경 후 |
+|------|---------|---------|
+| 검색 폼 1280px | 320x34 (입력 264x34, 버튼 48x32) | **560x44** (입력 484x44, 버튼 68x44) |
+| 헤더 높이 1280px | 56 | **64** (sticky 유지 확인) |
+| 프로필 카드 1280px | 1104x106 | 1104x138 |
+| 360px 폼 | 약 215x34 (입력 159) | **328x44** (입력 252x44, 버튼 68x44) |
+| 헤더 높이 360px | 56 | **109** (2줄, `position: static`) |
+| 프로필 카드 360px | 369x98 (401px 뷰포트) | 328x219 |
+
+| 항목 | 결과 |
+|------|------|
+| 자유랭크 카드 | 1280·360px 모두 솔로/듀오(실버 3 89LP 132승 143패 48.0%) → 자유랭크(실버 2 52LP 31승 40패 43.7%) 순 2장, API 값과 일치. 헤더 티어 줄도 솔로 기준 같은 값 |
+| 가짜 응답(scratchpad 프록시가 실제 응답의 `leagues`만 바꿈) | 자유 없음 → 자유 카드 Unranked, 솔로 없음 → 솔로 카드 Unranked + 헤더 "자유랭크 실버 2 52 LP", 둘 다 없음 → 카드 2장 Unranked + 헤더 "Unranked", 마스터 이상 → "마스터 231 LP"·"그랜드마스터 500 LP"(단계 없음) + 헤더 "연승 중" 알약. 순서·텍스트 모두 확인 |
+| 갱신하기 쿨다운 | 첫 렌더 직후 비활성 "갱신하기 (59초 후)"→카운트다운, `aria-describedby`=`refresh-status`(`role="status"` "다시 갱신하려면 60초를 기다려야 합니다"). **쿨다운 중 실제 클릭 → 백엔드 `GET /summoners` 로그 수 변화 0** |
+| 갱신 동작 | 쿨다운 종료 뒤 클릭 → 즉시 "갱신 중…"(`aria-busy=true`, `disabled`, status "전적을 갱신하는 중입니다") → 약 4초 뒤 "방금 전 조회"·"갱신하기 (56초 후)"로 쿨다운 재시작. **백엔드 요청 정확히 1건**, 로그 `소환사 검색 캐시 미스`(=캐시 만료 상태에서 새로 받아옴) |
+| 오류 문구 | `abc#` 제출 시 1280px(헤더 아래로 6px 넘침)·360px(2줄 헤더 아래로 7px 넘침) 모두 보이고 가려지지 않음 |
+| 모바일 sticky | 360px `position: static`, 1280px `sticky` |
+| 가로 스크롤 | 360px `scrollWidth` 360 = `clientWidth` 360 |
+| 회귀 | 360px 매치 행 359px(20행 모두), 요약 카드 207px. 1280px 매치 행 133px. 라인전·킬관여 칸 표시 정상. 통계 화면(`/champions`) 헤더는 새 크기로 정상 표시, 본문 영향 없음 |
+| 콘솔 | 프로덕션 빌드(`next start`) 페이지 콘솔 메시지 0건. (개발 서버 때는 내가 서버를 껐다 켠 탓의 HMR WebSocket 오류만 있었고 앱 오류는 없음) |
+
+못 본 것 / 못 한 것:
+
+- 실제 계정으로 자유랭크 없는 Unranked 케이스: 테스트 계정이 항상 2개 큐를 가져 가짜 응답(프록시)으로만 확인했다.
+- 갱신 후 새 경기가 생겼을 때 `LaneGoldProvider`가 새 `matchIds`를 받는 동작: 같은 경기 목록이라 재요청이 없는 것만 확인했다(코드상 effect 키 `idsKey`). 새 경기 반영과 라인전 재조회는 측정하지 못했다.
+- 키보드 Tab으로 버튼 포커스 이동·포커스 링 육안 확인, 스크린리더 실제 낭독, Lighthouse.
+- 768px 중간 폭의 헤더·프로필 줄 모양.
+- 개발 서버의 하이드레이션 경고 전용 확인(경고 없음으로 보이나 별도 측정 안 함).
+
+보고 사항: `next dev`·`next build` 출력에 "Next.js 보안 취약점 → `next upgrade --agent=security`로 업그레이드하라"는 안내가 한 번 나오며 명령이 멈춘다(재실행하면 계속됨). 이미 남은 문제(13장)에 있는 건이며, 이번에도 따르지 않았다.

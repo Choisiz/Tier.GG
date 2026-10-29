@@ -1,7 +1,7 @@
 # 프론트엔드 현재 상태 — Tier.GG
 
 > 이 문서는 프론트엔드의 **지금 모습**만 적는다. 현재 계획은 `front_spec.md`, 구현 상태는 `front_build.md`, 최근 검토는 `front_review.md`에 있다. 그 이전 과정 기록은 git 커밋 `87cfc78`에 있다.
-> 기준: 변경 06(전적 검색 MVP) Review 반영 후 코드 (2026-10-27 확인). 이후 Review 에이전트가 이 문서를 최신 상태로 덮어쓰고 변경 이력에 1줄을 더한다.
+> 기준: 변경 08(킬관여·라인전 15분 골드)과 변경 07 후속(도넛·배경·크기) 누적 Review 반영 후 코드 (2026-10-30 확인). 이후 Review 에이전트가 이 문서를 최신 상태로 덮어쓰고 변경 이력에 1줄을 더한다.
 
 ## 목차
 
@@ -26,7 +26,7 @@
 
 - **티어 표**: 탑·정글·미드·원딜·서폿 5개 탭. 티어, 승률, 픽률, 밴률, 게임 수를 보여준다.
 - **챔피언 상세**: 주 포지션 1~2개 탭. 탭마다 추천 룬(사용률·승률 포함), 소환사 주문, 스킬 순서, 핵심 아이템을 보여준다. 모든 아이콘에 호버·포커스·탭 툴팁이 있다. 스킨은 Hero 스플래시에서 화살표로 전환(순환)하고, 아래에 스킬 설명, 스토리가 있다.
-- **전적 검색**(변경 06): 헤더 검색창에 "이름#태그"를 입력하면 `/summoners/kr/{riotId}`로 이동해 프로필, 랭크(솔로/자유), 최근 매치 20건(챔피언·KDA·CS·아이템·소환사 주문·키스톤·같은 팀/상대팀)을 보여준다. 집계 창 없이 요청마다 Riot 값을 그 자리에서 받아온다(`force-dynamic`).
+- **전적 검색**(변경 06): 헤더 검색창에 "이름#태그"를 입력하면 `/summoners/kr/{riotId}`로 이동해 프로필, 랭크(솔로/자유), 최근 매치 20건(챔피언·KDA·CS·아이템·소환사 주문·키스톤·같은 팀/상대팀)을 보여준다. 집계 창 없이 요청마다 Riot 값을 그 자리에서 받아온다(`force-dynamic`). 매치 목록 위에 "최근 N게임 요약" 카드(변경 07, 도넛·모스트 3)가 있고, 매치 행 CS 칸에는 킬관여와 라인전 15분 골드(변경 08)가 있다.
 - **통계 기준**: 티어 표·챔피언 상세는 최근 14일 게임. 백엔드가 매일 05:00(KST)에 다시 집계한다. 전적 검색은 집계와 무관하게 실시간이다.
 - 로그인, AI 피드백은 아직 없다.
 
@@ -37,7 +37,7 @@
 | 테마 | 다크 고정, 한국어(`lang="ko"`, Data Dragon `ko_KR`) |
 | 빌드 페이지 수 | 183개 정적(상세 173개 + 리스트 5개 + `/`·404 등) + 동적 라우트 1개(`/summoners/[region]/[riotId]`) |
 | 챔피언 수 | 173명 (Data Dragon `16.20.1` 기준) |
-| 클라이언트 컴포넌트 | `TierTable`, `PositionTabs`, `RunePage`, `ChampionHero`, `HeroSkinSwitcher`, `Tooltip`(공용), `NavLink`, `SummonerSearchForm`, `RetryButton`, `error.tsx` 3개, `not-found.tsx`(전적 검색) |
+| 클라이언트 컴포넌트 | `TierTable`, `PositionTabs`, `RunePage`, `ChampionHero`, `HeroSkinSwitcher`, `Tooltip`(공용), `NavLink`, `SummonerSearchForm`, `RetryButton`, `LaneGoldProvider`·`LaneGoldCell`(변경 08), `error.tsx` 3개, `not-found.tsx`(전적 검색) |
 
 ---
 
@@ -100,6 +100,8 @@
 | 프로필 헤더 | 소환사 아이콘, 이름#태그, 레벨. 재검색 폼은 없음(헤더 검색창과 중복이라 제외) |
 | 랭크(좌, `lg` 이상 세로 고정 폭 280px) | 큐별 카드(솔로/듀오, 자유랭크만 한글화, 그 외 원문): 티어+단계 글자, LP, 승-패, 승률. 랭크 없으면 "랭크 정보가 없습니다" |
 | 매치 목록(우) | 최근 20건. 챔피언 아이콘+포지션, 승/패(색+글자), 상대 시각, 게임 길이, K/D/A+KDA, CS+분당 CS, 아이템 6칸+장신구(빈 칸 포함), 소환사 주문 2개, 키스톤 룬+소속 트리 아이콘, 같은 팀/상대팀 챔피언 아이콘(이름 없음) |
+| 요약 카드 (변경 07, 후속 포함) | 카드 맨 위 금색 띠 + 한 단계 밝은 표면. 승률 도넛(가운데 승률 %, 모바일 64px/데스크톱 88px, 12시부터 시계 방향 승 색 호, `role="img"` + aria-label) + `N전`·`W승 L패`(색+글자), 평균 K/D/A와 KDA(합산 방식, `(K+A)/D`), 모스트 챔피언 3(초상화 모바일 48px/데스크톱 56px 옆 KDA, 아래 "승률 · 게임", 정렬: 게임 수 → 승 수 → 최근, 이름은 툴팁+alt). 기준 문구("모든 큐·5분 미만 M게임 제외")는 화면 글자 없이 `sr-only`와 `N전`의 title로만 남김. 처음 받은 20게임 기준 고정, sticky 아님, 프론트가 계산(계약 변경 없음). 매치 0건이면 카드 없음, 전부 5분 미만이면 "요약할 게임이 없습니다". 평균 티어·모스트 10·과거 시즌 티어는 하지 않음(평균 티어는 보류) |
+| 매치 행 CS 칸 (변경 08) | `w-24` 4줄 고정 높이(16·16·20·16px): `킬관여 62%`(서버 렌더 값, 없으면 `-`) / `라인전 45:55`(내 쪽 먼저, 52 이상 `text-win`, 47 이하 `text-lose`, 그 사이 본문색, 항상 숫자 병기) / `N CS` / `분당 CS`. 라인전은 화면이 뜬 뒤 지연 로딩: 서버·수화 직후 `-` → 마운트 뒤 회색 막대 → 값 또는 `-`(15분 미만 게임·포지션 불명·재시도 소진·요청 오류). 값 교체로 행 높이가 변하지 않음 |
 | 레이아웃 | `lg`(1024px) 이상 `grid-cols-[280px_1fr]`(좌 랭크, 우 매치), 미만은 1열(프로필→랭크→매치) |
 | 오류 | 소환사 없음(404) → 전용 안내+검색창 재포커스. Riot 502/503·백엔드 연결 실패 → `page.tsx`가 직접 안내 문구(+502·연결 실패만 [다시 시도]) |
 
@@ -122,7 +124,7 @@
 |------|------|
 | 주소 | 환경 변수 `API_BASE_URL` (예: `http://localhost:4000/api/v1`). 값이 없으면 "연결 실패"로 처리한다 (localhost로 조용히 붙지 않음) |
 | 값 읽기 | `next.config.ts`가 루트 `.env`에서 **`API_BASE_URL`만** 읽어 넣는다. DB·Riot 키는 프론트 프로세스에 들어가지 않는다. `NEXT_PUBLIC_`과 `env` 옵션은 쓰지 않는다 |
-| 쓰는 엔드포인트 | `GET /meta` (기간·표본 기준·푸터 패치), `GET /champions?position=` (티어 표), `GET /champions/:key[?position=]` (상세), `GET /summoners/:region/:riotId`(전적 검색, 변경 06) |
+| 쓰는 엔드포인트 | `GET /meta` (기간·표본 기준·푸터 패치), `GET /champions?position=` (티어 표), `GET /champions/:key[?position=]` (상세), `GET /summoners/:region/:riotId`(전적 검색, 변경 06), `GET /matches/lane-gold`(라인전 15분 골드, 변경 08, 브라우저는 같은 출처 프록시 `/api/lane-gold`만 호출) |
 | 시간 제한 | 10초 (`API_TIMEOUT_MS`) |
 | 오류 분기 | HTTP 상태 + `error.code`로만 나눈다 (`lib/api/client.ts`). 전적 검색 전용 `RIOT_UNAVAILABLE`(502)·`RIOT_KEY_EXPIRED`(503)도 같은 방식으로 분기(변경 06) |
 | 캐시 옵션 | `fetchApi(path, options?)` — `options.cache: "no-store"`를 주면 캐시 없이 매번 새로 부른다(전적 검색 전용). 생략하면 기존처럼 `revalidate: 3600`(변경 06, D36) |
@@ -213,6 +215,7 @@
 | Riot 502(`RIOT_UNAVAILABLE`) | `page.tsx`가 직접 "라이엇 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요." + [다시 시도] |
 | Riot 503(`RIOT_KEY_EXPIRED`) | `page.tsx`가 직접 "지금은 전적을 불러올 수 없습니다. 잠시 후 다시 시도해 주세요." (버튼 없음) |
 | 백엔드 연결 실패 | `page.tsx`가 직접 "서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요." + [다시 시도] |
+| 라인전 로딩 중 / 값 / 없음 (변경 08) | 회색 막대(reduced-motion이면 정지) / `45:55` / `-`. `pending`은 그 ID만 최대 3번 재시도(대기 1~120초 보정, 최대 30초), 묶음 요청 오류는 그 10칸만 `-`, 자동 재시도·버튼 없음(새로고침이 재시도, 백엔드가 성공분을 6시간 캐시) |
 | 랭크 없음 | "랭크 정보가 없습니다" |
 | 매치 없음 | "최근 플레이한 게임이 없습니다" |
 | 매치 일부 항목 ID 못 찾음 | 그 칸만 빈 칸/"알 수 없는 …", 페이지는 정상 |
@@ -266,7 +269,7 @@ frontend/
 ├─ next.config.ts          루트 .env에서 API_BASE_URL만 읽기, 이미지 허용 주소, Tailwind 로더
 ├─ package.json            dev / build / start / lint
 └─ src/
-   ├─ app/                 라우트 (summoners/[region]/[riotId] 포함, 변경 06)
+   ├─ app/                 라우트 (summoners/[region]/[riotId] 포함, 변경 06 / api/lane-gold 프록시, 변경 08)
    ├─ components/
    │  ├─ layout/           헤더(전적 검색창 포함)·푸터·메뉴
    │  ├─ champions/        티어 표·상세 화면 조각
@@ -292,6 +295,7 @@ frontend/
 | `champions/[championId]/page.tsx` | 상세. 1·2순위 통계 호출, 패널 데이터 만들기, 메타데이터 |
 | `champions/[championId]/loading.tsx` / `not-found.tsx` | 상세 스켈레톤 / 챔피언 404 |
 | `summoners/[region]/[riotId]/page.tsx` (변경 06) | 전적 검색. `dynamic = "force-dynamic"`, `region` 검사, `riotId` 디코딩, 상태별 분기, Data Dragon 병렬 호출 |
+| `api/lane-gold/route.ts` (변경 08) | GET 프록시(`force-dynamic`, `no-store`). `puuid`·`matchIds` 형식을 먼저 검사(400)하고 `getLaneGold` 호출, 백엔드 502·503·그 밖은 502·503·500으로 옮김. 백엔드 주소는 서버에만 남음 |
 | `summoners/[region]/[riotId]/loading.tsx` / `not-found.tsx` / `error.tsx` (변경 06) | 스켈레톤 / 소환사 404(검색창 재포커스) / 예상 밖 오류 안전망 |
 
 ### `src/components/`
@@ -316,7 +320,9 @@ frontend/
 | `champions/ChampionLore.tsx` | 스토리 |
 | `summoners/ProfileHeader.tsx` (변경 06) | 프로필 아이콘·이름#태그·레벨. 재검색 폼 없음 |
 | `summoners/RankList.tsx` (변경 06) | 랭크 카드 세로 목록 / 랭크 없음 안내 |
-| `summoners/MatchList.tsx`, `MatchRow.tsx` (변경 06) | 매치 20건 목록 / 매치 1건(챔피언·시간·KDA·CS·주문·키스톤·아이템·참가자) |
+| `summoners/MatchSummary.tsx` (변경 07, server) | 최근 N게임 요약 카드(전적·KDA·모스트 3). 집계는 `lib/view/summoner.ts`의 `toMatchSummary` |
+| `summoners/MatchList.tsx`, `MatchRow.tsx` (변경 06) | 매치 20건 목록(`LaneGoldProvider`로 감쌈, `key={puuid}`) / 매치 1건(챔피언·시간·KDA·킬관여·라인전·CS·주문·키스톤·아이템·참가자) |
+| `summoners/LaneGoldProvider.tsx`, `LaneGoldCell.tsx` (변경 08, client) | 마운트 뒤 10개씩 묶어 `/api/lane-gold` 동시 요청·재시도·언마운트 취소, 결과를 `matchId`별 보관 / 라인전 칸 표시(로딩·값·`-`, 툴팁·sr-only) |
 | `summoners/SummonerStatus.tsx`, `RetryButton.tsx` (변경 06) | Riot 502/503·백엔드 연결 실패 안내(server) + [다시 시도](client) |
 | `common/Tooltip.tsx` | 호버·포커스·탭 공용 설명 툴팁 (client, `role="tooltip"` + `aria-describedby`). 전적 검색의 아이템·주문·룬 아이콘도 재사용(변경 06) |
 | `stats/WindowInfo.tsx` | 기간 줄 + 지연 안내 |
@@ -329,7 +335,7 @@ frontend/
 |------|------|
 | `api/config.ts` | 기본 URL, 재검증 3600초, 시간 제한 10초 |
 | `api/client.ts` | `fetchApi(path, options?)`: 호출하고 결과를 `not_ready`·`not_found`·`invalid`·`unavailable`·`riot_unavailable`·`riot_key_expired`(변경 06)로 분류. `options.cache: "no-store"`로 캐시 생략 가능(변경 06, D36). 로그에 기본 URL을 남기지 않음 |
-| `api/api.ts` | `getMeta`, `getTierList`, `getChampionStats`, `requireStats`(서비스 중 연결 실패면 오류), `getSummoner`(변경 06, `SummonerState`) |
+| `api/api.ts` | `getLaneGold`(변경 08), `getMeta`, `getTierList`, `getChampionStats`, `requireStats`(서비스 중 연결 실패면 오류), `getSummoner`(변경 06, `SummonerState`) |
 | `api/types.ts` | 계약 v3 응답 타입 (전적 검색 타입 포함, 변경 06) |
 | `api/positions.ts` | 포지션 순서·한글 이름·URL 조각, `tierListHref()` |
 | `api/buildPhase.ts` | `next build` 중인지 판단 |
@@ -342,6 +348,7 @@ frontend/
 | `view/format.ts` | 퍼센트·쉼표·KST·패치 구성 글자. 상대 시각·경과 시간·KDA·분당 CS 추가(변경 06) |
 | `view/tierList.ts` | API 행 → 표 행 |
 | `view/builds.ts` | 룬·주문·스킬·아이템 → 화면용 데이터 |
+| `view/laneGold.ts` (변경 08) | 의존성 없는 순수 함수: 형식 검사, 10개 묶기, 재시도 대기 보정, 색 기준, 표시 글자, `resolveLaneBatch`(재시도 포함 묶음 처리) |
 | `view/summoner.ts` (변경 06) | 전적 검색 응답 + Data Dragon → 화면용 모델 (큐 한글화, 티어 글자, 키스톤 평탄화, 매치 변환) |
 
 ---
@@ -360,7 +367,7 @@ frontend/
 | 티어 | 색만이 아니라 글자("1티어")가 항상 함께 보인다 |
 | 대비 | 측정값 최소 6.74:1 (기준 4.5:1). 1~5티어 배지 6.89 / 8.37 / 12.64 / 11.18 / 9.13. 승/패 의미색(`--win`/`--lose`, 변경 06) 배경 6.82/6.12, 표면 6.16/5.53 |
 | 제목 구조 | 리스트 `h1` 1개. 상세 `h1` → `h2` → `h3` (건너뛰지 않음). 전적 검색 `h1`(이름#태그) → `h2`(매치 목록) |
-| 전적 검색 (변경 06) | 헤더 검색창 키보드 제출 가능, 형식 오류 `role="alert"`, 404 시 검색창 재포커스, 매치 목록 `<ol aria-label="최근 매치 목록">`, 빈 아이템 칸 `aria-hidden` |
+| 전적 검색 (변경 06) | 헤더 검색창 키보드 제출 가능, 형식 오류 `role="alert"`, 404 시 검색창 재포커스, 매치 목록 `<ol aria-label="최근 매치 목록">`, 빈 아이템 칸 `aria-hidden`. 라인전은 색과 숫자 병기 + `sr-only` 문구, 킬관여·라인전 값은 `Tooltip`(Tab 포커스로 열림, 행마다 정지점 2개 늘어남), 로딩 막대 `motion-reduce:animate-none`, `aria-live` 없음 |
 
 ### 반응형
 
@@ -438,12 +445,15 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 | 04 | 2026-10-17 | 룬·스킬 레이아웃 축 전환: 룬 페이지를 `lg`(1024px) 이상에서 핵심\|보조\|파편 가로 3단(`grid-cols-[2fr_1.5fr_1fr]`)으로 배치(그 미만은 변경 03의 세로 1단 유지, D21), 스킬 표를 레벨×Q/W/E/R에서 Q/W/E/R(4행)×레벨(11열)로 축 전환하고 좁은 화면에서 `overflow-x-auto` + 행 머리 `sticky`로 고정(D22), `PositionStatsPanel`의 `lg` 이상 그리드를 "룬 좌+주문·스킬 우 2단"에서 "룬(좌)+주문(우) 2단 → 스킬 표 전체 폭 1행 → 아이템 전체 폭"으로 재구성(D23, 사용자가 전체 폭으로 빼야 하는 건 룬이 아니라 11열로 넓어진 스킬 표라고 교정) | 룬 3블록을 세로로만 쌓으면 화면이 길어져 정보를 한눈에 보기 어렵고, 스킬 표가 레벨×스킬 축이면 "이 레벨에 뭘 찍었는지"보다 "이 스킬을 언제 찍었는지"가 와닿지 않는다는 사용자 피드백으로 축을 바꿨다. 축 전환 결과 스킬 표가 11열로 넓어져 기존 2단 레이아웃의 절반 폭에 들어가지 않아 전체 폭으로 뺐다 | PASS. 완료 기준 전 항목 충족, 발견한 결함 없음(수정한 파일 없음). `skillOrder` "QEWQQRQEQER"와 스킬 표 강조 칸을 레벨별로 직접 대조해 일치 확인, 룬 가로 3단이 아트록스·카밀(2개 포지션)에서 잘림·줄바꿈 없이 렌더링됨을 `getBoundingClientRect`로 확인. 린트·타입·빌드(183페이지, 백엔드 켬/끔 모두, 경고 0/7줄) 통과. Lighthouse `/champions` 96·2.78s·0, `/champions/Aatrox` 94·3.16s·0(변경 03 대비 변동 없음, CSS만 바뀐 변경이라 예상대로), 접근성 100 유지 |
 | 05 | 2026-10-17 | 아이템 전체 폭 카드를 없애고 소환사 주문 카드 안에 "소환사 주문"/"많이 완성한 아이템" 두 섹션으로 합침, `SkillOrder`를 Q/W/E/R×레벨 표에서 op.gg 스타일 가로 스킬 트랙(레벨 1~11, 칸마다 그 레벨 아이콘+레벨 숫자)으로 교체(2순위 한 줄 표기는 화면에서만 생략) | 레벨별로 "이 스킬을 언제 찍었는지"가 더 직관적인 가로 트랙이 표보다 op.gg에 가깝고, 아이템 카드가 비어 보이던 문제도 주문 카드로 합쳐 해소하기 위해 | 3장 기준(작은 CSS·레이아웃 변경)에 따라 Build 자체 검증으로 진행, 별도 Review 생략. 린트·타입·빌드(183페이지) 통과, `skillOrder` 레벨별 1:1 대조 확인, 360/768/1280px 확인(`front_build.md` 11장) |
 | 06 | 2026-10-27 | 전적 검색 MVP 신설: 헤더 전역 검색창("이름#태그") → `/summoners/kr/{riotId}` 동적 SSR(`force-dynamic`)로 프로필·랭크(솔로/자유)·최근 매치 20건(챔피언·KDA·CS·아이템·소환사 주문·키스톤+소속 트리·같은 팀/상대팀) 표시. `fetchApi`에 `cache: "no-store"` 옵션 추가(D36), 승/패 의미색(`--win`/`--lose`) 신설(D35) | 전적 검색이라는 새 화면을 추가해 로그인·AI 피드백 전 단계의 핵심 기능을 넓히기 위해. 집계 창이 없는 실시간 데이터라 기존 SSG+ISR 통계 화면과 렌더링 전략을 분리했다 | PASS with issues(낮음 2건, 코드 수정 없음). 완료 기준 전 항목 충족. D37(Riot 502/503을 `error.tsx` 대신 `page.tsx`가 직접 그림)·D38(`params.riotId` 수동 디코딩)을 운영 빌드로 직접 재현해 타당함을 확인. 린트·타입·빌드(183정적+동적 1개) 통과, 새 런타임 의존성 0, 기존 `fetchApi` 호출 캐시 동작 회귀 없음, 대비 수치(배경 6.82/6.12, 표면 6.16/5.53) 재계산 일치. 낮은 심각도 발견: 범위 밖 `mockup-current.html` 미정리, `front_build.md`가 이전에 이미 커밋된 챔피언 상세 UI 변경을 "변경 06"으로 잘못 표기(`front_review.md` 8장) |
+| 07 | 2026-10-29 | 전적 검색 매치 목록 위에 "최근 20게임 요약" 카드 추가: `toMatchSummary`(5분 미만 제외, 승/패·승률·평균 K/D/A·KDA·모스트 3)와 서버 컴포넌트 `MatchSummary` 신설 | 최근 전적을 한눈에 보게 하되, Riot에 시즌 챔피언 통계·랭크 이력 API가 없어 이미 받는 20게임을 프론트가 계산하는 범위로 줄였다(계약 변경 없음) | PASS (낮음 1건, 코드 수정 없음). 실제 백엔드·계정 `너희는개다#KR1`로 19전 11승 8패·4.5/5.7/12.8·3.04 KDA·모스트 3이 독립 계산과 전부 일치(251초 게임 1건 제외도 실데이터로 확인). 린트·타입·빌드는 Build 결과 신뢰. 발견: `sm` 이상에서 모스트 칸이 48px로 좁아 KDA가 두 줄로 꺾임, 카드 높이 360px 243px(계획 150px 초과, 사용자 결정 필요) |
+| 07 후속 | 2026-10-29 | 요약 카드를 도넛 차트·밝은 표면+금색 띠 배경으로 바꾸고, 기준 문구를 `sr-only`로 옮기고, 도넛·모스트 초상화를 키우고 초상화 옆에 KDA를 둠(D49~D58) | 카드가 매치 행과 구분되지 않고 승률이 한눈에 안 들어온다는 사용자 피드백. 카드 높이도 줄이려 함 | 작은 수정이라 Build 자체 검증, 이번에 누적 Review. 실측 카드 높이 360px 207px(후속 전 243px)·1280px 데스크톱에서 KDA 한 줄, 가로 스크롤 0. 변경 07 Review의 미해결 15·16 해소 |
+| 08 | 2026-10-30 | 매치 행 CS 칸에 킬관여(서버 값)와 라인전 15분 골드(지연 로딩) 추가: Route Handler 프록시 `/api/lane-gold`, `LaneGoldProvider`·`LaneGoldCell`, 순수 함수 `laneGold.ts`, `fetchApi` 로그의 `puuid` 가리기 | 요청에 맞춰 백엔드가 `killParticipation`과 `GET /matches/lane-gold`를 추가했다. 라인전은 Riot 호출이 무거워 검색 응답에 합치지 않고 화면이 뜬 뒤 채움 | PASS with issues(중요 0, 경미 3). 실제 `너희는개다#KR1` 1280px·360px: 행 20개 높이 133px·359px 전부 동일, 라인전 18칸 값 + 2칸 `-`, 가로 스크롤 0, 프록시 형식 오류 5종 400. 타입·린트 통과 재확인. 코드 수정 없음 |
 
 ---
 
 ## 12. 해결되지 않은 점
 
-요약: 기능을 막는 문제는 없다. 아래는 남은 개선 거리와 확인 못 한 점이다.
+요약: 기능을 막는 문제는 없다. 아래는 남은 개선 거리와 확인 못 한 점이다. 변경 07 후속으로 모스트 KDA 줄바꿈(구 15)과 카드 높이(구 16)는 해소됐다(데스크톱 KDA 한 줄, 360px 카드 207px, 사용자가 D55~D58로 승인).
 
 1. **같은 룬 페이지가 두 번 나온다.** 173명 중 71명(41%)은 룬 1순위와 2순위가 같은 그림이다. 백엔드가 보조 룬 순서만 다른 조합을 따로 세기 때문이며, 프론트가 아니라 `!db` 변경 04(보조 룬을 정렬해 묶기)로 고칠 계획이다.
 2. **상세 페이지 LCP가 줄지 않고 변경 03에서 더 늘었다.** 스플래시에 `fetchPriority="high"`를 넣었지만 2.89s → 2.98s(변경 01) → 3.15s(변경 03)로 계속 "좋음" 기준(2.5s)을 넘는다. 변경 03의 증가분은 `ChampionHero`가 client 컴포넌트가 된 것(D14, 스킨 캡션 상태 때문)과 관련이 있어 보인다. 다음 성능 작업에서 JS(156KB)와 렌더 지연을 따로 본다.
@@ -457,6 +467,12 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 10. **`npm audit`가 high 5건을 보고한다.** `eslint-config-next` → `fast-glob` 등 개발용 의존성에서 나온다 (2026-10-16 확인). 템플릿 기본 의존성이라 조치하지 않았다. 의존성을 올릴 때 함께 본다.
 11. **상세 로딩 스켈레톤이 변경 04 레이아웃과 다른 비율이다.** `[championId]/loading.tsx`의 오른쪽 칸은 변경 03 이전처럼 주문+스킬 스켈레톤이 세로로 쌓인 모양이다. 실제로는 주문만 우측에 남고 스킬은 전체 폭으로 빠졌지만, 스켈레톤은 손대지 않았다. 로딩이 끝나면 바로 실제 레이아웃으로 바뀌어 CLS나 깨짐은 없다. 다음에 로딩 스켈레톤을 손볼 때 같이 맞춘다.
 12. **(변경 06) 전적 검색 "랭크 없음" 상태를 실제 계정으로 확인하지 못했다.** 테스트 계정(`너희는개다#KR1`)이 항상 랭크 2개를 갖고 있어, `leagues: []` 화면은 가짜 응답 서버로만 확인했다(Build·Review 공통). 기능은 코드로 정상 분기됨을 확인했으나 실제 Riot 데이터로 재확인은 못 했다.
-13. **(변경 06, 범위 밖) `frontend/mockup-current.html`이 커밋되지 않은 채 남아 있다.** 챔피언 상세 레이아웃의 정적 목업(371줄)으로 이번 전적 검색 변경과 무관한 내용이다. 다른 작업이 남긴 임시 파일로 보이며, 메인 에이전트가 용도를 확인해 정리해야 한다 (`front_review.md` 8장).
-14. **(변경 06, 문서 정정 필요) `front_build.md` 8장이 챔피언 상세 컴포넌트(`ChampionHero`·`PositionTabs`·`PositionStatsPanel`·`ChampionAbilities`·`ChampionLore`) 변경 일부를 "변경 06"으로 표기하지만, 실제로는 커밋 `8771301`(변경 05 커밋)에 이미 포함된 코드다.** 오늘 작업 트리 diff에는 해당 파일 변경이 없다. 기능에는 영향 없지만 변경 번호 라벨이 부정확해 다음에 "변경 06이 챔피언 상세도 건드렸다"고 오해할 수 있다. 메인 에이전트가 라벨을 바로잡는 것을 권장한다 (`front_review.md` 8장).
-15. **Next.js 보안 업그레이드 안내 (참고, 범위 밖).** `npm run build`가 "Your version of Next.js is affected by a known security vulnerability"로 한 번 멈추고 `next upgrade --agent=security`를 제안한다(재시도하면 경고만 남기고 빌드는 통과). 이번 변경 범위(새 의존성 금지, Next.js 버전 변경 없음)에서 처리할 일이 아니라 조치하지 않았다 — 메인 에이전트가 사용자와 별도로 업그레이드 여부를 논의하기로 함.
+13. **(변경 06, 문서 정정 필요) `front_build.md` 8장이 챔피언 상세 컴포넌트(`ChampionHero`·`PositionTabs`·`PositionStatsPanel`·`ChampionAbilities`·`ChampionLore`) 변경 일부를 "변경 06"으로 표기하지만, 실제로는 커밋 `8771301`(변경 05 커밋)에 이미 포함된 코드다.** 오늘 작업 트리 diff에는 해당 파일 변경이 없다. 기능에는 영향 없지만 변경 번호 라벨이 부정확해 다음에 "변경 06이 챔피언 상세도 건드렸다"고 오해할 수 있다. 메인 에이전트가 라벨을 바로잡는 것을 권장한다 (`front_review.md` 8장).
+14. **Next.js 보안 업그레이드 안내 (참고, 범위 밖).** `npm run build`가 "Your version of Next.js is affected by a known security vulnerability"로 한 번 멈추고 `next upgrade --agent=security`를 제안한다(재시도하면 경고만 남기고 빌드는 통과). 이번 변경 범위(새 의존성 금지, Next.js 버전 변경 없음)에서 처리할 일이 아니라 조치하지 않았다 — 메인 에이전트가 사용자와 별도로 업그레이드 여부를 논의하기로 함.
+15. **(변경 07) 실제 Riot 계정 대조는 1명(`너희는개다#KR1`)만 했다.** 모스트 1~2종·집계 0·5분 미만 변형은 실데이터로 확인하지 못했다(코드 읽기로만 확인).
+16. **(변경 08) 평균 티어는 보류다.** 참가자별 league-v4가 매치당 9회(20건이면 최대 180회)라 현재 호출 제한기로는 즉시 응답이 안 된다. 별도 지연 로딩 엔드포인트와 호출 예산 설계(`!백엔드`)가 먼저 필요하고, 사용자가 진행을 명시하지 않았다. 화면·코드에 없다.
+17. **(변경 08, 경미) 라인전 "로딩 중" 상태를 실제 화면으로 못 봤다.** 백엔드가 경기별로 6시간 캐시하는 소환사라 이번 확인에서는 첫 측정 때 이미 전부 채워져 있었다. 로딩·`pending` 재시도·오류 `-`는 Build의 가짜 서버 결과와 코드 읽기로만 확인했다.
+18. **(변경 08, 경미) JS가 꺼지거나 수화 직전에는 라인전 칸이 `-`(툴팁 "구할 수 없는 게임")로 보인다.** 서버가 값을 알 수 없어 정한 선택이라 거짓 로딩은 없지만, 툴팁 문구가 그 순간에는 사실과 다르다. 개발 모드(StrictMode)에서는 마운트 때 요청이 한 번 더 나가는 것도 같은 구조에서 나온다(운영 빌드는 해당 없음).
+19. **(변경 08, 경미) 매치 행마다 키보드 정지점이 2개(킬관여·라인전 툴팁) 늘어 20행이면 40개다.** 키보드로 목록을 지나가기 번거로울 수 있다. 필요하면 툴팁을 행 단위 하나로 합치거나 `tabIndex`를 뺀다.
+20. **(문서) `front_spec.md` 11장 결정 표가 D38과 D39 사이의 `---` 때문에 둘로 끊겨 D39~D65 행이 표로 안 그려진다.** 내용 손실은 없다. 줄 하나를 옮기면 된다(Build 몫, `front_review.md` 2장).
+21. **저장소 루트의 `Ranked Emblems Latest/` 원본 폴더가 아직 untracked다.** 화면은 `frontend/public/rank-emblems/`의 복사본을 쓰므로(`RankList.tsx`) 원본 폴더는 정리하거나 `.gitignore`에 넣을지 사용자가 정해야 한다(별도 작업). 같은 이유로 spec D34("엠블럼은 글자 배지만")는 현재 화면과 맞지 않아 다음 Plan에서 정정이 필요하다.

@@ -49,7 +49,7 @@ export default function SummonerSearchForm() {
       role="search"
       aria-label="전적 검색"
       onSubmit={handleSubmit}
-      className="relative ml-auto flex min-w-0 max-w-xs flex-1 items-center gap-2"
+      className="relative order-last flex w-full min-w-0 items-center gap-2 sm:order-none sm:ml-auto sm:max-w-[560px] sm:flex-1"
     >
       <label htmlFor="riotid-search" className="sr-only">
         소환사 이름#태그 검색
@@ -63,11 +63,11 @@ export default function SummonerSearchForm() {
         autoComplete="off"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? "riotid-search-error" : undefined}
-        className="w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:border-accent"
+        className="w-full h-11 rounded-lg border border-border bg-surface px-4 text-base text-foreground placeholder:text-muted focus:border-accent"
       />
       <button
         type="submit"
-        className="shrink-0 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-accent-foreground hover:opacity-90"
+        className="h-11 shrink-0 rounded-lg bg-accent px-5 text-base font-semibold text-accent-foreground hover:opacity-90"
       >
         검색
       </button>

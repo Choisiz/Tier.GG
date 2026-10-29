@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import MatchSummary from "@/components/summoners/MatchSummary";
 import MatchList from "@/components/summoners/MatchList";
 import ProfileHeader from "@/components/summoners/ProfileHeader";
 import RankList from "@/components/summoners/RankList";
@@ -76,6 +77,8 @@ export default async function SummonerPage({ params }: Props) {
     );
   }
 
+  // force-dynamic이라 렌더 시각 = 조회 시각. 갱신하기 쿨다운·"N분 전 조회"의 기준이다 (변경 09)
+  const fetchedAt = new Date().toISOString();
   const response = state.data;
   const itemIds = new Set<number>();
   for (const match of response.matches) {
@@ -102,14 +105,15 @@ export default async function SummonerPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
-      <ProfileHeader profile={view.profile} />
+      <ProfileHeader profile={view.profile} headline={view.headline} fetchedAt={fetchedAt} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr] lg:items-start">
-        <RankList leagues={view.leagues} />
+        <RankList solo={view.soloLeague} flex={view.flexLeague} />
         <section aria-labelledby="matches-heading" className="min-w-0">
-          <h2 id="matches-heading" className="mb-3 text-sm font-semibold text-muted">
-            최근 매치 (최대 20건)
+          <h2 id="matches-heading" className="sr-only">
+            최근 매치
           </h2>
-          <MatchList matches={view.matches} />
+          {view.matches.length > 0 && <MatchSummary summary={view.summary} />}
+          <MatchList matches={view.matches} puuid={response.summoner.puuid} />
         </section>
       </div>
     </div>

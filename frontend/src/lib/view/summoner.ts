@@ -7,6 +7,7 @@ import type {
 } from "@/lib/api/types";
 import { profileIconUrl } from "@/lib/ddragon/images";
 import type { ChampionSummary, IconInfo, ItemInfo, RuneTreeInfo } from "@/lib/ddragon/types";
+import { formatKillParticipation } from "./laneGold";
 import { formatCsPerMinute, formatDuration, formatKda, formatPercent, formatRelativeKo } from "./format";
 
 /* ───────── 랭크 (D33, D34) ───────── */
@@ -39,7 +40,7 @@ const RANK_LABELS: Record<string, string> = { I: "1", II: "2", III: "3", IV: "4"
 /** 상위 4티어(마스터+)는 랭크(단계)가 없다 */
 const RANKLESS_TIERS = new Set(["MASTER", "GRANDMASTER", "CHALLENGER"]);
 
-/** "에메랄드 2" (D34: 글자 배지만) */
+/** "에메랄드 2" (마스터 이상은 단계 없이 "마스터") */
 function tierLabel(league: League): string {
   const tier = TIER_LABELS[league.tier] ?? league.tier;
   if (RANKLESS_TIERS.has(league.tier)) return tier;
@@ -58,6 +59,7 @@ function tierEmblemUrl(tier: string): string | undefined {
 
 export type LeagueView = {
   queueLabel: string;
+  hotStreak: boolean;
   tierLabel: string;
   tierEmblemUrl?: string;
   leaguePoints: number;
@@ -71,6 +73,7 @@ function toLeagueView(league: League): LeagueView {
   const winRate = total > 0 ? formatPercent((league.wins / total) * 100) : "0.0%";
   return {
     queueLabel: queueLabel(league.queueType),
+    hotStreak: league.hotStreak,
     tierLabel: tierLabel(league),
     tierEmblemUrl: tierEmblemUrl(league.tier),
     leaguePoints: league.leaguePoints,
@@ -207,6 +210,8 @@ export type MatchView = {
   deaths: number;
   assists: number;
   kda: string;
+  /** 킬관여 "62%", 값이 없으면 "-" (2026-10-30 추가) */
+  killParticipation: string;
   cs: number;
   csPerMinute: string;
   items: SlotView[];
@@ -262,6 +267,7 @@ function toMatchView(match: MatchSummary, ctx: MatchContext): MatchView {
     deaths: match.deaths,
     assists: match.assists,
     kda: formatKda(match.kills, match.deaths, match.assists),
+    killParticipation: formatKillParticipation(match.killParticipation),
     cs: match.cs,
     csPerMinute: formatCsPerMinute(match.cs, match.gameDurationSec),
     items: match.items.map((itemId) => toSlotView(itemId, ctx.items)),
@@ -273,12 +279,107 @@ function toMatchView(match: MatchSummary, ctx: MatchContext): MatchView {
   };
 }
 
+/* ───────── 최근 게임 요약 카드 (변경 07) ───────── */
+
+/** 5분 미만 게임은 요약에서 뺀다 (다시하기 근사, D39) */
+const MIN_SUMMARY_DURATION_SEC = 300;
+
+export type MostChampionView = {
+  champion: ChampionIconView;
+  games: number;
+  /** 정수 % */
+  winRate: number;
+  kda: string;
+};
+
+export type MatchSummaryView = {
+  /** 집계한 게임 수 N (5분 미만 제외 후) */
+  count: number;
+  wins: number;
+  losses: number;
+  /** 정수 % */
+  winRate: number;
+  avgKills: string;
+  avgDeaths: string;
+  avgAssists: string;
+  kda: string;
+  /** 5분 미만이라 뺀 게임 수 */
+  excludedCount: number;
+  most: MostChampionView[];
+};
+
+/**
+ * 받은 매치 전체(최대 20건)를 합산해 요약한다. 게임별 KDA의 평균이 아니라 K·D·A 합으로 계산한다.
+ * 모스트 3 정렬: 게임 수 → 승 수 → 최근 플레이(matches가 최신순이라 처음 나타난 순서).
+ */
+export function toMatchSummary(
+  matches: MatchSummary[],
+  champions: Map<string, ChampionSummary>,
+): MatchSummaryView {
+  const counted = matches.filter((m) => m.gameDurationSec >= MIN_SUMMARY_DURATION_SEC);
+  const count = counted.length;
+  const wins = counted.filter((m) => m.win).length;
+  const sum = (pick: (m: MatchSummary) => number) => counted.reduce((acc, m) => acc + pick(m), 0);
+  const kills = sum((m) => m.kills);
+  const deaths = sum((m) => m.deaths);
+  const assists = sum((m) => m.assists);
+  const avg = (total: number) => (count > 0 ? (total / count).toFixed(1) : "0.0");
+
+  type Acc = { championId: number; games: number; wins: number; k: number; d: number; a: number };
+  const byChampion = new Map<number, Acc>(); // Map은 삽입순 = 최근 플레이 순서
+  for (const m of counted) {
+    const acc = byChampion.get(m.championId) ?? {
+      championId: m.championId,
+      games: 0,
+      wins: 0,
+      k: 0,
+      d: 0,
+      a: 0,
+    };
+    acc.games += 1;
+    if (m.win) acc.wins += 1;
+    acc.k += m.kills;
+    acc.d += m.deaths;
+    acc.a += m.assists;
+    byChampion.set(m.championId, acc);
+  }
+  const most = [...byChampion.values()]
+    // Array.prototype.sort는 안정 정렬이라 동률이면 삽입순(최근 먼저)이 유지된다
+    .sort((x, y) => y.games - x.games || y.wins - x.wins)
+    .slice(0, 3)
+    .map((acc) => ({
+      champion: toChampionIconView(acc.championId, champions),
+      games: acc.games,
+      winRate: Math.round((100 * acc.wins) / acc.games),
+      kda: formatKda(acc.k, acc.d, acc.a),
+    }));
+
+  return {
+    count,
+    wins,
+    losses: count - wins,
+    winRate: count > 0 ? Math.round((100 * wins) / count) : 0,
+    avgKills: avg(kills),
+    avgDeaths: avg(deaths),
+    avgAssists: avg(assists),
+    kda: formatKda(kills, deaths, assists),
+    excludedCount: matches.length - count,
+    most,
+  };
+}
+
 /* ───────── 전체 화면용 데이터 ───────── */
 
 export type SummonerPageView = {
   profile: SummonerProfileView;
-  leagues: LeagueView[];
+  /** 솔로/듀오 슬롯. 해당 큐 항목이 없으면 null (Unranked 카드) */
+  soloLeague: LeagueView | null;
+  /** 자유랭크 슬롯. 해당 큐 항목이 없으면 null */
+  flexLeague: LeagueView | null;
+  /** 프로필 헤더 티어 줄 기준: 솔로 → 자유랭크 → null(Unranked) (변경 09 Q4) */
+  headline: { league: LeagueView; isFlex: boolean } | null;
   matches: MatchView[];
+  summary: MatchSummaryView;
 };
 
 export function toSummonerPageView(
@@ -286,6 +387,12 @@ export function toSummonerPageView(
   version: string,
   ctx: MatchContext,
 ): SummonerPageView {
+  const find = (queueType: string) => {
+    const league = response.leagues.find((l) => l.queueType === queueType);
+    return league ? toLeagueView(league) : null;
+  };
+  const soloLeague = find("RANKED_SOLO_5x5");
+  const flexLeague = find("RANKED_FLEX_SR");
   return {
     profile: {
       gameName: response.summoner.gameName,
@@ -293,8 +400,15 @@ export function toSummonerPageView(
       level: response.summoner.summonerLevel,
       iconUrl: profileIconUrl(version, response.summoner.profileIconId),
     },
-    // 2026-10-27: 자유랭크 카드 삭제, 솔로/듀오만 보여준다
-    leagues: response.leagues.filter((l) => l.queueType === "RANKED_SOLO_5x5").map(toLeagueView),
+    // 2026-10-30: 자유랭크 카드를 다시 보여준다(2026-10-27 삭제를 되돌림). 응답 순서와 무관하게 큐로 찾는다
+    soloLeague,
+    flexLeague,
+    headline: soloLeague
+      ? { league: soloLeague, isFlex: false }
+      : flexLeague
+        ? { league: flexLeague, isFlex: true }
+        : null,
     matches: response.matches.map((match) => toMatchView(match, ctx)),
+    summary: toMatchSummary(response.matches, ctx.champions),
   };
 }

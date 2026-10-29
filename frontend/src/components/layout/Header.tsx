@@ -7,8 +7,8 @@ const NAV_ITEMS = [{ href: "/champions", label: "챔피언" }];
 
 export default function Header() {
   return (
-    <header className="sticky top-0 z-40 h-14 border-b border-border bg-background/90 backdrop-blur">
-      <div className="mx-auto flex h-full w-full max-w-6xl items-center gap-4 px-4 sm:gap-6 sm:px-6">
+    <header className="z-40 border-b border-border bg-background/90 backdrop-blur sm:sticky sm:top-0 sm:h-16">
+      <div className="mx-auto flex h-full w-full max-w-6xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 sm:flex-nowrap sm:gap-6 sm:px-6 sm:py-0">
         <Link href="/" className="shrink-0 text-lg font-extrabold tracking-tight">
           Tier<span className="text-accent">.GG</span>
         </Link>

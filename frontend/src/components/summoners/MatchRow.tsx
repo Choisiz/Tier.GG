@@ -1,6 +1,7 @@
 import Image from "next/image";
 import MatchExpandToggle from "@/components/summoners/MatchExpandToggle";
 import Tooltip from "@/components/common/Tooltip";
+import LaneGoldCell from "@/components/summoners/LaneGoldCell";
 import type { MatchView, ParticipantView, SlotView } from "@/lib/view/summoner";
 
 /** 2026-10-27: 리스트 크기 안에서 아이템·스펠·룬 아이콘을 두 차례 키움 (24px→28px→32px) */
@@ -204,9 +205,21 @@ export default function MatchRow({ match }: { match: MatchView }) {
         </div>
       </div>
 
+      {/* CS 칸 (변경 08): 킬관여(서버 값) / 라인전 15분 골드(클라이언트 지연 로딩) / CS / 분당 CS.
+          줄 높이를 고정(16px·16px·20px·16px)해 라인전 값이 채워져도 칸·행 높이가 변하지 않는다 */}
       <div className="w-24 shrink-0 text-sm">
-        <p>{match.cs} CS</p>
-        <p className="text-xs text-muted">{match.csPerMinute} /분</p>
+        <p className="h-4 text-xs leading-4">
+          <Tooltip
+            content="킬관여: 우리 팀 킬 중 내가 킬이나 어시스트로 관여한 비율"
+            className="gap-1"
+          >
+            <span className="text-muted">킬관여</span>
+            <span className="tabular-nums">{match.killParticipation}</span>
+          </Tooltip>
+        </p>
+        <LaneGoldCell matchId={match.matchId} />
+        <p className="leading-5">{match.cs} CS</p>
+        <p className="text-xs leading-4 text-muted">{match.csPerMinute} /분</p>
       </div>
 
       {/* 왼쪽 5(같은 팀) - 오른쪽 5(상대 팀) 세로 두 열로 나란히 */}

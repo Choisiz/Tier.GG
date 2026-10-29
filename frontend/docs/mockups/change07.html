@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>변경 07 후속 2 목업 - 요약 카드 크기·배치 (정적, 모양 확인용)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: { colors: {
+  background:'#0b1020', surface:'#141b2f', 'surface-2':'#1d2540', border:'#2a3456',
+  foreground:'#e7eaf3', muted:'#a4adc6', accent:'#e3b456', win:'#5a9bff', lose:'#f16565' } } } }
+</script>
+<style>body{background:#0b1020;color:#e7eaf3;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif}</style>
+</head>
+<body class="min-h-screen">
+<!-- 정적 목업. 데스크톱(944px 상자 = 1280px 화면의 우측 열)과 모바일(360px 상자)을 클래스 접두어 없이 강제로 그려 폭에 상관없이 같게 보인다.
+     높이는 각 카드 아래에 JS로 측정해 표시한다. 이미지 자리는 색 상자. -->
+<div class="mx-auto max-w-[1000px] px-4 py-6">
+  <div class="mb-6 rounded-lg border border-accent/40 bg-surface p-3 text-xs text-muted">
+    <p class="font-semibold text-accent">변경 07 후속 2 목업</p>
+    <p>변경점: ① "최근 N게임 기준 · 모든 큐 · 5분 미만 제외" 줄 삭제 ② 도넛·초상화 확대 ③ 초상화 오른쪽에 KDA. 1) 데스크톱 현재 vs 배치 3안, 2) 360px 현재 vs 3안, 3) 상태, 4) 도넛 크기 후보. 카드 높이(px)는 카드 아래에 측정값으로 표시된다.</p>
+  </div>
+
+  <h2 class="mb-2 text-sm font-semibold text-accent">1. 데스크톱 (우측 열 944px)</h2>
+  <div class="space-y-5 overflow-x-auto" id="desk"></div>
+
+  <h2 class="mt-12 mb-2 text-sm font-semibold text-accent">2. 모바일 360px</h2>
+  <div class="flex flex-wrap items-start gap-6" id="mob"></div>
+
+  <h2 class="mt-12 mb-2 text-sm font-semibold text-accent">3. 상태 (추천안, 데스크톱/360px)</h2>
+  <div class="flex flex-wrap items-start gap-6" id="states"></div>
+
+  <h2 class="mt-12 mb-2 text-sm font-semibold text-accent">4. 도넛 크기 후보 (모바일 / 데스크톱)</h2>
+  <div class="flex flex-wrap items-end gap-8" id="donuts"></div>
+</div>
+
+<script>
+const band = 'rounded-lg border border-border border-t-4 border-t-accent bg-surface-2';
+function donut(d,px){
+  const wr=Math.round(100*d.w/d.n), fs = px>=80?'text-lg':(px>=64?'text-base':'text-xs');
+  return `<div class="relative shrink-0" style="width:${px}px;height:${px}px" role="img" aria-label="${d.n}전 ${d.w}승 ${d.l}패, 승률 ${wr}%">
+   <svg viewBox="0 0 36 36" class="size-full -rotate-90" aria-hidden="true"><circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f16565" stroke-width="4"/>${wr>0?`<circle cx="18" cy="18" r="15.9155" fill="none" stroke="#5a9bff" stroke-width="4" stroke-dasharray="${wr} ${100-wr}"/>`:''}</svg>
+   <span class="absolute inset-0 flex items-center justify-center font-bold ${fs}" aria-hidden="true">${wr}%</span></div>`;
+}
+const icon=(px)=>`<span class="block shrink-0 rounded-md bg-background" style="width:${px}px;height:${px}px"></span>`;
+const left=(d,px)=>`<div class="flex items-center gap-3">${donut(d,px)}<div class="min-w-0 text-sm"><p class="font-bold">${d.n}전</p><p><span class="font-bold text-win">${d.w}승</span> <span class="font-bold text-lose">${d.l}패</span></p></div></div>`;
+const kdaBlock=(d,sz)=>`<div><p class="${sz}font-semibold">${d.avgK} / ${d.avgD} / ${d.avgA}</p><p class="text-xs text-muted">${d.kda} KDA</p><p class="text-[11px] text-muted">평균 · (K+A)/D</p></div>`;
+
+// ---- 모스트 칸 변형 ----
+const cells = {
+  old: (m,mob)=>`<li class="flex min-w-0 max-w-28 flex-1 flex-col items-center gap-1 text-center ${mob?'':'min-w-[5.5rem]'}">${icon(mob?40:44)}<span class="whitespace-nowrap text-xs font-semibold">${m.wr}% <span class="font-normal text-muted">· ${m.g}게임</span></span><span class="whitespace-nowrap text-[11px] leading-tight text-muted">${m.kda} KDA</span></li>`,
+  // 데스크톱 A: 초상화 | KDA(굵게) / 승률·게임(흐리게)
+  A: (m,mob,ic)=>`<li class="flex items-center gap-2">${icon(ic)}<div class="whitespace-nowrap"><p class="text-sm font-semibold">${m.kda} KDA</p><p class="text-xs text-muted">${m.wr}% · ${m.g}게임</p></div></li>`,
+  // 데스크톱 B: 초상화 | KDA, 승률·게임은 초상화 줄 아래 가운데
+  B: (m,mob,ic)=>`<li class="flex flex-col items-center gap-1"><div class="flex items-center gap-2">${icon(ic)}<p class="whitespace-nowrap text-sm font-semibold">${m.kda}<span class="text-xs font-normal text-muted"> KDA</span></p></div><p class="whitespace-nowrap text-xs text-muted">${m.wr}% · ${m.g}게임</p></li>`,
+  // 데스크톱 C: 초상화 | KDA / 승률 / 게임 3줄
+  C: (m,mob,ic)=>`<li class="flex items-center gap-2">${icon(ic)}<div class="whitespace-nowrap leading-snug"><p class="text-sm font-semibold">${m.kda} KDA</p><p class="text-xs text-muted">승률 ${m.wr}%</p><p class="text-xs text-muted">${m.g}게임</p></div></li>`,
+  // 모바일 M3(추천): 초상화 | KDA 두 줄, 승률·게임은 아래 한 줄
+  M3: (m,mob,ic)=>`<li class="flex min-w-0 flex-1 flex-col items-center gap-1"><div class="flex items-center gap-1.5">${icon(ic)}<div class="leading-tight"><p class="text-sm font-semibold">${m.kda}</p><p class="text-[11px] text-muted">KDA</p></div></div><p class="whitespace-nowrap text-[11px] text-muted">${m.wr}% · ${m.g}게임</p></li>`,
+  // 모바일 M1: 세로 3행 (초상화 | 승률·게임 | KDA)
+  M1: (m,mob,ic)=>`<li class="flex items-center gap-3 py-1">${icon(ic)}<div class="min-w-0 flex-1 text-sm"><span class="font-semibold">${m.wr}%</span> <span class="text-xs text-muted">· ${m.g}게임</span></div><p class="text-sm font-semibold">${m.kda} <span class="text-xs font-normal text-muted">KDA</span></p></li>`,
+};
+
+// opts: mode 'd'|'m', cell, donutPx, iconPx, header(bool), listDir
+function card(d,o){
+  if(d.n===0) return `<section class="${band.replace('bg-surface-2','bg-surface-2')} p-4 text-center text-sm text-muted" style="border-top-width:0">요약할 게임이 없습니다</section>`.replace('border-t-4 border-t-accent','border-t-0');
+  const D=o.mode==='d', pad=D?'p-4':'p-3';
+  const head = o.header?`<p class="mb-2 text-xs font-semibold text-muted">최근 ${d.n}게임 기준 · 모든 큐${d.excluded?` · 5분 미만 ${d.excluded}게임 제외`:''}</p>`:'';
+  const most = d.most.map(m=>cells[o.cell](m,!D,o.iconPx)).join('');
+  const listCls = o.cell==='M1' ? 'flex flex-col gap-0.5' : 'flex gap-'+(D?'5':'1');
+  const mostBlock = d.most.length?`<div class="${D?'border-l border-border pl-4':'col-span-2 border-t border-border pt-3'}"><p class="mb-1 text-[11px] text-muted">모스트 챔피언</p><ol class="${listCls}">${most}</ol></div>`:'';
+  const sr = o.header?'':`<p class="sr-only">모든 큐 기준${d.excluded?`, 5분 미만 ${d.excluded}게임 제외`:''}</p>`;
+  return `<section class="${band} ${pad}" data-measure>${head}${sr}
+    <div class="grid gap-x-4 gap-y-3 ${D?'grid-cols-[1fr_1fr_auto] items-center':'grid-cols-2'}">${left(d,o.donutPx)}${kdaBlock(d,'text-sm ')}${mostBlock}</div></section>`;
+}
+const wrap=(title,html,w)=>`<div style="width:${w}px;max-width:100%"><p class="mb-1 text-xs text-accent">${title}</p>${html}<p class="mt-1 text-xs text-muted" data-h></p></div>`;
+
+const full={n:19,w:11,l:8,avgK:'5.2',avgD:'3.1',avgA:'6.8',kda:'3.87',excluded:1,most:[
+ {wr:83,kda:'3.42',g:6},{wr:60,kda:'2.85',g:5},{wr:100,kda:'4.10',g:3}]};
+const m2={n:3,w:2,l:1,avgK:'4.7',avgD:'2.0',avgA:'8.0',kda:'6.35',excluded:0,most:[{wr:100,kda:'5.50',g:2},{wr:0,kda:'8.00',g:1}]};
+const m1={n:2,w:1,l:1,avgK:'3.0',avgD:'5.0',avgA:'4.0',kda:'1.40',excluded:0,most:[{wr:50,kda:'1.40',g:2}]};
+const none={n:0};
+
+// 데스크톱 비교 (현재 vs A/B/C). 현재 = 도넛 64, 초상화 44, 헤더 줄 있음, 칸이 세로 쌓임
+const OLDD={mode:'d',cell:'old',donutPx:64,iconPx:44,header:true}, OLDM={mode:'m',cell:'old',donutPx:48,iconPx:40,header:true};
+const NEWD=(c)=>({mode:'d',cell:c,donutPx:88,iconPx:56,header:false});
+document.getElementById('desk').innerHTML =
+ wrap('현재 (구현됨)',card(full,OLDD),944)+
+ wrap('안 A (추천): 초상화 | KDA 굵게 + 승률·게임 흐리게 (2줄)',card(full,NEWD('A')),944)+
+ wrap('안 B: 초상화 | KDA, 승률·게임은 아래 한 줄',card(full,NEWD('B')),944)+
+ wrap('안 C: 초상화 | KDA / 승률 / 게임 (3줄)',card(full,NEWD('C')),944);
+
+const NEWM=(c,ic=48)=>({mode:'m',cell:c,donutPx:64,iconPx:ic,header:false});
+document.getElementById('mob').innerHTML =
+ wrap('현재 (구현됨)',card(full,OLDM),360)+
+ wrap('M3 (추천): 3칸 가로, 초상화 48 | KDA, 승률·게임은 아래',card(full,NEWM('M3')),360)+
+ wrap('M1: 세로 3행 (초상화 | 승률·게임 | KDA)',card(full,NEWM('M1',44)),360)+
+ wrap('M2: 초상화만 키움, KDA는 아래 (요청 3번 미적용)',card(full,{mode:'m',cell:'old',donutPx:64,iconPx:52,header:false}),360);
+
+document.getElementById('states').innerHTML =
+ [['모스트 2종','d',m2],['모스트 1종','d',m1],['집계 0게임','d',none]].map(([t,m,d])=>wrap(t+' (944px)',card(d,NEWD('A')),600)).join('')+
+ [['모스트 2종','m',m2],['모스트 1종','m',m1],['집계 0게임','m',none]].map(([t,m,d])=>wrap(t+' (360px)',card(d,NEWM('M3')),360)).join('');
+
+document.getElementById('donuts').innerHTML = [[48,'현재 모바일 48'],[64,'모바일 후보 64 (추천)'],[72,'모바일 72'],[64,'현재 데스크톱 64'],[88,'데스크톱 후보 88 (추천)'],[96,'데스크톱 96']]
+ .map(([px,t])=>`<div class="text-center">${donut(full,px)}<p class="mt-1 text-xs text-muted">${t}</p></div>`).join('');
+
+// 높이 측정
+setTimeout(()=>{document.querySelectorAll('[data-h]').forEach(p=>{const s=p.parentElement.querySelector('section');if(s)p.textContent='카드 높이 '+(Math.round(s.getBoundingClientRect().height*100)/100)+'px';});},600);
+</script>
+</body>
+</html>
