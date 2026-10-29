@@ -3,6 +3,7 @@ import { isBuildPhase } from "./buildPhase";
 import { fetchApi, type ApiResult } from "./client";
 import type {
   ChampionStatsResponse,
+  LaneGoldResponse,
   MetaResponse,
   Position,
   SummonerResponse,
@@ -103,4 +104,22 @@ export async function getSummoner(
     default:
       return { status: "unavailable" };
   }
+}
+
+/**
+ * GET /matches/lane-gold (계약 2-6, 변경 08). 라인전 15분 골드를 지연 로딩할 때 Route Handler가 부른다.
+ * 요청마다 새로 부른다(`no-store`). 호출 한도 때문에 못 구한 경기는 응답 안에서 `pending`으로 온다(HTTP 200).
+ * 오류 종류(`riot_unavailable` 등)는 그대로 돌려줘 Route Handler가 상태 코드로 옮긴다.
+ * @param matchIds 1~10개 (형식 검사는 Route Handler가 먼저 한다)
+ */
+export async function getLaneGold(
+  puuid: string,
+  matchIds: string[],
+): Promise<ApiResult<LaneGoldResponse>> {
+  return fetchApi<LaneGoldResponse>(
+    `/matches/lane-gold?puuid=${encodeURIComponent(puuid)}&matchIds=${matchIds
+      .map(encodeURIComponent)
+      .join(",")}`,
+    { cache: "no-store" },
+  );
 }

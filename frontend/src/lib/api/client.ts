@@ -25,6 +25,11 @@ export type ApiResult<T> =
 
 let missingBaseUrlLogged = false;
 
+/** 로그에 남길 경로에서 `puuid` 값을 가린다 (라인전 프록시, 변경 08) */
+function redactPath(path: string): string {
+  return path.replace(/([?&]puuid=)[^&]*/, "$1***");
+}
+
 function isErrorBody(value: unknown): value is ApiErrorBody {
   if (typeof value !== "object" || value === null || !("error" in value)) {
     return false;
@@ -89,7 +94,7 @@ export async function fetchApi<T>(
     );
   } catch (error) {
     const reason = error instanceof Error ? error.name : "unknown";
-    reportUnavailable(path, `연결 실패(${reason})`);
+    reportUnavailable(redactPath(path), `연결 실패(${reason})`);
     return { ok: false, kind: "unavailable" };
   }
 
@@ -97,7 +102,7 @@ export async function fetchApi<T>(
   try {
     body = await res.json();
   } catch {
-    reportUnavailable(path, `JSON 아님(HTTP ${res.status})`);
+    reportUnavailable(redactPath(path), `JSON 아님(HTTP ${res.status})`);
     return { ok: false, kind: "unavailable" };
   }
 
@@ -108,9 +113,9 @@ export async function fetchApi<T>(
   const code = isErrorBody(body) ? body.error.code : null;
   const kind = classifyError(res.status, code);
   if (kind === "invalid") {
-    console.error(`[api] 잘못된 요청 ${path} → HTTP ${res.status} ${code}`);
+    console.error(`[api] 잘못된 요청 ${redactPath(path)} → HTTP ${res.status} ${code}`);
   } else if (kind === "unavailable") {
-    reportUnavailable(path, `HTTP ${res.status} ${code ?? "-"}`);
+    reportUnavailable(redactPath(path), `HTTP ${res.status} ${code ?? "-"}`);
   }
   return { ok: false, kind };
 }

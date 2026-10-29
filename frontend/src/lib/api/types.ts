@@ -188,6 +188,8 @@ export type MatchSummary = {
   kills: number;
   deaths: number;
   assists: number;
+  /** 내 킬관여 % (정수, 팀 킬 합이 0이면 null → 화면 "-", 2026-10-30 추가) */
+  killParticipation: number | null;
   cs: number;
   goldEarned: number;
   /** item0~5, 빈 칸 0 */
@@ -209,6 +211,22 @@ export type SummonerResponse = {
   summoner: SummonerProfile;
   leagues: League[];
   matches: MatchSummary[];
+};
+
+/** 라인전 15분 골드 결과 1건 (계약 2-6). `ready`가 아니면 숫자는 null */
+export type LaneGoldItem = {
+  matchId: string;
+  state: "ready" | "unavailable" | "pending";
+  /** 내 쪽 비율(정수 0~100). 상대 쪽 = 100 - myPercent */
+  myPercent: number | null;
+  myGold: number | null;
+  enemyGold: number | null;
+};
+
+/** GET /matches/lane-gold (계약 2-6). `retryAfterSec`는 pending이 있을 때만 1~120, 없으면 null */
+export type LaneGoldResponse = {
+  results: LaneGoldItem[];
+  retryAfterSec: number | null;
 };
 
 /** 오류 응답 (계약 3장). 분기는 `code`로만 한다 */
