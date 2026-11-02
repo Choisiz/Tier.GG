@@ -1,0 +1,1520 @@
+{
+ "version": "16.21.1",
+ "source": "Data Dragon 16.21.1 ko_KR champion.json (key, id, name, tags만 추림)",
+ "champions": [
+  {
+   "key": 1,
+   "id": "Annie",
+   "name": "애니",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 2,
+   "id": "Olaf",
+   "name": "올라프",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 3,
+   "id": "Galio",
+   "name": "갈리오",
+   "tags": [
+    "Tank",
+    "Mage"
+   ]
+  },
+  {
+   "key": 4,
+   "id": "TwistedFate",
+   "name": "트위스티드 페이트",
+   "tags": [
+    "Mage",
+    "Marksman"
+   ]
+  },
+  {
+   "key": 5,
+   "id": "XinZhao",
+   "name": "신 짜오",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 6,
+   "id": "Urgot",
+   "name": "우르곳",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 7,
+   "id": "Leblanc",
+   "name": "르블랑",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "key": 8,
+   "id": "Vladimir",
+   "name": "블라디미르",
+   "tags": [
+    "Mage",
+    "Fighter"
+   ]
+  },
+  {
+   "key": 9,
+   "id": "Fiddlesticks",
+   "name": "피들스틱",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 10,
+   "id": "Kayle",
+   "name": "케일",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "key": 11,
+   "id": "MasterYi",
+   "name": "마스터 이",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 12,
+   "id": "Alistar",
+   "name": "알리스타",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "key": 13,
+   "id": "Ryze",
+   "name": "라이즈",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 14,
+   "id": "Sion",
+   "name": "사이온",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ]
+  },
+  {
+   "key": 15,
+   "id": "Sivir",
+   "name": "시비르",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "key": 16,
+   "id": "Soraka",
+   "name": "소라카",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "key": 17,
+   "id": "Teemo",
+   "name": "티모",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "key": 18,
+   "id": "Tristana",
+   "name": "트리스타나",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 19,
+   "id": "Warwick",
+   "name": "워윅",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 20,
+   "id": "Nunu",
+   "name": "누누와 윌럼프",
+   "tags": [
+    "Tank",
+    "Mage"
+   ]
+  },
+  {
+   "key": 21,
+   "id": "MissFortune",
+   "name": "미스 포츈",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "key": 22,
+   "id": "Ashe",
+   "name": "애쉬",
+   "tags": [
+    "Marksman",
+    "Support"
+   ]
+  },
+  {
+   "key": 23,
+   "id": "Tryndamere",
+   "name": "트린다미어",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 24,
+   "id": "Jax",
+   "name": "잭스",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "key": 25,
+   "id": "Morgana",
+   "name": "모르가나",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "key": 26,
+   "id": "Zilean",
+   "name": "질리언",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "key": 27,
+   "id": "Singed",
+   "name": "신지드",
+   "tags": [
+    "Tank",
+    "Mage"
+   ]
+  },
+  {
+   "key": 28,
+   "id": "Evelynn",
+   "name": "이블린",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "key": 29,
+   "id": "Twitch",
+   "name": "트위치",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 30,
+   "id": "Karthus",
+   "name": "카서스",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 31,
+   "id": "Chogath",
+   "name": "초가스",
+   "tags": [
+    "Tank",
+    "Mage"
+   ]
+  },
+  {
+   "key": 32,
+   "id": "Amumu",
+   "name": "아무무",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "key": 33,
+   "id": "Rammus",
+   "name": "람머스",
+   "tags": [
+    "Tank"
+   ]
+  },
+  {
+   "key": 34,
+   "id": "Anivia",
+   "name": "애니비아",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 35,
+   "id": "Shaco",
+   "name": "샤코",
+   "tags": [
+    "Assassin"
+   ]
+  },
+  {
+   "key": 36,
+   "id": "DrMundo",
+   "name": "문도 박사",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ]
+  },
+  {
+   "key": 37,
+   "id": "Sona",
+   "name": "소나",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "key": 38,
+   "id": "Kassadin",
+   "name": "카사딘",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "key": 39,
+   "id": "Irelia",
+   "name": "이렐리아",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 40,
+   "id": "Janna",
+   "name": "잔나",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "key": 41,
+   "id": "Gangplank",
+   "name": "갱플랭크",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "key": 42,
+   "id": "Corki",
+   "name": "코르키",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "key": 43,
+   "id": "Karma",
+   "name": "카르마",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 44,
+   "id": "Taric",
+   "name": "타릭",
+   "tags": [
+    "Support",
+    "Tank"
+   ]
+  },
+  {
+   "key": 45,
+   "id": "Veigar",
+   "name": "베이가",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 48,
+   "id": "Trundle",
+   "name": "트런들",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 50,
+   "id": "Swain",
+   "name": "스웨인",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 51,
+   "id": "Caitlyn",
+   "name": "케이틀린",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "key": 53,
+   "id": "Blitzcrank",
+   "name": "블리츠크랭크",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "key": 54,
+   "id": "Malphite",
+   "name": "말파이트",
+   "tags": [
+    "Tank",
+    "Mage"
+   ]
+  },
+  {
+   "key": 55,
+   "id": "Katarina",
+   "name": "카타리나",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "key": 56,
+   "id": "Nocturne",
+   "name": "녹턴",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 57,
+   "id": "Maokai",
+   "name": "마오카이",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "key": 58,
+   "id": "Renekton",
+   "name": "레넥톤",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 59,
+   "id": "JarvanIV",
+   "name": "자르반 4세",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 60,
+   "id": "Elise",
+   "name": "엘리스",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "key": 61,
+   "id": "Orianna",
+   "name": "오리아나",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 62,
+   "id": "MonkeyKing",
+   "name": "오공",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 63,
+   "id": "Brand",
+   "name": "브랜드",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 64,
+   "id": "LeeSin",
+   "name": "리 신",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 67,
+   "id": "Vayne",
+   "name": "베인",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 68,
+   "id": "Rumble",
+   "name": "럼블",
+   "tags": [
+    "Fighter",
+    "Mage"
+   ]
+  },
+  {
+   "key": 69,
+   "id": "Cassiopeia",
+   "name": "카시오페아",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 72,
+   "id": "Skarner",
+   "name": "스카너",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ]
+  },
+  {
+   "key": 74,
+   "id": "Heimerdinger",
+   "name": "하이머딩거",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 75,
+   "id": "Nasus",
+   "name": "나서스",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 76,
+   "id": "Nidalee",
+   "name": "니달리",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "key": 77,
+   "id": "Udyr",
+   "name": "우디르",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 78,
+   "id": "Poppy",
+   "name": "뽀삐",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ]
+  },
+  {
+   "key": 79,
+   "id": "Gragas",
+   "name": "그라가스",
+   "tags": [
+    "Fighter",
+    "Mage"
+   ]
+  },
+  {
+   "key": 80,
+   "id": "Pantheon",
+   "name": "판테온",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 81,
+   "id": "Ezreal",
+   "name": "이즈리얼",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "key": 82,
+   "id": "Mordekaiser",
+   "name": "모데카이저",
+   "tags": [
+    "Fighter",
+    "Mage"
+   ]
+  },
+  {
+   "key": 83,
+   "id": "Yorick",
+   "name": "요릭",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 84,
+   "id": "Akali",
+   "name": "아칼리",
+   "tags": [
+    "Assassin"
+   ]
+  },
+  {
+   "key": 85,
+   "id": "Kennen",
+   "name": "케넨",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 86,
+   "id": "Garen",
+   "name": "가렌",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 89,
+   "id": "Leona",
+   "name": "레오나",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "key": 90,
+   "id": "Malzahar",
+   "name": "말자하",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 91,
+   "id": "Talon",
+   "name": "탈론",
+   "tags": [
+    "Assassin"
+   ]
+  },
+  {
+   "key": 92,
+   "id": "Riven",
+   "name": "리븐",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 96,
+   "id": "KogMaw",
+   "name": "코그모",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "key": 98,
+   "id": "Shen",
+   "name": "쉔",
+   "tags": [
+    "Tank"
+   ]
+  },
+  {
+   "key": 99,
+   "id": "Lux",
+   "name": "럭스",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 101,
+   "id": "Xerath",
+   "name": "제라스",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 102,
+   "id": "Shyvana",
+   "name": "쉬바나",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 103,
+   "id": "Ahri",
+   "name": "아리",
+   "tags": [
+    "Mage",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 104,
+   "id": "Graves",
+   "name": "그레이브즈",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "key": 105,
+   "id": "Fizz",
+   "name": "피즈",
+   "tags": [
+    "Assassin",
+    "Fighter"
+   ]
+  },
+  {
+   "key": 106,
+   "id": "Volibear",
+   "name": "볼리베어",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 107,
+   "id": "Rengar",
+   "name": "렝가",
+   "tags": [
+    "Assassin",
+    "Fighter"
+   ]
+  },
+  {
+   "key": 110,
+   "id": "Varus",
+   "name": "바루스",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "key": 111,
+   "id": "Nautilus",
+   "name": "노틸러스",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "key": 112,
+   "id": "Viktor",
+   "name": "빅토르",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 113,
+   "id": "Sejuani",
+   "name": "세주아니",
+   "tags": [
+    "Tank"
+   ]
+  },
+  {
+   "key": 114,
+   "id": "Fiora",
+   "name": "피오라",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 115,
+   "id": "Ziggs",
+   "name": "직스",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 117,
+   "id": "Lulu",
+   "name": "룰루",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "key": 119,
+   "id": "Draven",
+   "name": "드레이븐",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "key": 120,
+   "id": "Hecarim",
+   "name": "헤카림",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 121,
+   "id": "Khazix",
+   "name": "카직스",
+   "tags": [
+    "Assassin"
+   ]
+  },
+  {
+   "key": 122,
+   "id": "Darius",
+   "name": "다리우스",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 126,
+   "id": "Jayce",
+   "name": "제이스",
+   "tags": [
+    "Fighter",
+    "Marksman"
+   ]
+  },
+  {
+   "key": 127,
+   "id": "Lissandra",
+   "name": "리산드라",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 131,
+   "id": "Diana",
+   "name": "다이애나",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 133,
+   "id": "Quinn",
+   "name": "퀸",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 134,
+   "id": "Syndra",
+   "name": "신드라",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 136,
+   "id": "AurelionSol",
+   "name": "아우렐리온 솔",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 141,
+   "id": "Kayn",
+   "name": "케인",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 142,
+   "id": "Zoe",
+   "name": "조이",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 143,
+   "id": "Zyra",
+   "name": "자이라",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 145,
+   "id": "Kaisa",
+   "name": "카이사",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "key": 147,
+   "id": "Seraphine",
+   "name": "세라핀",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "key": 150,
+   "id": "Gnar",
+   "name": "나르",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 154,
+   "id": "Zac",
+   "name": "자크",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ]
+  },
+  {
+   "key": 157,
+   "id": "Yasuo",
+   "name": "야스오",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 161,
+   "id": "Velkoz",
+   "name": "벨코즈",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 163,
+   "id": "Taliyah",
+   "name": "탈리야",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 164,
+   "id": "Camille",
+   "name": "카밀",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 166,
+   "id": "Akshan",
+   "name": "아크샨",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 200,
+   "id": "Belveth",
+   "name": "벨베스",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "key": 201,
+   "id": "Braum",
+   "name": "브라움",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "key": 202,
+   "id": "Jhin",
+   "name": "진",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "key": 203,
+   "id": "Kindred",
+   "name": "킨드레드",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "key": 221,
+   "id": "Zeri",
+   "name": "제리",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "key": 222,
+   "id": "Jinx",
+   "name": "징크스",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "key": 223,
+   "id": "TahmKench",
+   "name": "탐 켄치",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "key": 233,
+   "id": "Briar",
+   "name": "브라이어",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 234,
+   "id": "Viego",
+   "name": "비에고",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 235,
+   "id": "Senna",
+   "name": "세나",
+   "tags": [
+    "Support",
+    "Marksman"
+   ]
+  },
+  {
+   "key": 236,
+   "id": "Lucian",
+   "name": "루시안",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 238,
+   "id": "Zed",
+   "name": "제드",
+   "tags": [
+    "Assassin"
+   ]
+  },
+  {
+   "key": 240,
+   "id": "Kled",
+   "name": "클레드",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "key": 245,
+   "id": "Ekko",
+   "name": "에코",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "key": 246,
+   "id": "Qiyana",
+   "name": "키아나",
+   "tags": [
+    "Assassin"
+   ]
+  },
+  {
+   "key": 254,
+   "id": "Vi",
+   "name": "바이",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 266,
+   "id": "Aatrox",
+   "name": "아트록스",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "key": 267,
+   "id": "Nami",
+   "name": "나미",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "key": 268,
+   "id": "Azir",
+   "name": "아지르",
+   "tags": [
+    "Mage",
+    "Marksman"
+   ]
+  },
+  {
+   "key": 350,
+   "id": "Yuumi",
+   "name": "유미",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "key": 360,
+   "id": "Samira",
+   "name": "사미라",
+   "tags": [
+    "Marksman",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 412,
+   "id": "Thresh",
+   "name": "쓰레쉬",
+   "tags": [
+    "Support",
+    "Tank"
+   ]
+  },
+  {
+   "key": 420,
+   "id": "Illaoi",
+   "name": "일라오이",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 421,
+   "id": "RekSai",
+   "name": "렉사이",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 427,
+   "id": "Ivern",
+   "name": "아이번",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "key": 429,
+   "id": "Kalista",
+   "name": "칼리스타",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "key": 432,
+   "id": "Bard",
+   "name": "바드",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "key": 497,
+   "id": "Rakan",
+   "name": "라칸",
+   "tags": [
+    "Support"
+   ]
+  },
+  {
+   "key": 498,
+   "id": "Xayah",
+   "name": "자야",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "key": 516,
+   "id": "Ornn",
+   "name": "오른",
+   "tags": [
+    "Tank"
+   ]
+  },
+  {
+   "key": 517,
+   "id": "Sylas",
+   "name": "사일러스",
+   "tags": [
+    "Mage",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 518,
+   "id": "Neeko",
+   "name": "니코",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 523,
+   "id": "Aphelios",
+   "name": "아펠리오스",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "key": 526,
+   "id": "Rell",
+   "name": "렐",
+   "tags": [
+    "Tank",
+    "Support"
+   ]
+  },
+  {
+   "key": 555,
+   "id": "Pyke",
+   "name": "파이크",
+   "tags": [
+    "Support",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 711,
+   "id": "Vex",
+   "name": "벡스",
+   "tags": [
+    "Mage"
+   ]
+  },
+  {
+   "key": 777,
+   "id": "Yone",
+   "name": "요네",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 799,
+   "id": "Ambessa",
+   "name": "암베사",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 800,
+   "id": "Mel",
+   "name": "멜",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 804,
+   "id": "Yunara",
+   "name": "유나라",
+   "tags": [
+    "Marksman"
+   ]
+  },
+  {
+   "key": 805,
+   "id": "Locke",
+   "name": "로크",
+   "tags": [
+    "Assassin",
+    "Mage"
+   ]
+  },
+  {
+   "key": 875,
+   "id": "Sett",
+   "name": "세트",
+   "tags": [
+    "Fighter",
+    "Tank"
+   ]
+  },
+  {
+   "key": 876,
+   "id": "Lillia",
+   "name": "릴리아",
+   "tags": [
+    "Fighter",
+    "Mage"
+   ]
+  },
+  {
+   "key": 887,
+   "id": "Gwen",
+   "name": "그웬",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "key": 888,
+   "id": "Renata",
+   "name": "레나타 글라스크",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "key": 893,
+   "id": "Aurora",
+   "name": "오로라",
+   "tags": [
+    "Mage",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 895,
+   "id": "Nilah",
+   "name": "닐라",
+   "tags": [
+    "Fighter",
+    "Assassin"
+   ]
+  },
+  {
+   "key": 897,
+   "id": "KSante",
+   "name": "크산테",
+   "tags": [
+    "Tank",
+    "Fighter"
+   ]
+  },
+  {
+   "key": 901,
+   "id": "Smolder",
+   "name": "스몰더",
+   "tags": [
+    "Marksman",
+    "Mage"
+   ]
+  },
+  {
+   "key": 902,
+   "id": "Milio",
+   "name": "밀리오",
+   "tags": [
+    "Support",
+    "Mage"
+   ]
+  },
+  {
+   "key": 904,
+   "id": "Zaahen",
+   "name": "자헨",
+   "tags": [
+    "Fighter"
+   ]
+  },
+  {
+   "key": 910,
+   "id": "Hwei",
+   "name": "흐웨이",
+   "tags": [
+    "Mage",
+    "Support"
+   ]
+  },
+  {
+   "key": 950,
+   "id": "Naafiri",
+   "name": "나피리",
+   "tags": [
+    "Assassin",
+    "Fighter"
+   ]
+  }
+ ]
+}

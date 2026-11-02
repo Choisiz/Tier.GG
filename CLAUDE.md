@@ -123,6 +123,7 @@
 | `!db`     | 테이블, 인덱스, RLS, 마이그레이션 SQL, 집계 SQL 함수 |
 | `!백엔드` | Riot API 수집 워커, 집계 함수 호출, 읽기 API         |
 | `!프론트` | API 계약과 Data Dragon을 사용한 화면                 |
+| `!ai`     | 판정 엔진·LLM·RAG 코드(`backend/src/analysis/`), RAG 지식 문서(`docs/ai/knowledge/`), 평가 세트 |
 
 ## 8. DB 작업 흐름
 
@@ -292,3 +293,42 @@
 - 결과: 무엇이 좋아졌나 (가능하면 수치)
 - 배운 점 / 한계
 ```
+
+## 12. AI 작업 흐름
+
+### 경로
+
+| 구분      | 경로                                                                 |
+| --------- | -------------------------------------------------------------------- |
+| 작업 경로 | `backend/src/analysis/`, `backend/src/cli/{analyze,feedback,rag}.ts`, `backend/test/unit/analysis/`, `backend/test/eval/`, `docs/ai/knowledge/` |
+| 기준 문서 | `docs/ai/feedback_design.md`(평가 기준), `docs/ai/feedback_metrics.md`(Riot 필드) |
+| 읽는 계약 | `docs/contracts/db_contract.md`(벡터 테이블), `docs/contracts/api_contract.md`(분석 API) |
+| 계획      | `docs/ai/ai_spec.md`     |
+| 구현 기록 | `docs/ai/ai_build.md`    |
+| 검토 기록 | `docs/ai/ai_review.md`   |
+| 현재 상태 | `docs/ai/ai_overview.md` |
+
+### 단계별 서브에이전트
+
+- Plan, Build, Review 서브에이전트 3개를 사용한다. Build와 Review는 반드시 분리한다. 기록 형식과 상태 표기는 10장과 같다.
+- `!ai`는 `backend/` 안에 코드를 두지만 기존 백엔드 파일(`src/api`, `src/collector`, `src/riot` 등)은 수정하지 않는다. 필요하면 메인 에이전트에게 보고하고 `!백엔드` 작업으로 넘긴다.
+- 계약 문서는 수정하지 않는다. 필요한 변경은 `ai_spec.md`의 "계약 변경 요청"에 적는다 (7장).
+
+### Review 적용 기준 (3장 보충)
+
+| 변경 | 적용 |
+|------|------|
+| RAG 지식 문서의 문구 추가·수정만 | 작은 수정. Review 생략, Build가 적재 검사와 검색 평가 세트를 다시 돌려 결과를 `ai_build.md`에 기록 |
+| 판정 규칙·경계값, 프롬프트, 검증기, 검색 방식 변경 | 중간~큰 변경. Plan→Build→Review. Review는 diff와 고정 판 표본 출력에 집중 |
+| 임베딩 모델 변경, 벡터 전체 재적재, 외부 유료 서비스 추가 | 항상 전체 독립 Review |
+
+### 비용 규칙
+
+- Anthropic·임베딩 등 유료 API를 부르는 실행(평가 세트, 전체 재적재)은 예상 비용을 먼저 보여 주고 사용자 승인 뒤에 한다. 단위 테스트는 유료 API를 부르지 않는다(가짜 클라이언트).
+- LLM이 숫자를 지어내지 않게, 판단은 코드가 하고 LLM 답의 숫자는 코드가 검증한다. 이 원칙을 바꾸려면 재승인을 받는다.
+
+### Review
+
+- 승인된 요구사항·완료 기준, 고정 판의 엔진 출력, (2단계부터) 숫자 검증 결과와 평가 지표, 비용·시간, 오류 시 대체 출력을 확인한다.
+- `ai_review.md`에 결과를 기록하고, 검토 후 `docs/career_log.md`에 판단 기록을 추가한다 (11장).
+- 검토가 끝나면 `docs/ai/ai_overview.md`를 덮어써서 갱신한다. 맨 끝에 "변경 이력" 표와 "해결되지 않은 점"을 둔다.
