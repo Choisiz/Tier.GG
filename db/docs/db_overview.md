@@ -3,7 +3,7 @@
 - 기준 시각: 2026-10-16 14:40 UTC (변경 04 Review가 실제 DB를 직접 조회)
 - 계약: `docs/contracts/db_contract.md` / `db_contract.dbml` **v8**
 - 마이그레이션: `001` ~ `016` 적용됨 (다음 파일은 `017`)
-- 이 문서는 **지금 상태**만 적는다. 현재 계획은 `db_spec.md`, 구현 상태는 `db_build.md`, 최근 검토는 `db_review.md`에 있다. 지난 과정 기록은 git에 있다 (정리 전 전체는 커밋 `87cfc78`). DB Review가 끝날 때마다 이 문서를 덮어쓴다 (CLAUDE.md 6장 "영역 문서 관리", 8장).
+- 이 문서는 **지금 상태**만 적는다. 현재 계획은 `db_spec.md`, 구현 상태는 `db_build.md`, 최근 검토는 `db_review.md`에 있다. 지난 과정 기록은 git에 있다 (정리 전 전체는 커밋 `24918eb`). DB Review가 끝날 때마다 이 문서를 덮어쓴다 (CLAUDE.md 6장 "영역 문서 관리", 8장).
 
 ## 목차
 
@@ -191,7 +191,7 @@ SELECT count(*) FROM champion_rune WHERE sub_perk1 >= sub_perk2;  -- 0이어야 
 | [`db/docs/db_spec.md`](db_spec.md) | 현재 계획 (테이블, 함수, 예약 작업, 테스트, 완료 기준, 결정 사항 표, 작업 범위) |
 | [`db/docs/db_build.md`](db_build.md) | 현재 구현 상태 (기능별 ✅ ⚠️ ❌ ⏸️, 명령, 최신 검증 결과) |
 | [`db/docs/db_review.md`](db_review.md) | 가장 최근 검토 (변경 04, 이슈 번호 L1~L3) |
-| git 커밋 `87cfc78` | 정리 전 문서 전체 (v1·변경 01~03 계획 원문, 이전 검토, 성능 측정 기록) |
+| git 커밋 `24918eb` | 정리 전 문서 전체 (v1·변경 01~03 계획 원문, 이전 검토, 성능 측정 기록) |
 | `db/migrations/`, `db/tests/`, `db/scripts/` | 마이그레이션 SQL, 검증 SQL, 실행기 |
 
 ---

@@ -1,7 +1,7 @@
 # DB 검토 기록 (`!db` Review)
 
 - 이 문서는 **가장 최근 검토만** 둔다. 지금은 **변경 04 검토 (2026-10-16): 보조 룬 정렬, 계약 v7 → v8**이다.
-- 이전 검토(변경 03까지)는 git 기록에 있다 (변경 03 검토는 커밋 `93e4461`의 이 파일). 아직 해결되지 않은 문제는 [`db_overview.md`](db_overview.md) "해결되지 않은 점"에 옮겨 두었다.
+- 이전 검토(변경 03까지)는 git 기록에 있다 (변경 03 검토는 커밋 `67cc2b9`의 이 파일). 아직 해결되지 않은 문제는 [`db_overview.md`](db_overview.md) "해결되지 않은 점"에 옮겨 두었다.
 - 작성: Review 서브에이전트 (2026-10-16 14:40 UTC 무렵). Build 보고를 믿지 않고 실제 DB를 직접 조회·실행해 확인했다.
 - 기준: 승인된 변경 04 계획(04-1~04-12, 결정 04-A~G, 완료 기준 04-10, 작업 범위 04-11), `db/docs/db_build.md`, 계약 v8 (`db_contract.md`, `db_contract.dbml`)
 - 대상: Supabase PostgreSQL 17.11, Session pooler, 접속 계정 `postgres`(superuser 아님)

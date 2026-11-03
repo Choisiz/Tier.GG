@@ -3,7 +3,7 @@
 - 상태: **현재 계획** (계약 v8, 마이그레이션 001~016 적용됨, 2026-10-16 승인분(변경 04)까지 반영)
 - 기준 계약: `docs/contracts/db_contract.dbml` (우선), `docs/contracts/db_contract.md`
 - 대상: Supabase 무료 플랜, PostgreSQL 17, Session pooler 접속
-- 이 문서는 **지금 유효한 계획만** 둔다. 바뀐 계획은 덮어쓴다. v1과 변경 01~03의 원문은 git 커밋 `87cfc78`의 `db/docs/db_spec.md`에 있다 (CLAUDE.md 6장 "영역 문서 관리").
+- 이 문서는 **지금 유효한 계획만** 둔다. 바뀐 계획은 덮어쓴다. v1과 변경 01~03의 원문은 git 커밋 `24918eb`의 `db/docs/db_spec.md`에 있다 (CLAUDE.md 6장 "영역 문서 관리").
 - 다음 변경은 이 문서 맨 아래에 `## 이번 변경 (승인 대기)` 절을 임시로 쓰고, Build가 끝나면 본문에 합친 뒤 지운다.
 
 ## 목차

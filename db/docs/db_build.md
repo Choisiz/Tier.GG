@@ -3,7 +3,7 @@
 - 기준: `db/docs/db_spec.md` (현재 계획), 계약 `docs/contracts/db_contract.md` / `db_contract.dbml` **v8**
 - 대상 DB: Supabase PostgreSQL 17.11, Session pooler, 접속 계정 `postgres` (superuser 아님)
 - 마지막 반영: 변경 04 Build (2026-10-16, 마이그레이션 016 적용) + 변경 04 Review (2026-10-16, PASS with issues, 코드 수정 없음)
-- 이 문서는 **지금 구현 상태만** 둔다. 예전 시도·편차·측정 기록은 git 커밋 `87cfc78`의 `db/docs/db_build.md`에 있다.
+- 이 문서는 **지금 구현 상태만** 둔다. 예전 시도·편차·측정 기록은 git 커밋 `24918eb`의 `db/docs/db_build.md`에 있다.
 - 상태 표기: ✅ 완료 / ⚠️ 부분 완료 / ❌ 실패 / ⏸️ 보류
 
 ## 목차
