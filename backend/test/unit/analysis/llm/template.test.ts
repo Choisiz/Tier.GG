@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { buildFacts } from '../../../../src/analysis/llm/facts.js';
-import { templateFor } from '../../../../src/analysis/llm/template.js';
+import { ro, templateFor } from '../../../../src/analysis/llm/template.js';
 import { verifySlot } from '../../../../src/analysis/llm/verify.js';
 import type { AnalysisResult } from '../../../../src/analysis/types.js';
 import { ctxOf, NAMES, secondResult, senaResult } from './helpers.js';
@@ -75,5 +75,12 @@ describe('템플릿: 라인전 비교 불가·장면 없음', () => {
         assert.deepEqual(verifySlot(slot, t, ctxOf(sheet)), [], `p${pid} ${slot.slot}: ${t.text}`);
       }
     }
+  });
+});
+
+describe('숫자 뒤 조사 로/으로', () => {
+  it('끝소리에 맞춰 고른다', () => {
+    for (const n of ['1', '2', '0.5', '4', '87.4', '7', '8', '9', '1.5']) assert.equal(ro(n), '로', n);
+    for (const n of ['3', '0.93', '6', '10', '2,000', '0.40', '100']) assert.equal(ro(n), '으로', n);
   });
 });

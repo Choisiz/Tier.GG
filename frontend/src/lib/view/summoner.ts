@@ -7,6 +7,7 @@ import type {
 } from "@/lib/api/types";
 import { profileIconUrl } from "@/lib/ddragon/images";
 import type { ChampionSummary, IconInfo, ItemInfo, RuneTreeInfo } from "@/lib/ddragon/types";
+import { isFeedbackEligible } from "./feedback";
 import { formatKillParticipation } from "./laneGold";
 import { formatCsPerMinute, formatDuration, formatKda, formatPercent, formatRelativeKo } from "./format";
 
@@ -220,6 +221,8 @@ export type MatchView = {
   keystone: KeystoneView;
   team: ParticipantView[];
   enemy: ParticipantView[];
+  /** AI 게임 분석 버튼을 보여 줄 판 (솔로·자유랭크 15분 이상, 변경 10) */
+  feedbackEligible: boolean;
 };
 
 type MatchContext = {
@@ -276,6 +279,7 @@ function toMatchView(match: MatchSummary, ctx: MatchContext): MatchView {
     keystone: toKeystoneView(match.keystone, ctx.keystones),
     team: match.participants.team.map((p) => toParticipantView(p, ctx.champions, maxDamage)),
     enemy: match.participants.enemy.map((p) => toParticipantView(p, ctx.champions, maxDamage)),
+    feedbackEligible: isFeedbackEligible(match.queueId, match.gameDurationSec),
   };
 }
 

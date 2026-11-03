@@ -134,3 +134,84 @@ function reportUnavailable(path: string, reason: string): void {
   }
 }
 
+
+/* ───────── POST (변경 10, 계약 2-7) ─────────
+ * 기존 `ApiFailureKind`는 그대로 두고, POST는 상태·`code`·`details`를 그대로 담아 돌려준다
+ * (화면 문구가 `details.reason`·`retryAfterSec`까지 보기 때문). 기존 GET 화면은 영향 없음.
+ */
+
+/**
+ * POST 실패.
+ * - `http`: 백엔드가 계약 3장 형식의 오류 본문을 줬다
+ * - `timeout`: `timeoutMs` 안에 답이 없음 (`TimeoutError`)
+ * - `unavailable`: `API_BASE_URL` 없음, 연결 실패, JSON 아님, 오류 본문 형식 아님
+ */
+export type FeedbackFailure =
+  | { ok: false; kind: "http"; status: number; code: string; details: Record<string, unknown> | null }
+  | { ok: false; kind: "timeout" }
+  | { ok: false; kind: "unavailable" };
+
+export type PostApiResult<T> = { ok: true; data: T } | FeedbackFailure;
+
+/**
+ * 백엔드 POST 호출. 예외를 던지지 않는다. 캐시하지 않는다(`no-store`).
+ * 로그에는 메서드·경로·상태·`code`만 남긴다. 본문(`puuid` 등)은 절대 남기지 않는다.
+ * @param path `/matches/KR_1/feedback`처럼 `/api/v1` 뒤 경로 (경로에 개인 값을 넣지 않는다)
+ */
+export async function postApi<T>(
+  path: string,
+  body: unknown,
+  options: { timeoutMs: number },
+): Promise<PostApiResult<T>> {
+  const baseUrl = getApiBaseUrl();
+  if (!baseUrl) {
+    console.warn(`[api] POST ${path} → API_BASE_URL 없음`);
+    return { ok: false, kind: "unavailable" };
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: AbortSignal.timeout(options.timeoutMs),
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.name : "unknown";
+    if (reason === "TimeoutError") {
+      console.warn(`[api] POST ${path} → 시간 초과(${options.timeoutMs}ms)`);
+      return { ok: false, kind: "timeout" };
+    }
+    console.warn(`[api] POST ${path} → 연결 실패(${reason})`);
+    return { ok: false, kind: "unavailable" };
+  }
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    console.warn(`[api] POST ${path} → JSON 아님(HTTP ${res.status})`);
+    return { ok: false, kind: "unavailable" };
+  }
+
+  if (res.ok) {
+    return { ok: true, data: json as T };
+  }
+
+  if (!isErrorBody(json)) {
+    console.warn(`[api] POST ${path} → HTTP ${res.status} (오류 형식 아님)`);
+    return { ok: false, kind: "unavailable" };
+  }
+  const { code, details } = json.error;
+  const log = res.status === 400 ? console.error : console.warn;
+  log(`[api] POST ${path} → HTTP ${res.status} ${code}`);
+  return {
+    ok: false,
+    kind: "http",
+    status: res.status,
+    code,
+    details: details && typeof details === "object" ? details : null,
+  };
+}

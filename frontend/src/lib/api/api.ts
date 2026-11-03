@@ -1,8 +1,10 @@
 import "server-only";
 import { isBuildPhase } from "./buildPhase";
-import { fetchApi, type ApiResult } from "./client";
+import { fetchApi, postApi, type ApiResult, type PostApiResult } from "./client";
+import { FEEDBACK_TIMEOUT_MS } from "./config";
 import type {
   ChampionStatsResponse,
+  FeedbackResponse,
   LaneGoldResponse,
   MetaResponse,
   Position,
@@ -121,5 +123,21 @@ export async function getLaneGold(
       .map(encodeURIComponent)
       .join(",")}`,
     { cache: "no-store" },
+  );
+}
+
+/**
+ * POST /matches/:matchId/feedback (계약 2-7, 변경 10). Route Handler `/api/feedback`만 부른다.
+ * `puuid`는 본문에만 넣는다(URL·로그에 남지 않게). 이 요청만 35초 타임아웃(D76), 자동 재시도 없음.
+ * @param matchId `KR_숫자` (형식 검사는 Route Handler가 먼저 한다)
+ */
+export async function postFeedback(
+  matchId: string,
+  puuid: string,
+): Promise<PostApiResult<FeedbackResponse>> {
+  return postApi<FeedbackResponse>(
+    `/matches/${encodeURIComponent(matchId)}/feedback`,
+    { puuid },
+    { timeoutMs: FEEDBACK_TIMEOUT_MS },
   );
 }

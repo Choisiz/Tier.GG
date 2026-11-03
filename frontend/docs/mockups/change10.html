@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>변경 10 목업 - 매치 펼침 안 AI 게임 분석</title>
+<!-- 모양 확인용 정적 목업. 실제 컴포넌트 코드와 무관하며 데이터 연동·버튼 동작 없음.
+     문장은 backend/test/eval/results/2026-11-03T05-43-18-058Z.live.set5.claude-opus-5-5.low.grading.md 의
+     KR_8437852704(세나, 딜서폿, 패배) 실제 LLM 출력에서 가져왔다. 아이콘은 회색 자리 표시. -->
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: { colors: {
+      background: '#0b1020', surface: '#141b2f', 'surface-2': '#1d2540', border: '#2a3456',
+      foreground: '#e7eaf3', muted: '#a4adc6', accent: '#e3b456', 'accent-fg': '#1a1405',
+      win: '#5a9bff', lose: '#f16565'
+    }, fontFamily: { sans: ['-apple-system','BlinkMacSystemFont','Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR','sans-serif'] } } }
+  }
+</script>
+<style>
+  body { background:#07091a; color:#e7eaf3; }
+  .frame { background:#0b1020; border:1px solid #2a3456; overflow:hidden; }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .shimmer { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity:.45; } }
+</style>
+</head>
+<body class="font-sans p-6">
+<div class="mx-auto max-w-[1320px] space-y-10">
+
+  <header>
+    <h1 class="text-2xl font-bold">변경 10 목업 <span class="text-muted text-base font-normal">매치 행을 펼친 안쪽의 AI 게임 분석</span></h1>
+    <p class="mt-2 text-sm text-muted">정적 목업입니다(가짜 데이터, 동작 없음). 문장은 실제 LLM 출력(세나 · 딜서폿 · 패배 판)을 그대로 썼습니다. 등급·점수 숫자는 어디에도 만들지 않습니다.</p>
+    <ol class="mt-3 grid gap-1 text-sm text-muted sm:grid-cols-2">
+      <li>1. 데스크톱 1280px: 실제 페이지 폭(매치 칸 800px)에서 ① 분석 전 → ③ 결과</li>
+      <li>2. 모바일 360px: ① ② ③ 나란히</li>
+      <li>3. 상태 모음(매치 칸 800px 폭): ① 분석 전 ② 분석 중 ③ 결과 ④ 템플릿 결과 2종</li>
+      <li>4. 오류 모음: 한도 초과, 분석 불가 판, 다시 검색 필요, 잠시 뒤 다시, 그 밖</li>
+      <li>5. 분석 대상이 아닌 판(일반·칼바람·15분 미만)을 펼쳤을 때</li>
+    </ol>
+  </header>
+
+  <section class="space-y-4">
+    <h2 class="text-lg font-bold">1. 데스크톱 1280px</h2>
+    <p class="text-sm text-muted">왼쪽 280px은 기존 랭크 카드(회색 자리 표시). 오른쪽 매치 칸 800px 안에서 첫 행은 펼침 + 분석 전, 둘째 행은 펼침 + 결과입니다.</p>
+    <div id="desktop"></div>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="text-lg font-bold">2. 모바일 360px</h2>
+    <p class="text-sm text-muted">본문 좌우 여백 16px → 내용 폭 328px. 라인전·교전·운영은 세로로 쌓이고, 좋은 점 → 부족한 점 순서로 이어집니다.</p>
+    <div id="mobile" class="flex flex-wrap items-start gap-8"></div>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="text-lg font-bold">3. 상태 모음 (매치 칸 800px)</h2>
+    <div id="states" class="space-y-8"></div>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="text-lg font-bold">4. 오류 상태 (펼친 패널만, 800px / 360px)</h2>
+    <p class="text-sm text-muted">오류는 결과 자리에 한 줄 안내 + 필요할 때만 버튼. 자동 재시도는 하지 않습니다. 오류도 페이지 안에서 기억하지 않아(결과만 기억) 접었다 펼치면 ① 분석 전으로 돌아갑니다. 단 한도 초과는 페이지 안에서 기억해 다른 판 버튼도 비활성으로 바꿉니다(질문 6).</p>
+    <div id="errors" class="grid gap-6 lg:grid-cols-2"></div>
+    <div id="errors-mobile" class="flex flex-wrap items-start gap-6"></div>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="text-lg font-bold">5. 분석 대상이 아닌 판</h2>
+    <p class="text-sm text-muted">일반·칼바람·아레나 또는 15분 미만 판은 버튼을 만들지 않고 이유 한 줄만 보여 줍니다(펼치기 버튼은 모든 행에 그대로, 질문 2).</p>
+    <div id="ineligible" class="flex flex-wrap items-start gap-6"></div>
+  </section>
+</div>
+
+<script>
+/* ───────── 실제 LLM 출력 (세나, 딜서폿, 패배) ───────── */
+const FB = {
+  champion: '세나', role: '딜서폿', win: false,
+  summary: '라인전은 상대 애쉬에게 밀렸고, 오브젝트 싸움과 그 밖의 운영 모두 부족했습니다. 15분 싸움에서 1킬을 내고 4킬을 내주며 팀 골드 격차가 약 3,900 벌어졌습니다.',
+  sections: [
+    { key:'laning', label:'라인전', good:[], bad:[
+      '15분 골드가 3,958로 상대 애쉬의 4,661보다 703 적었습니다.',
+      '15분까지 0킬 2데스 3어시스트로, 상대 애쉬보다 킬과 어시스트를 더하고 데스를 뺀 값이 4 낮았습니다.' ], note:null },
+    { key:'fight', label:'교전', hint:'오브젝트 싸움', good:[], bad:[
+      '오브젝트 4개 전 시야 점수 합이 2로, 오브젝트당 0.5에 그쳤습니다.',
+      '낀 오브젝트 싸움 2번에서 득실 중 우리 팀 몫이 4.5%로 낮았습니다.' ], note:null },
+    { key:'macro', label:'운영', hint:'그 밖의 싸움·시야·파밍', good:[
+      '포탑 피해량 2,017, 분당 87.4로 포탑에 꾸준히 피해를 넣었습니다.' ], bad:[
+      '오브젝트 싸움 밖 시야 점수 합이 21로, 분당 0.91에 머물렀습니다.',
+      '낀 오브젝트 밖 싸움 5번에서 득실 중 우리 팀 몫이 25.4%로 낮았습니다.' ], note:null },
+  ],
+  moments: [
+    { time:'15:06', end:'15:36', dir:'widened', text:'15분 싸움에서 1킬, 4킬을 내주며 골드 격차가 3,324에서 7,219로 벌어졌고, 우리 바텀 1차 포탑을 잃었습니다.' },
+    { time:'16:10', end:'16:40', dir:'widened', text:'16분 싸움에서 3킬을 내주며 골드 격차가 약 3,900 벌어졌고, 상대 팀이 전령을 잡았습니다.' },
+    { time:'22:02', end:'22:32', dir:'narrowed', text:'22분 싸움에서 4킬씩 주고받아 골드 격차가 465 좁혀졌지만, 우리 미드 억제기를 잃었습니다.' },
+  ],
+};
+/* 템플릿 결과(백엔드 템플릿 문장 모양 예시 — 숫자는 같은 판) */
+const FB_TPL = {
+  ...FB,
+  summary: '라인전은 부족, 오브젝트 싸움은 부족, 그 밖의 운영은 부족으로 판정했습니다.',
+  sections: [
+    { key:'laning', label:'라인전', good:[], bad:['15분 골드가 상대보다 703 적었습니다.'], note:null },
+    { key:'fight', label:'교전', hint:'오브젝트 싸움', good:[], bad:['오브젝트 전 시야 점수가 오브젝트당 0.5였습니다.'], note:null },
+    { key:'macro', label:'운영', hint:'그 밖의 싸움·시야·파밍', good:['포탑 피해량이 분당 87.4였습니다.'], bad:['오브젝트 밖 시야 점수가 분당 0.91이었습니다.'], note:null },
+  ],
+  moments: [ { time:'15:06', end:'15:36', dir:'widened', text:'15분 싸움에서 골드 격차가 3,324에서 7,219로 벌어졌습니다.' } ],
+};
+
+/* ───────── 아이콘 ───────── */
+const ICON = {
+  spark: `<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4"><path d="M8 1.5l1.6 4.1 4.1 1.6-4.1 1.6L8 12.9 6.4 8.8 2.3 7.2l4.1-1.6z" fill="currentColor"/></svg>`,
+  good: `<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 mt-0.5"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.8 8.2l2.1 2.1 4.3-4.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  bad: `<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 mt-0.5"><path d="M8 1.8l6.6 11.8H1.4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.2v3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".9" fill="currentColor"/></svg>`,
+  up: `<svg aria-hidden="true" viewBox="0 0 12 12" class="size-3"><path d="M2 6h8M7 3l3 3-3 3M5 3L2 6l3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  down: `<svg aria-hidden="true" viewBox="0 0 12 12" class="size-3"><path d="M1 6h3M8 6h3M2 3l3 3-3 3M10 3L7 6l3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  info: `<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 shrink-0 mt-0.5"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.8" r=".9" fill="currentColor"/></svg>`,
+  chevron: (up) => `<svg aria-hidden="true" viewBox="0 0 12 12" class="size-3 ${up?'rotate-180':''}"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  spinner: `<svg aria-hidden="true" viewBox="0 0 16 16" class="size-4 spin"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-width="2"/><path d="M14 8a6 6 0 0 0-6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+};
+
+/* ───────── 매치 행 (기존 모양 요약) ───────── */
+function matchRow({ m=false, win=false, queue='솔랭', dur='27:31', expanded=true, champ='세나', kda='2 / 7 / 11', open=true }) {
+  const b = win ? 'border-win' : 'border-lose', t = win ? 'text-win' : 'text-lose';
+  const sq = (s) => `<span class="block ${s} rounded bg-surface-2"></span>`;
+  const items = Array.from({length:7}, () => sq('size-8')).join('');
+  const parts = (side) => Array.from({length:5}, (_,i) => `<div class="flex w-20 items-stretch gap-1"><span class="w-5 rounded-full border border-border bg-surface-2"></span><div class="flex-1"><span class="block h-3 w-12 rounded bg-surface-2/70"></span><div class="mt-0.5 h-0.5 rounded-full ${side} " style="width:${30+((i*17)%60)}%"></div></div></div>`).join('');
+  return `
+  <div class="flex flex-wrap items-start gap-3 ${open?'rounded-t-lg':'rounded-lg'} border-l-4 ${b} bg-surface p-3">
+    <div class="w-20 shrink-0 text-xs text-muted"><p class="font-bold ${t}">${win?'승리':'패배'}</p><p>${queue}</p><p>3시간 전</p><p>${dur}</p></div>
+    <div class="flex shrink-0 flex-col gap-1">
+      <div class="flex items-center gap-2">
+        <span class="relative grid size-14 place-items-center rounded-md bg-surface-2 text-[11px] text-muted">${champ}</span>
+        <div class="flex gap-0.5"><div class="flex flex-col gap-0.5">${sq('size-8')}${sq('size-8')}</div><div class="flex flex-col gap-0.5">${sq('size-8')}${sq('size-8')}</div></div>
+        <div class="ml-1 text-sm"><p class="font-semibold">${kda}</p><p class="text-xs text-muted">1.86 KDA</p></div>
+      </div>
+      <div class="flex gap-0.5">${items}</div>
+    </div>
+    <div class="w-24 shrink-0 text-sm">
+      <p class="h-4 text-xs leading-4"><span class="text-muted">킬관여</span> 54%</p>
+      <p class="h-4 text-xs leading-4"><span class="text-muted">라인전</span> <span class="text-lose">-703</span></p>
+      <p class="leading-5">31 CS</p><p class="text-xs leading-4 text-muted">1.1 /분</p>
+    </div>
+    <div class="${m?'':'ml-auto'} flex items-start gap-2 text-xs">
+      <div class="flex flex-col gap-1">${parts('bg-win')}</div><span class="self-center text-muted">vs</span><div class="flex flex-col gap-1">${parts('bg-lose')}</div>
+    </div>
+    <button type="button" aria-expanded="${expanded}" aria-controls="x" class="ml-1 flex size-6 shrink-0 items-center justify-center self-center rounded-full ${expanded?'bg-surface-2 text-foreground':'text-muted'}">${ICON.chevron(expanded)}</button>
+  </div>`;
+}
+
+/* 펼친 패널 틀: 행 바로 아래, 같은 왼쪽 띠를 이어 하나의 카드로 보이게 */
+function panelShell(inner, { win=false } = {}) {
+  const b = win ? 'border-win' : 'border-lose';
+  return `<div role="region" aria-label="매치 상세" class="rounded-b-lg border-l-4 ${b} border-t border-t-border bg-[#10172b] p-3 sm:p-4">${inner}</div>`;
+}
+
+/* 패널 머리말: 제목 + 기준(챔피언·유형) + 오른쪽 보조 표시 */
+function head({ m=false, right='', sub=true } = {}) {
+  return `
+  <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+    <h3 class="flex items-center gap-1.5 text-sm font-bold text-foreground"><span class="text-accent">${ICON.spark}</span>AI 게임 분석</h3>
+    ${sub ? `<span class="text-xs text-muted">${FB.champion} · ${FB.role} 기준</span>` : ''}
+    <span class="${m?'w-full':'ml-auto'} flex flex-wrap items-center gap-2">${right}</span>
+  </div>`;
+}
+
+/* ① 분석 전 */
+function stateIdle({ m=false } = {}) {
+  return `
+  ${head({ m, sub:false })}
+  <div class="mt-3 flex ${m?'flex-col items-stretch':'items-center'} gap-3 rounded-lg border border-dashed border-border p-3">
+    <p class="flex-1 text-sm text-muted">이 판에서 <b class="font-semibold text-foreground">잘한 점과 부족한 점</b>을 라인전·교전·운영으로 나눠 정리해 드려요. 버튼을 누르면 분석을 시작하고, 보통 10~20초 걸려요.</p>
+    <button type="button" class="inline-flex ${m?'w-full':''} shrink-0 items-center justify-center gap-1.5 rounded-md bg-accent px-4 py-2 text-sm font-bold text-accent-fg hover:brightness-110">${ICON.spark}AI 분석하기</button>
+  </div>
+  <p class="mt-2 text-[11px] text-muted">검색한 소환사 본인 기준 · 하루 20회까지 · 결과는 Riot 경기 기록으로 만든 문장이며 틀릴 수 있어요</p>`;
+}
+
+/* ② 분석 중 */
+function stateLoading({ m=false, sec=12 } = {}) {
+  const sk = (w) => `<span class="block h-3 ${w} rounded bg-surface-2 shimmer"></span>`;
+  const block = `<div class="space-y-2 rounded-lg bg-surface p-3">${sk('w-16')}${sk('w-full')}${sk('w-4/5')}</div>`;
+  return `
+  ${head({ m, sub:false })}
+  <div class="mt-3 flex ${m?'flex-col items-stretch':'items-center'} gap-3 rounded-lg border border-border bg-surface p-3" aria-busy="true">
+    <p role="status" aria-live="polite" class="flex flex-1 items-center gap-2 text-sm"><span class="text-accent">${ICON.spinner}</span><span>AI가 분석 중입니다 · 보통 10~20초 <span class="text-muted tabular-nums">(${sec}초)</span></span></p>
+    <button type="button" disabled aria-disabled="true" class="inline-flex ${m?'w-full':''} shrink-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-md bg-surface-2 px-4 py-2 text-sm font-bold text-muted">${ICON.spinner}분석 중…</button>
+  </div>
+  <div class="mt-3 grid gap-2 ${m?'':'grid-cols-3'}">${block}${block}${block}</div>
+  <p class="mt-2 text-[11px] text-muted">패널을 접어도 분석은 계속되고, 다시 펼치면 결과가 보여요.</p>`;
+}
+
+/* 좋은 점 / 부족한 점 목록 (색 + 아이콘 + 글자) */
+function list(kind, items) {
+  if (!items.length) return '';
+  const good = kind === 'good';
+  const color = good ? 'text-win' : 'text-lose';
+  const label = good ? '좋은 점' : '부족한 점';
+  return `
+  <div>
+    <p class="mb-1 flex items-center gap-1 text-xs font-bold ${color}">${good?ICON.good:ICON.bad}<span>${label}</span></p>
+    <ul class="space-y-1.5" aria-label="${label}">
+      ${items.map(t => `<li class="relative pl-3 text-sm leading-6 text-foreground before:absolute before:left-0 before:top-[11px] before:size-1 before:rounded-full ${good?'before:bg-win':'before:bg-lose'}">${t}</li>`).join('')}
+    </ul>
+  </div>`;
+}
+
+function section(s, { m=false } = {}) {
+  const body = s.note
+    ? `<p class="flex gap-1.5 text-sm text-muted">${ICON.info}${s.note}</p>`
+    : (!s.good.length && !s.bad.length)
+      ? `<p class="text-sm text-muted">이 영역은 특별히 짚을 점이 없었어요.</p>`
+      /* 둘 다 있으면 데스크톱 2열(좋은 점 | 부족한 점), 한쪽만 있으면 그쪽만 전체 폭. 빈 쪽 안내 문구는 만들지 않는다 */
+      : `<div class="grid gap-3 ${!m && s.good.length && s.bad.length ? 'grid-cols-2' : ''}">${list('good', s.good)}${list('bad', s.bad)}</div>`;
+  return `
+  <section class="${m?'':'grid grid-cols-[88px_1fr] gap-3'} border-t border-border pt-3" aria-labelledby="sec-${s.key}">
+    <h4 id="sec-${s.key}" class="${m?'mb-2 flex items-baseline gap-2':''} text-sm font-bold">${s.label}${s.hint?`<span class="${m?'':'mt-0.5 block'} text-[11px] font-normal text-muted">${s.hint}</span>`:''}</h4>
+    ${body}
+  </section>`;
+}
+
+function moments(list, { m=false } = {}) {
+  if (!list.length) return '';
+  return `
+  <section class="border-t border-border pt-3" aria-labelledby="km">
+    <h4 id="km" class="mb-2 text-sm font-bold">결정적 장면 <span class="text-[11px] font-normal text-muted">골드 격차가 크게 움직인 싸움 ${list.length}개</span></h4>
+    <ol class="space-y-2">
+      ${list.map(k => `
+      <li class="flex ${m?'flex-col gap-1':'gap-3'} rounded-md bg-surface p-2.5">
+        <div class="flex shrink-0 items-center gap-2 ${m?'':'w-[132px] flex-col items-start gap-1'}">
+          <span class="rounded bg-surface-2 px-1.5 py-0.5 text-xs font-bold tabular-nums text-accent"><span class="sr-only">게임 시간 </span>${k.time}</span>
+          <span class="inline-flex items-center gap-1 text-[11px] text-muted">${k.dir==='widened'?ICON.up:ICON.down}${k.dir==='widened'?'격차 벌어짐':'격차 좁혀짐'}</span>
+        </div>
+        <p class="text-sm leading-6">${k.text}</p>
+      </li>`).join('')}
+    </ol>
+  </section>`;
+}
+
+/* ③ 결과 / ④ 템플릿 결과 */
+function stateResult({ m=false, data=FB, template=null } = {}) {
+  const chip = template === 'llm_error'
+    ? `<span class="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">${ICON.info}<span>기본 문장</span></span>`
+    : template === 'llm_off'
+      ? `<span class="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">${ICON.info}<span>간단 분석</span></span>`
+      : '';
+  const tplNote = template === 'llm_error'
+    ? `<p class="mt-2 flex gap-1.5 text-xs text-muted">${ICON.info}AI 문장 생성에 실패해 기본 문장으로 보여 드려요.</p>`
+    : template === 'llm_off'
+      ? `<p class="mt-2 flex gap-1.5 text-xs text-muted">${ICON.info}지금은 AI 문장 없이 판정 결과만 간단히 보여 드려요.</p>`
+      : '';
+  return `
+  ${head({ m, right: chip })}
+  ${tplNote}
+  <div class="mt-3 rounded-lg border-l-2 border-accent bg-surface p-3">
+    <p class="mb-1 text-xs font-bold text-accent">한 줄 요약</p>
+    <p class="text-sm leading-6">${data.summary}</p>
+  </div>
+  <div class="mt-3 space-y-3">
+    ${data.sections.map(s => section(s, { m })).join('')}
+    ${moments(data.moments, { m })}
+  </div>
+  <p class="mt-3 text-[11px] text-muted">Riot 경기 기록의 숫자로 판정하고 AI가 문장으로 옮겼어요. 문장은 틀릴 수 있어요.</p>`;
+}
+
+/* ⑤ 오류 */
+const ERRORS = [
+  { title:'한도 초과 (429 daily)', tone:'warn', text:'오늘 분석 한도를 모두 썼어요. 자정(한국 시간)에 다시 열려요.', btn:{ label:'AI 분석하기', disabled:true } },
+  { title:'분석 불가 판 (422)', tone:'info', text:'솔로·자유랭크 15분 이상 경기만 분석할 수 있어요.', btn:null },
+  { title:'다시 검색 필요 (404 participant)', tone:'warn', text:'검색 결과가 오래됐어요. 다시 검색해 주세요.', btn:{ label:'다시 검색', link:true } },
+  { title:'잠시 뒤 다시 (503 busy · 504 timeout)', tone:'warn', text:'분석이 조금 오래 걸리고 있어요. 15초 뒤 다시 눌러 주세요.', btn:{ label:'다시 시도', after:'15초 뒤 활성' } },
+  { title:'Riot 서버 문제 (502)', tone:'warn', text:'Riot 서버가 바빠요. 잠시 후 다시 눌러 주세요.', btn:{ label:'다시 시도' } },
+  { title:'그 밖 (503 key · 500 · 400 · 연결 실패)', tone:'warn', text:'지금은 분석할 수 없어요. 잠시 후 다시 시도해 주세요.', btn:{ label:'다시 시도' } },
+];
+function stateError(e, { m=false } = {}) {
+  const icon = e.tone === 'info' ? ICON.info : ICON.bad;
+  const color = e.tone === 'info' ? 'text-muted' : 'text-accent';
+  let btn = '';
+  if (e.btn) {
+    if (e.btn.link) btn = `<a href="#" class="inline-flex ${m?'w-full':''} shrink-0 items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-bold hover:bg-surface-2">${e.btn.label}</a>`;
+    else if (e.btn.disabled) btn = `<button disabled aria-disabled="true" class="inline-flex ${m?'w-full':''} shrink-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-md bg-surface-2 px-4 py-2 text-sm font-bold text-muted">${ICON.spark}${e.btn.label}</button>`;
+    else btn = `<button class="inline-flex ${m?'w-full':''} shrink-0 items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-bold hover:bg-surface-2">${e.btn.label}${e.btn.after?`<span class="ml-1 text-[11px] font-normal text-muted">(${e.btn.after})</span>`:''}</button>`;
+  }
+  return `
+  ${head({ m, sub:false })}
+  <div role="alert" class="mt-3 flex ${m?'flex-col items-stretch':'items-center'} gap-3 rounded-lg border border-border bg-surface p-3">
+    <p class="flex flex-1 gap-1.5 text-sm ${color}">${icon}<span class="text-foreground">${e.text}</span></p>
+    ${btn}
+  </div>`;
+}
+
+/* ───────── 조립 ───────── */
+const frameLabel = (t) => `<p class="mb-2 text-xs font-bold text-accent">${t}</p>`;
+
+document.getElementById('desktop').innerHTML = `
+<div class="frame w-[1280px] max-w-full overflow-x-auto rounded-xl">
+  <div class="h-16 border-b border-border bg-surface/60 px-6 text-sm leading-[64px] text-muted">헤더 (변경 09 그대로)</div>
+  <div class="mx-auto max-w-[1152px] px-6 py-8">
+    <div class="mb-6 h-[120px] rounded-lg border border-border bg-surface/50 p-4 text-sm text-muted">프로필 헤더 (그대로)</div>
+    <div class="grid grid-cols-[280px_1fr] items-start gap-6">
+      <div class="space-y-3"><div class="h-[150px] rounded-lg bg-surface/50"></div><div class="h-[150px] rounded-lg bg-surface/50"></div></div>
+      <div class="w-[800px] space-y-2">
+        <div class="h-[207px] rounded-lg border border-border bg-surface/50 p-4 text-sm text-muted">최근 20게임 요약 카드 (그대로)</div>
+        <div>${matchRow({})}${panelShell(stateIdle())}</div>
+        <div>${matchRow({ win:true, queue:'자유랭크', champ:'세나', kda:'4 / 2 / 17' })}${panelShell(stateResult(), { win:true })}</div>
+        ${matchRow({ open:false, expanded:false, queue:'솔랭' })}
+        ${matchRow({ open:false, expanded:false, win:true, queue:'칼바람', dur:'19:02' })}
+      </div>
+    </div>
+  </div>
+</div>`;
+
+const mobileFrame = (label, inner) => `
+<div>
+  ${frameLabel(label)}
+  <div class="frame w-[360px] rounded-xl px-4 py-4">${inner}</div>
+</div>`;
+document.getElementById('mobile').innerHTML =
+  mobileFrame('① 분석 전', matchRow({ m:true }) + panelShell(stateIdle({ m:true }))) +
+  mobileFrame('② 분석 중', matchRow({ m:true }) + panelShell(stateLoading({ m:true }))) +
+  mobileFrame('③ 결과', matchRow({ m:true }) + panelShell(stateResult({ m:true })));
+
+const stateBlock = (label, inner, win=false) => `<div>${frameLabel(label)}<div class="frame w-[800px] max-w-full rounded-xl p-4">${matchRow({ win })}${panelShell(inner, { win })}</div></div>`;
+document.getElementById('states').innerHTML =
+  stateBlock('① 분석 전 — 버튼 + 짧은 안내', stateIdle()) +
+  stateBlock('② 분석 중 — 버튼 비활성, 경과 초, 자리 표시 3칸 (aria-live로 1번만 알림)', stateLoading()) +
+  stateBlock('③ 결과 (mode: llm) — 요약 · 라인전/교전/운영 좋은 점·부족한 점 · 결정적 장면 최대 3개', stateResult()) +
+  stateBlock('④-a 템플릿 결과 (templateReason: llm_error) — 작은 "기본 문장" 표시 + 한 줄 설명', stateResult({ data:FB_TPL, template:'llm_error' })) +
+  stateBlock('④-b 템플릿 결과 (templateReason: llm_off, 개발 중) — "간단 분석" 표시', stateResult({ data:FB_TPL, template:'llm_off' }));
+
+document.getElementById('errors').innerHTML = ERRORS.map(e =>
+  `<div>${frameLabel(e.title)}<div class="frame rounded-xl p-4">${panelShell(stateError(e))}</div></div>`).join('');
+document.getElementById('errors-mobile').innerHTML = ERRORS.slice(0, 4).map(e =>
+  mobileFrame('360px · ' + e.title, panelShell(stateError(e, { m:true })))).join('');
+
+const inelig = (m) => `
+  ${head({ m, sub:false })}
+  <p class="mt-3 flex gap-1.5 rounded-lg border border-dashed border-border p-3 text-sm text-muted">${ICON.info}AI 분석은 솔로·자유랭크 15분 이상 경기만 할 수 있어요.</p>`;
+document.getElementById('ineligible').innerHTML =
+  `<div>${frameLabel('800px · 칼바람 판')}<div class="frame w-[800px] max-w-full rounded-xl p-4">${matchRow({ win:true, queue:'칼바람', dur:'19:02' })}${panelShell(inelig(false), { win:true })}</div></div>` +
+  mobileFrame('360px · 14분 항복 판', matchRow({ m:true, dur:'14:20' }) + panelShell(inelig(true)));
+</script>
+</body>
+</html>

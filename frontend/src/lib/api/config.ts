@@ -18,3 +18,9 @@ export function getApiBaseUrl(): string | null {
   }
   return value.replace(/\/+$/, "");
 }
+
+/**
+ * 게임 피드백 분석 POST만 쓰는 타임아웃(ms) (변경 10, 계약 2-7).
+ * 백엔드 30초 < 이 값 35초 < 브라우저 40초 (D76). 다른 API는 `API_TIMEOUT_MS` 그대로.
+ */
+export const FEEDBACK_TIMEOUT_MS = 35_000;

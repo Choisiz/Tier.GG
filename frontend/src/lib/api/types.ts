@@ -237,3 +237,60 @@ export type ApiErrorBody = {
     details?: Record<string, unknown>;
   };
 };
+
+/* ───────── 게임 피드백 분석 (계약 2-7, 변경 10) ───────── */
+
+/** 엔진 유형 10개 (계약 2-7 `role`) */
+export type FeedbackRole =
+  | "TOP_TANK"
+  | "TOP_DAMAGE"
+  | "JUNGLE_TANK"
+  | "JUNGLE_DAMAGE"
+  | "MID_TANK"
+  | "MID_DAMAGE"
+  | "ADC"
+  | "SUPPORT_TANK"
+  | "SUPPORT_DAMAGE"
+  | "SUPPORT_UTILITY";
+
+/** 잘한 점·아쉬운 점 1개. `subjectId`는 늘어날 수 있으니 모르는 값은 무시한다 */
+export type FeedbackItem = { subjectId: string; text: string };
+
+export type FeedbackSection = {
+  good: FeedbackItem[];
+  bad: FeedbackItem[];
+  note: string | null;
+};
+
+/** 결정적 장면 (0~3개). `direction`은 격차 크기 변화일 뿐 우리 팀 기준이 아니다 */
+export type FeedbackKeyMoment = {
+  startSec: number;
+  endSec: number;
+  direction: "widened" | "narrowed";
+  text: string;
+};
+
+/** POST /matches/:matchId/feedback (계약 2-7). 등급·점수 필드는 없다 */
+export type FeedbackResponse = {
+  matchId: string;
+  championId: number;
+  position: Position;
+  role: FeedbackRole;
+  win: boolean;
+  mode: "llm" | "template";
+  templateReason: "llm_off" | "llm_error" | null;
+  summary: { text: string };
+  sections: {
+    laning: FeedbackSection;
+    fight: FeedbackSection;
+    macro: FeedbackSection;
+  };
+  keyMoments: FeedbackKeyMoment[];
+  meta: {
+    engineVersion: string;
+    promptVersion: string;
+    knowledgeVersion: string | null;
+    championDataVersion: string;
+    generatedAt: string;
+  };
+};

@@ -1,4 +1,5 @@
 import type { MatchView } from "@/lib/view/summoner";
+import FeedbackProvider from "./FeedbackProvider";
 import LaneGoldProvider from "./LaneGoldProvider";
 import MatchRow from "./MatchRow";
 
@@ -8,7 +9,7 @@ export default function MatchList({
   puuid,
 }: {
   matches: MatchView[];
-  /** 라인전 15분 골드를 지연 로딩할 때 쓴다 (변경 08) */
+  /** 라인전 15분 골드 지연 로딩(변경 08)·AI 게임 분석(변경 10)에 쓴다 */
   puuid: string;
 }) {
   if (matches.length === 0) {
@@ -20,13 +21,15 @@ export default function MatchList({
   }
   return (
     <LaneGoldProvider key={puuid} puuid={puuid} matchIds={matches.map((match) => match.matchId)}>
-      <ol className="flex flex-col gap-2" aria-label="최근 매치 목록">
-        {matches.map((match) => (
-          <li key={match.matchId}>
-            <MatchRow match={match} />
-          </li>
-        ))}
-      </ol>
+      <FeedbackProvider key={puuid} puuid={puuid}>
+        <ol className="flex flex-col gap-2" aria-label="최근 매치 목록">
+          {matches.map((match) => (
+            <li key={match.matchId}>
+              <MatchRow match={match} />
+            </li>
+          ))}
+        </ol>
+      </FeedbackProvider>
     </LaneGoldProvider>
   );
 }

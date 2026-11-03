@@ -20,6 +20,16 @@ function picker(sheet: FactSheet, used: string[]): Pick {
 
 const has = (sheet: FactSheet, id: string) => sheet.byId.has(id);
 
+/**
+ * 숫자 뒤 조사 "로/으로". 한국어 읽기의 끝소리로 고른다.
+ * 끝자리 1·2·4·5·7·8·9는 "로"(받침 없음·ㄹ), 3·6은 "으로"(삼·육), 0은 영·십·백·천·만 모두 받침이라 "으로".
+ */
+export function ro(num: string): string {
+  const digits = num.replace(/[^0-9.]/g, '');
+  const last = digits.at(-1);
+  return last === '3' || last === '6' || last === '0' ? '으로' : '로';
+}
+
 /** 과목 × 방향 템플릿. 쓸 fact가 없으면 숫자 없는 문장 */
 function subjectText(sheet: FactSheet, subjectId: string, good: boolean, p: Pick): string {
   const opp = () => p('laning.opponent');
@@ -30,7 +40,7 @@ function subjectText(sheet: FactSheet, subjectId: string, good: boolean, p: Pick
     case 'laning.level':
       return `${ref()}분 레벨이 상대 ${opp()}보다 ${p('laning.level.diffAbs')} ${good ? '높았습니다' : '낮았습니다'}.`;
     case 'laning.kda':
-      return `${ref()}분까지 ${p('laning.kda.formula')}이 ${p('laning.kda.me')}로 상대 ${opp()}의 ${p('laning.kda.enemy')}보다 ${good ? '좋았습니다' : '나빴습니다'}.`;
+      return `${ref()}분까지 ${p('laning.kda.formula')}이 ${p('laning.kda.me')}${ro(p('laning.kda.me'))} 상대 ${opp()}의 ${p('laning.kda.enemy')}보다 ${good ? '좋았습니다' : '나빴습니다'}.`;
     case 'laning.cs':
       return `${ref()}분 CS가 상대 ${opp()}보다 ${p('laning.cs.diffAbs')}개 ${good ? '많았습니다' : '적었습니다'}.`;
     case 'fight.advantage':
@@ -48,7 +58,7 @@ function subjectText(sheet: FactSheet, subjectId: string, good: boolean, p: Pick
       return `챔피언 딜 비중이 이 유형의 기대치보다 ${word}.`;
     }
     case 'fight.vision':
-      return `오브젝트 싸움 직전 시야 점수가 오브젝트당 ${p('fight.vision.perObjective')}로 ${good ? '높았습니다' : '낮았습니다'}.`;
+      return `오브젝트 싸움 직전 시야 점수가 오브젝트당 ${p('fight.vision.perObjective')}${ro(p('fight.vision.perObjective'))} ${good ? '높았습니다' : '낮았습니다'}.`;
     case 'fight.objective':
       return good
         ? `오브젝트 막타를 ${p('fight.objective.lastHits')}번 챙겼습니다.`
@@ -58,11 +68,11 @@ function subjectText(sheet: FactSheet, subjectId: string, good: boolean, p: Pick
     case 'macro.solo':
       return `단독 킬 ${p('macro.solo.kills')}번, 단독 데스 ${p('macro.solo.deaths')}번으로 혼자 싸운 결과가 ${good ? '좋았습니다' : '나빴습니다'}.`;
     case 'macro.side':
-      return `분당 포탑 피해량이 ${p('macro.side.perMinute')}로 사이드 압박이 ${good ? '좋았습니다' : '약했습니다'}.`;
+      return `분당 포탑 피해량이 ${p('macro.side.perMinute')}${ro(p('macro.side.perMinute'))} 사이드 압박이 ${good ? '좋았습니다' : '약했습니다'}.`;
     case 'macro.farm':
       return `중후반 분당 CS가 ${p('macro.farm.perMinute')}개로 ${good ? '많았습니다' : '적었습니다'}.`;
     case 'macro.vision':
-      return `분당 시야 점수가 ${p('macro.vision.perMinute')}로 ${good ? '높았습니다' : '낮았습니다'}.`;
+      return `분당 시야 점수가 ${p('macro.vision.perMinute')}${ro(p('macro.vision.perMinute'))} ${good ? '높았습니다' : '낮았습니다'}.`;
     default:
       return good ? '이 부분은 잘했습니다.' : '이 부분은 아쉬웠습니다.';
   }

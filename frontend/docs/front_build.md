@@ -1,6 +1,6 @@
 # 프론트엔드 구현 상태 — Tier.GG 챔피언 화면
 
-> 기준: `front_spec.md` (현재 계획), `docs/contracts/api_contract.md` v3. 코드 상태: 변경 09 Build 반영 후 (2026-10-30).
+> 기준: `front_spec.md` (현재 계획), `docs/contracts/api_contract.md` v4. 코드 상태: 변경 10 Build 반영 후 (2026-11-03).
 > 이 문서는 **지금 구현 상태**만 적는다. 이전 시도와 과정 기록은 git 커밋 `87cfc78`에 있다.
 > 상태 표기: ✅ 완료 / ⚠️ 부분 완료 / ❌ 실패 / ⏸️ 보류
 
@@ -23,6 +23,7 @@
 - [15. 최근 게임 요약 카드 (변경 07)](#15-최근-게임-요약-카드-변경-07)
 - [16. 킬관여·라인전 15분 골드 (변경 08)](#16-킬관여라인전-15분-골드-변경-08)
 - [17. 전적 화면 상단 보강 (변경 09)](#17-전적-화면-상단-보강-변경-09)
+- [18. 매치 펼침 안 AI 게임 분석 (변경 10)](#18-매치-펼침-안-ai-게임-분석-변경-10)
 
 ---
 
@@ -590,3 +591,77 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 - 개발 서버의 하이드레이션 경고 전용 확인(경고 없음으로 보이나 별도 측정 안 함).
 
 보고 사항: `next dev`·`next build` 출력에 "Next.js 보안 취약점 → `next upgrade --agent=security`로 업그레이드하라"는 안내가 한 번 나오며 명령이 멈춘다(재실행하면 계속됨). 이미 남은 문제(13장)에 있는 건이며, 이번에도 따르지 않았다.
+
+---
+
+## 18. 매치 펼침 안 AI 게임 분석 (변경 10)
+
+> 기준: `front_spec.md` 5-10·6-5·7장 "AI 게임 분석 오류 문구"·10장 "AI 게임 분석"·11장 D72~D78, 목업 `frontend/docs/mockups/change10.html`, 계약 v4 2-7. 백엔드·계약 수정 없음, 새 의존성·환경 변수 없음. 사용자 결정(2026-11-03)으로 **독립 Review 없이 Build 자체 검증**.
+
+### 18-1. 구현
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 타입·설정 | `lib/api/types.ts`: `FeedbackRole`(10개)·`FeedbackItem`·`FeedbackSection`·`FeedbackKeyMoment`·`FeedbackResponse`(계약 2-7, 등급 필드 없음). `lib/api/config.ts`: `FEEDBACK_TIMEOUT_MS = 35_000`(기존 `API_TIMEOUT_MS` 10초 그대로) | ✅ |
+| POST 클라이언트 | `lib/api/client.ts` `postApi<T>(path, body, {timeoutMs})`: `no-store`, JSON 본문, `TimeoutError`→`kind:"timeout"`, 계약 오류 본문→`kind:"http"`(status·code·details), 그 밖→`unavailable`. 로그는 `[api] POST /matches/{id}/feedback → HTTP 503 ANALYSIS_BUSY` 형식, 본문 미기록. 기존 `fetchApi`·`ApiFailureKind` 무변경. `lib/api/api.ts` `postFeedback(matchId, puuid)` | ✅ |
+| 프록시 | `app/api/feedback/route.ts`(`POST`만, `force-dynamic`, `no-store`): Content-Type JSON·2KB·JSON 객체·`matchId` `^KR_[0-9]{1,15}$`·`isValidPuuid` 검사 → 400. 백엔드 status·code 그대로, `details`는 `reason`·`retryAfterSec`·`resetAt`·`limit`만. 35초 초과→504 `ANALYSIS_TIMEOUT`(`retryAfterSec:15`), 연결 실패 등→503 `UNAVAILABLE` | ✅ |
+| 순수 함수 | `lib/view/feedback.ts`: `isFeedbackEligible`(420·440 && ≥900초), `ROLE_LABEL_KO`, `formatGameTime`, `toFeedbackView`(섹션 순서 고정, 장면 최대 3개, 모르는 필드 무시), `isFeedbackResponse`, `feedbackErrorView`(7장 표), `pickFeedbackDetails` | ✅ |
+| 매핑 | `lib/view/summoner.ts`: `MatchView.feedbackEligible` | ✅ |
+| 행·토글 | `MatchDisclosure.tsx`(client, 신규): 행 틀(`border-l-4`, 펼치면 `rounded-t-lg`)+토글(`aria-expanded`·`aria-controls="feedback-{matchId}"`, 라벨 그대로)+패널(`role="region"` "매치 상세", `rounded-b-lg`·`border-t`, 펼쳤을 때만 마운트). 접으면 오류 항목 삭제. `MatchRow.tsx`는 행 내용만 `children`으로 넘김(서버 컴포넌트 유지). `MatchExpandToggle.tsx` 삭제 | ✅ |
+| 상태 저장 | `FeedbackProvider.tsx`(client, 신규): `entries[matchId]`(`loading`·`done`·`error`) + `limitReached`. 진행 중·완료 `useRef` 집합으로 연타 차단, 브라우저 40초 타이머, 언마운트 시 abort·상태 변경 없음. `MatchList`가 `key={puuid}`로 감쌈 | ✅ |
+| 패널 | `FeedbackPanel.tsx`(client, 신규): 대상 아님 안내, ① 분석 전, ② 분석 중(스피너·경과 초 `aria-hidden`·자리 표시 3칸), ⑤ 오류(`role="alert"`, 다시 시도(대기 초 카운트다운)/다시 검색(`router.refresh()`)/비활성 분석 버튼), 한도 초과 뒤 다른 판도 비활성+문구. `sr-only` `role="status"` 1곳에서 "AI가 분석 중입니다"→"분석이 끝났어요". 끝나면 포커스가 `body`일 때만 결과 제목/오류 안내로 이동 | ✅ |
+| 결과 | `FeedbackResult.tsx`(신규): 머리말 "챔피언 · 유형 기준", 템플릿 알약(`llm_error` 기본 문장 / `llm_off` 간단 분석)+설명, 한 줄 요약, 영역 3줄(sm 이상 88px 제목 칸, 둘 다 있으면 2열), 빈 영역 문구, `note`, 결정적 장면(시간 칩 `sr-only` "게임 시간", 벌어짐/좁혀짐 중립색), 하단 안내. 등급·점수·개수 요약 없음 | ✅ |
+
+### 18-2. 계획과 다르게 구현한 점
+
+1. 아이콘은 별도 파일 없이 `FeedbackResult.tsx`에서 내보내 `FeedbackPanel`이 재사용한다.
+2. 진행 알림은 상태 줄에 직접 `role="status"`를 달지 않고 패널 안에 항상 있는 `sr-only` 상태 줄 하나로 했다(결과가 오면 보이는 상태 줄이 사라져 "분석이 끝났어요"를 알릴 곳이 없어서).
+3. 패널 배경은 목업의 `#10172b` 대신 기존 토큰 `bg-surface/70`(거의 같은 색)을 썼다.
+4. 결정적 장면 개수는 계약 v4 확정(0~3개)에 따랐다(계획 10-9의 확인 요청 해소).
+
+### 18-3. 검증 결과 (2026-11-03)
+
+| 명령 | 결과 |
+|------|------|
+| `npx tsc --noEmit` | 통과 (오류 0) |
+| `npm run lint` (eslint) | 통과 (오류·경고 0) |
+| `npm run build` | 통과. 정적 183페이지 + `ƒ /api/feedback`. 새 의존성 0, 새 환경 변수 0 (보안 업그레이드 안내로 1회 멈춘 뒤 재실행) |
+
+환경: 백엔드 `API_PORT=4000 FEEDBACK_ENABLED=true FEEDBACK_LLM_ENABLED=false`(템플릿, 0원), 프론트 3000. **`next dev`에서 페이지가 0.3~1.3초마다 스스로 다시 불러와지는 현상**(파일 변경 없이 "Compiled in 1ms" 반복, `/champions`에서도 같음)이 있어, 그 사이 소환사 검색·라인전 요청이 반복되며 Riot 호출 한도가 소진됐다(분석 요청이 503 busy·504로 돌아옴). 백엔드를 재시작하고 프론트는 **프로덕션 빌드(`next start`)**로 바꿔 확인했다. 내장 브라우저, 계정 `너희는개다#KR1`.
+
+| 항목 | 결과 |
+|------|------|
+| 프록시 형식 검사 (curl) | GET 405. Content-Type `text/plain`·깨진 JSON·배열·`NA_1`·puuid 공백·2KB 초과 → 모두 400 `INVALID_PARAMETER`, 백엔드 로그에 요청 없음. `KR_1`→404 `{reason:"match"}`, 남의 puuid→404 `{reason:"participant"}` (details 걸러서 전달) |
+| 대상 판정 | 20행 모두 펼치기 버튼. 1분 10초·4분 11초 판 펼침 → 버튼 없이 "AI 분석은 솔로·자유랭크 15분 이상 경기만 할 수 있어요." |
+| 버튼 1번 = 요청 1건 | [AI 분석하기] 3연타(같은 틱) → `/api/feedback` 1건, 백엔드 POST 1건. 2연타도 1건 |
+| 분석 중 | "AI가 분석 중입니다 · 보통 10~20초 (N초)" 경과 초 갱신, 버튼 "분석 중…" 비활성, 자리 표시 3칸(1280px 3열). 분석 중 접고 40초 뒤 펼침 → 결과 바로 표시, 추가 요청 0 |
+| 결과(템플릿 `llm_off`) | KR_8443854658(오공·딜정글): "간단 분석" 알약 + 설명, 요약, 라인전(부족한 점만 전체 폭)·교전(2열)·운영, 결정적 장면 3개(시간 칩·벌어짐/좁혀짐). 접었다 펼침 → 요청 0건 |
+| 포커스 | 결과 도착 시 `document.activeElement` = 결과 제목 `H3`, 오류 도착 시 = `role="alert"` 상자 |
+| 오류 | 503 `ANALYSIS_BUSY`(48초) → "분석이 조금 오래 걸리고 있어요. 48초 뒤…" + [다시 시도 (N초 뒤 활성)] 카운트다운 후 활성. 504(백엔드 30초) → 같은 문구 15초. 백엔드 끔 → 프록시 503 `UNAVAILABLE` → "지금은 분석할 수 없어요. 잠시 후 다시 시도해 주세요." + [다시 시도]. 오류 상태에서 접었다 펼침 → ① 분석 전 |
+| 크기·스크롤 | 접힌 행 1280px 133px·360px 359px(20행 모두, 회귀 없음). 가로 스크롤 0(1280·360). 펼친 결과 패널 1280px 817px, 360px 1,212px(템플릿 결과, 목업 근사 620/1,150px보다 큼 — 문장이 길고 장면 3개) |
+| 360px | 영역 제목 위·내용 아래, 좋은 점→부족한 점 세로, 버튼 전체 폭, 오류 상자 세로 배치 |
+| 로그·URL의 puuid | 프록시 로그 `[api] POST /matches/{id}/feedback → HTTP 503 ANALYSIS_BUSY` 형식만, puuid 없음. 브라우저 요청 URL은 `/api/feedback`(본문에만 puuid) |
+| 콘솔 | JS 오류 0. 보이는 항목은 의도한 오류 응답(503/504/500)의 "Failed to load resource" 네트워크 줄뿐 |
+
+실제 LLM 1회(사용자 승인 1회): 백엔드 `FEEDBACK_LLM_ENABLED=true FEEDBACK_API_BUDGET_USD=0.50`. 아직 분석하지 않은 **KR_8441587549**(솔랭 29분, 오공·딜정글)를 1280px 화면에서 [다시 시도]로 1회 요청(프론트 요청 1건, 백엔드 POST 1건).
+
+| 항목 | 결과 |
+|------|------|
+| 응답 | 200, `mode:"llm"`, 총 19.1초(LLM 18.5초, Riot 2회), LLM 시도 2회(첫 응답 11개 중 10개 통과 → 1칸 재요청, `templated=0`) |
+| 화면 | 템플릿 알약 없음, 요약·라인전(좋은 점/부족한 점 2열)·교전(좋은 점만)·운영(2열)·결정적 장면 3개(23:27 벌어짐, 28:23 벌어짐, 17:06 좁혀짐) 모두 정상. 분석 중 접었다 펼쳐도 추가 요청 0 |
+| 비용 | 이번 1회 **$0.1157**. 장부 `backend/logs/feedback-api-ledger.jsonl` 누적 **$0.1201 → $0.2357** (2줄 → 4줄, 오늘 2/20회) |
+
+못 본 것 / 못 한 것:
+
+- 가짜 응답 서버 확인: 429 `daily`(다른 판 비활성)·`budget`, 422 각 reason, 502, 503 `ANALYSIS_DISABLED`, 응답 모양 이상, `llm_error` 알약, `note`·빈 영역 문구, 장면 0개, `grade` 필드 무시, 프록시 36초 지연 → 504는 **화면으로 확인하지 못했다**(코드와 `feedbackErrorView` 분기만). 실제로 본 오류는 503 busy·504·503 unavailable·404 두 가지(curl)뿐.
+- 키보드만으로 펼치기→분석→결과 읽기, 스크린리더 실제 낭독.
+- `next dev` 반복 새로 고침의 원인(이번 변경과 무관해 보이나 확인 못 함).
+
+### 18-4. 남은 문제
+
+1. `next dev`가 파일 변경 없이 페이지를 계속 다시 불러온다(이번 세션 관찰). 개발 중 Riot 호출 한도를 빠르게 소진시킨다. 원인 미확인.
+2. 백엔드 템플릿 요약 문장에 "열세였고, 보통이었고, 잘했습니다" 같은 판정어가 들어 있다(프론트는 만들지 않음, D75). 사용자 결정 7과 맞는지 백엔드 쪽 확인 필요.
+3. 7장 오류 표 중 화면으로 못 본 항목(위 목록)은 가짜 응답 서버로 확인 필요.
+4. 결과 패널 높이가 목업 근사보다 크다(1280px 817px / 360px 1,212px). 모양은 목업과 같다.
+5. Next.js 보안 업그레이드 안내(기존 13장 항목).
+

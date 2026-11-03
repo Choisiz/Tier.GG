@@ -1,5 +1,5 @@
 import Image from "next/image";
-import MatchExpandToggle from "@/components/summoners/MatchExpandToggle";
+import MatchDisclosure from "@/components/summoners/MatchDisclosure";
 import Tooltip from "@/components/common/Tooltip";
 import LaneGoldCell from "@/components/summoners/LaneGoldCell";
 import type { MatchView, ParticipantView, SlotView } from "@/lib/view/summoner";
@@ -126,15 +126,19 @@ function ParticipantIcons({
   );
 }
 
-/** 매치 1건. 승/패 색은 왼쪽 테두리 + 글자 (D35) */
+/** 매치 1건. 승/패 색은 왼쪽 테두리 + 글자 (D35). 펼치면 AI 게임 분석 패널 (변경 10) */
 export default function MatchRow({ match }: { match: MatchView }) {
-  const borderClass = match.win ? "border-win" : "border-lose";
   const resultClass = match.win ? "text-win" : "text-lose";
 
   return (
-    // 모든 칸을 위쪽(items-start)으로 통일해 높이가 들쭉날쭉해 보이지 않게 한다(2026-10-27).
+    // 행 틀(승/패 왼쪽 띠·items-start 정렬)·펼치기 토글·펼친 패널은 client `MatchDisclosure`가 그린다 (변경 10).
     // 참가자 칸(5줄+딜량 막대)이 가장 길어 기준이 되고, 나머지 칸은 그 위쪽에 맞춰 시작한다.
-    <div className={`flex flex-wrap items-start gap-3 rounded-lg border-l-4 bg-surface p-3 ${borderClass}`}>
+    <MatchDisclosure
+      matchId={match.matchId}
+      win={match.win}
+      championName={match.champion.name}
+      feedbackEligible={match.feedbackEligible}
+    >
       {/* 결과·큐 종류·조회시간·플레이타임은 챔피언 초상화보다 왼쪽(2026-10-27). 큐 종류는 포지션 줄을 대신함 */}
       <div className="w-20 shrink-0 text-xs text-muted">
         <p className={`font-bold ${resultClass}`}>{match.win ? "승리" : "패배"}</p>
@@ -231,8 +235,6 @@ export default function MatchRow({ match }: { match: MatchView }) {
         <ParticipantIcons label="상대 팀 챔피언" participants={match.enemy} side="enemy" />
       </div>
 
-      {/* 리스트 가장 오른쪽 수직형 아코디언 토글. 펼침 데이터는 아직 없음(2026-10-27) */}
-      <MatchExpandToggle />
-    </div>
+    </MatchDisclosure>
   );
 }

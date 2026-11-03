@@ -1,6 +1,6 @@
 # 프론트엔드 계획서 — Tier.GG 챔피언 화면
 
-> 상태: **현재 계획 (승인됨)**. v1(2026-10-12), 변경 01(2026-10-15), 변경 02·03·04·05(2026-10-17), 변경 06(2026-10-27), 변경 07(2026-10-29), 변경 08(2026-10-30), 변경 09(2026-10-30)을 합친 지금 사이트의 계획이다.
+> 상태: **현재 계획 (승인됨)**. v1(2026-10-12), 변경 01(2026-10-15), 변경 02·03·04·05(2026-10-17), 변경 06(2026-10-27), 변경 07(2026-10-29), 변경 08(2026-10-30), 변경 09(2026-10-30), 변경 10(2026-11-03)을 합친 지금 사이트의 계획이다.
 > 기준 문서: `docs/contracts/api_contract.md` v3(2-5 `killParticipation`, 2-6 `lane-gold` 포함), `api.md`(Data Dragon), `CLAUDE.md` 6장(영역 문서 관리)·10장(프론트 흐름)
 > 이전 계획 원문은 git 커밋 `87cfc78`에 있다. 새 변경은 이 문서 맨 아래 `## 이번 변경 (승인 대기)`에 임시로 적고, Build가 본문에 합친다.
 
@@ -20,6 +20,7 @@
   - [5-7. 전적 검색](#5-7-전적-검색)
   - [5-8. 최근 게임 요약 카드 (도넛·배경 후속 포함)](#5-8-최근-게임-요약-카드-변경-07)
   - [5-9. 킬관여·라인전 15분 골드](#5-9-킬관여라인전-15분-골드-변경-08)
+  - [5-10. 매치 펼침 안 AI 게임 분석](#5-10-매치-펼침-안-ai-게임-분석-변경-10)
 - [6. 데이터](#6-데이터)
 - [7. 상태 처리](#7-상태-처리)
 - [8. 환경 변수](#8-환경-변수)
@@ -589,6 +590,70 @@ CS 칸은 `w-24`(96px)를 유지하고 줄 높이를 고정한 4줄이다 (D61).
 
 - 평균 티어, 최근 게임 요약 카드 변경, 라인전 골드 실수치·15분 외 시점·킬관여 평균, 오류 시 자동 재시도·수동 버튼·폴링, 백엔드·DB·계약 수정, 새 환경 변수·런타임 의존성(SWR 등), 프론트의 포지션 판정·골드 계산.
 
+### 5-10. 매치 펼침 안 AI 게임 분석 (변경 10)
+
+> **쉬운 요약**: 매치 행의 펼치기(▾)를 누르면 행 바로 아래에 "AI 게임 분석" 패널이 열린다. [AI 분석하기]를 눌러야만 분석하고, 결과(요약 · 라인전/교전/운영 좋은 점·부족한 점 · 결정적 장면)를 그 자리에 보여 준다. 결과는 페이지 안에서 기억한다. 모양 기준: [`mockups/change10.html`](./mockups/change10.html) (승인 2026-11-03). API: 계약 2-7(v4, 결정적 장면 0~3개 확정).
+
+#### 사용자 결정 (2026-11-03)
+
+요약: 매치 행의 펼치기(▾)를 누르면 행 바로 아래에 "AI 게임 분석" 패널이 열린다. [AI 분석하기]를 눌러야만 분석하고, 결과(요약 · 라인전/교전/운영 좋은 점·부족한 점 · 결정적 장면)를 그 자리에 보여 준다. 결과는 페이지 안에서 기억한다.
+
+| # | 사용자 결정 (2026-11-03) | 반영 |
+|---|------|------|
+| 1 | 위치: 매치 행을 펼친 안쪽 | 5-10 |
+| 2 | 분석 대상: 검색한 소환사 본인만 (`summoner.puuid`) | 6-5 |
+| 3 | 버튼을 눌렀을 때만 분석 (자동 분석 없음) | 6-5 |
+| 4 | 랭크(420·440)·15분(900초) 이상 판에만 버튼 | 6-5 `feedbackEligible` |
+| 5 | 하루 상한 20회, 초과 시 "오늘 분석 한도 초과" 안내 | 7장 |
+| 6 | 템플릿 결과면 작은 표시 | 5-10 ④ |
+| 7 | 화면에 등급·점수 숫자를 만들지 않는다 | 5-10 (영역 판정어·점수 없음) |
+| 8 | 대기 보통 10~20초·최대 30초, 이 요청만 35초 타임아웃, 자동 재시도 없음 | 6-5 |
+| 9 | 결과는 페이지 안에서 기억 (다시 펼쳐도 재호출 안 함) | 6-5 |
+
+- 하지 않는 것: 다른 참가자 분석, 자동 분석·자동 재시도, 등급·점수·영역 판정어(잘함/보통/부족) 표시, 스트리밍, 결과를 브라우저 저장소(localStorage)에 남기기, 새 런타임 의존성.
+
+- 계획 단계 질문 8개는 모두 추천안으로 승인(2026-11-03): 펼친 칸에 AI 분석만(탭 없음), 모든 행에 펼치기 버튼(대상 아니면 이유 한 줄), 영역 3줄 × 좋은 점/부족한 점 2칸, 결정적 장면은 시간 칩 + 벌어짐/좁혀짐 + 문장 목록, 버튼 문구 "AI 분석하기", 한도 초과 시 다른 판 버튼도 비활성, 분석 중 경과 초 표시, Build 실제 LLM 확인 최대 1회.
+- 머리말 챔피언 이름은 응답의 `championId`가 아니라 이미 가진 `MatchView.champion.name`을 쓴다(계약 변경 불필요).
+
+#### 화면 (상태별)
+
+요약: 패널은 행과 같은 왼쪽 승/패 띠를 이어 받아 한 카드처럼 보인다. 상태는 5가지다.
+
+| 상태 | 화면 (목업 번호) |
+|------|------|
+| ① 분석 전 | 제목 "✦ AI 게임 분석", 짧은 안내("잘한 점과 부족한 점을 라인전·교전·운영으로 나눠 정리해 드려요. 보통 10~20초"), 금색 [✦ AI 분석하기] 버튼, 아래 작은 글씨 "검색한 소환사 본인 기준 · 하루 20회까지 · 틀릴 수 있어요" |
+| ② 분석 중 | 버튼 비활성 "분석 중…"(스피너), 상태 줄 "AI가 분석 중입니다 · 보통 10~20초 (12초)" — 경과 초를 1초마다 갱신, 영역 3칸 자리 표시(회색 막대). 접어도 분석은 계속된다 |
+| ③ 결과 | 머리말 "세나 · 딜서폿 기준"(챔피언 이름은 `MatchView`, 유형 한글은 `role` → 10개 표). **한 줄 요약**(금색 왼쪽 선). 영역 3줄: 라인전 / 교전(오브젝트 싸움) / 운영(그 밖의 싸움·시야·파밍). 각 줄 안에 **좋은 점**(파랑 + 체크 원 아이콘 + "좋은 점" 글자) / **부족한 점**(빨강 + 삼각 경고 아이콘 + "부족한 점" 글자). 둘 다 있으면 데스크톱 2열, 한쪽만 있으면 그쪽만 전체 폭, 둘 다 없으면 "특별히 짚을 점이 없었어요", `note`가 있으면 ⓘ + note 문장. **결정적 장면** 최대 3개: 게임 시간 `15:06`(금색 칩) + "격차 벌어짐/좁혀짐"(방향 아이콘, 승패 색 없음) + 문장. 맨 아래 "Riot 경기 기록의 숫자로 판정하고 AI가 문장으로 옮겼어요. 문장은 틀릴 수 있어요." |
+| ④ 템플릿 결과 | ③과 같은 모양 + 머리말 오른쪽 작은 알약 표시와 한 줄 설명. `llm_error` → "기본 문장" + "AI 문장 생성에 실패해 기본 문장으로 보여 드려요." / `llm_off` → "간단 분석" + "지금은 AI 문장 없이 판정 결과만 간단히 보여 드려요." |
+| ⑤ 오류 | 결과 자리에 한 줄 안내(`role="alert"`) + 필요할 때만 버튼(다시 시도 / 다시 검색 / 비활성 분석 버튼). 문구는 7장 "AI 게임 분석 오류 문구" |
+| (대상 아님) | 버튼 없이 ⓘ "AI 분석은 솔로·자유랭크 15분 이상 경기만 할 수 있어요." (목업 5) |
+
+- 결정적 장면의 `direction`(`widened`/`narrowed`)은 "골드 격차가 벌어짐/좁혀짐"일 뿐 누구에게 유리한지가 아니다. 그래서 승/패 색을 쓰지 않고 중립 회색 + 화살표 아이콘으로 둔다(D74).
+- 게임 시간은 `startSec`를 `m:ss`로(`906` → `15:06`). `endSec`는 화면에 쓰지 않는다(문장이 이미 "15분 싸움"이라 중복).
+- 높이: 결과 패널은 데스크톱 약 620px, 360px 약 1,150px(목업 실측 근사). 패널은 펼쳤을 때만 생기므로 접힌 목록의 행 높이(1280px 133px, 360px 359px)는 바뀌지 않는다.
+
+#### 기존 펼치기 버튼과의 관계
+
+요약: 지금 펼치기 버튼(`MatchExpandToggle`)은 화살표만 돌고 내용이 없다. 이번에 그 버튼이 실제로 패널을 열게 한다. 모양·위치·라벨은 그대로다.
+
+- 모든 행에 펼치기 버튼을 그대로 둔다. 대상이 아닌 판을 펼치면 이유 한 줄만 보인다(목업 5, 승인 2026-11-03).
+- 펼친 패널에는 이번엔 **AI 분석만** 둔다(탭 없음, 승인 2026-11-03). 나중에 다른 상세(전체 참가자 표 등)가 생기면 그때 탭을 더한다.
+- 행 자체를 눌러 펼치지는 않는다(행 안에 툴팁·아이콘 정지점이 많아 클릭이 겹침). 버튼만 누른다.
+- 펼친 행은 행 아래 모서리를 각지게(`rounded-t-lg`), 패널은 `rounded-b-lg` + 같은 `border-l-4` 색 + 위쪽 구분선으로 이어 붙인다.
+
+#### 접근성·반응형
+
+요약: 좋은 점/부족한 점은 색 + 아이콘 + 글자로 3중 구분, 진행 상황은 스크린리더에 1번만 알린다.
+
+- 토글: `aria-expanded`, `aria-controls="feedback-{matchId}"`, 라벨 "매치 상세 정보 펼치기/접기"(기존 그대로). 패널은 `role="region"` + `aria-label="매치 상세"`.
+- 분석 중: 상태 줄 `role="status"`(polite). 경과 초는 `aria-hidden` 처리해 매초 읽히지 않게 하고, 결과가 오면 "분석이 끝났어요"를 같은 상태 줄로 1번 알린다. 포커스는 옮기지 않는다(버튼 자리가 결과로 바뀌므로, 결과 영역 제목에 `tabIndex=-1`을 두고 포커스를 옮길지는 Build가 실제로 확인 후 결정 — 버튼이 사라지면 포커스가 `body`로 빠지는 문제가 있으면 제목으로 옮긴다).
+- 오류: `role="alert"`. 비활성 버튼은 `disabled`(+ 이유를 옆 글자로).
+- 좋은 점/부족한 점: 소제목 글자 "좋은 점"/"부족한 점" + 다른 모양 아이콘(체크 원/삼각 경고) + 색(`--win`/`--lose`, 표면 대비 6.16/5.53 실측됨). 목록은 `ul` + `aria-label`.
+- 결정적 장면 시간: 화면 `15:06`, 스크린리더 "게임 시간 15:06".
+- 반응형: `sm`(640px) 미만은 영역 제목 위·내용 아래로 쌓고 좋은 점 → 부족한 점 세로, 버튼은 전체 폭. `sm` 이상은 영역 제목 88px 칸 + 내용(둘 다 있으면 2열). 가로 스크롤 0.
+- 버튼 대비: 금색 배경(`--accent`) + `--accent-foreground` 글자(기존 조합).
+- (Build 확인) 분석 중 버튼이 `disabled`가 되며 포커스가 `body`로 빠진다. 그래서 결과가 오면 결과 제목(`h3`, `tabIndex=-1`)으로, 오류면 오류 안내(`role="alert"`, `tabIndex=-1`)로 포커스를 옮긴다(포커스가 이미 다른 요소에 있으면 옮기지 않는다). 진행 알림은 패널에 항상 있는 `sr-only` `role="status"` 한 곳에서 "AI가 분석 중입니다" → "분석이 끝났어요"로 1번씩만 바뀐다.
+
 ---
 
 ## 6. 데이터
@@ -653,6 +718,76 @@ CS 칸은 `w-24`(96px)를 유지하고 줄 높이를 고정한 4줄이다 (D61).
 - (변경 08) `toMatchView`는 `killParticipation`을 `formatKillParticipation`으로 `"62%"`/`"-"` 문자열로 바꾼다. 라인전 값은 서버에서 만들지 않고 클라이언트가 `/api/lane-gold`로 채운다(5-9). `getLaneGold(puuid, matchIds)`(`lib/api/api.ts`)는 `ApiResult`를 그대로 돌려주고 `cache: "no-store"`를 쓴다.
 - 아이템·소환사 주문 조회는 기존 `getItems(ids, [])`·`getSummonerSpells()`를 그대로 재사용한다(전적 검색엔 `window.patches`가 없어 두 번째 인자는 빈 배열).
 
+### 6-5. AI 게임 분석 데이터 흐름 (변경 10)
+
+> **쉬운 요약**: 서버 컴포넌트 `MatchRow`는 그대로 두고, 펼침 상태와 패널만 작은 client 컴포넌트로 감싼다. 백엔드 POST는 Route Handler 프록시 `/api/feedback`이 서버에서 부른다. 결과는 목록 단위 Provider에 matchId별로 둔다.
+
+요약: 서버 컴포넌트 `MatchRow`는 그대로 두고, 펼침 상태와 패널만 작은 client 컴포넌트로 감싼다. 백엔드 POST는 새 Route Handler 프록시가 서버에서 부른다(브라우저 직접 호출 없음, CORS 없음, D6).
+
+```
+브라우저                                 Next 서버                                백엔드
+FeedbackPanel ──POST /api/feedback──▶ app/api/feedback/route.ts ──POST /api/v1/matches/:matchId/feedback──▶
+ {matchId, puuid}   (같은 출처, 40초)     형식 검사 → postFeedback() (35초)             {puuid} 본문
+```
+
+| 파일 | 새/수정 | 내용 |
+|------|---------|------|
+| `src/app/api/feedback/route.ts` | 새 | `POST`만. 본문 `{matchId, puuid}`(JSON, 2KB 이하) 검사 → `postFeedback` → 성공은 그대로, 실패는 `{error:{code, details}}`(허용한 `details` 키만: `reason`·`retryAfterSec`·`resetAt`·`limit`). `force-dynamic`, `Cache-Control: no-store`. `puuid`는 로그에 남기지 않는다 |
+| `src/lib/api/client.ts` | 수정 | `postApi<T>(path, body, {timeoutMs})` 추가. `fetchApi`와 같은 분류·로그 규칙, `cache: "no-store"`, 메서드 POST·`Content-Type: application/json`. 실패 결과에 `status`·`code`·`details`를 담은 새 종류 `FeedbackFailure`를 돌려준다(기존 `ApiFailureKind`는 손대지 않음 → 기존 화면 회귀 없음). 시간 초과(`TimeoutError`)는 `kind: "timeout"` |
+| `src/lib/api/config.ts` | 수정 | `FEEDBACK_TIMEOUT_MS = 35_000` (기본 `API_TIMEOUT_MS` 10초는 그대로) |
+| `src/lib/api/api.ts` | 수정 | `postFeedback(matchId, puuid)` → `postApi('/matches/{matchId}/feedback', {puuid}, {timeoutMs: FEEDBACK_TIMEOUT_MS})` |
+| `src/lib/api/types.ts` | 수정 | `FeedbackResponse`(05-2 모양: `matchId`·`championId`·`position`·`role`·`win`·`mode`·`templateReason`·`summary`·`sections`·`keyMoments`·`meta`), `FeedbackRole` 10개 |
+| `src/lib/view/feedback.ts` | 새 (순수 함수) | `isFeedbackEligible(queueId, gameDurationSec)`, `ROLE_LABEL_KO`(탱탑·딜탑·탱정글·딜정글·탱미드·딜미드·원딜·탱서폿·딜서폿·유틸서폿 — 백엔드 `role.ts`와 같은 이름), `formatGameTime(sec)`, `toFeedbackView(response)`(섹션 순서 고정·`keyMoments` 최대 3개·빈 배열 처리), `feedbackErrorView(status, code, details)` → `{text, action: "retry" \| "research" \| "none" \| "disabled"}`, `isFeedbackResponse(body)` 모양 검사 |
+| `src/lib/view/summoner.ts` | 수정 | `MatchView`에 `feedbackEligible: boolean` 추가(`queueId`·`gameDurationSec`은 이미 2-5에 있음) |
+| `src/components/summoners/MatchRow.tsx` | 수정 | 행 내용은 그대로. 바깥을 `MatchDisclosure`로 감싸고 `MatchExpandToggle` 자리를 비운다 |
+| `src/components/summoners/MatchDisclosure.tsx` | 새 (client) | 펼침 상태 보유. 서버가 그린 행 내용을 `children`으로 받아 행 `div` + 오른쪽 토글 버튼(`aria-expanded`·`aria-controls`) + 아래 패널(`FeedbackPanel`)을 그린다. 패널은 펼쳤을 때만 마운트 |
+| `src/components/summoners/MatchExpandToggle.tsx` | 삭제 | 역할이 `MatchDisclosure`로 옮겨짐 (버튼 모양·라벨·아이콘은 그대로 옮김) |
+| `src/components/summoners/FeedbackProvider.tsx` | 새 (client) | 페이지 안 기억 장소(6-5). `MatchList`가 `key={puuid}`로 감싼다(`LaneGoldProvider`와 같은 방식) |
+| `src/components/summoners/FeedbackPanel.tsx` | 새 (client) | 상태 ①~⑤ 그리기, 경과 초 타이머, 버튼 |
+| `src/components/summoners/FeedbackResult.tsx` | 새 (client 하위) | ③·④ 결과 모양(요약·영역 3줄·결정적 장면). 상태 없는 표시용 |
+| `src/components/summoners/MatchList.tsx` | 수정 | `FeedbackProvider`로 감싸기 |
+
+- 새 런타임 의존성 없음. 새 환경 변수 없음(`API_BASE_URL` 그대로).
+- 아이콘은 인라인 SVG(기존 토글과 같은 방식).
+- (Build) 아이콘은 `FeedbackResult.tsx`에서 함께 내보내 `FeedbackPanel`이 재사용한다(별도 파일 없음). `postApi` 실패 타입 이름은 `FeedbackFailure`(`kind: "http" | "timeout" | "unavailable"`).
+
+#### 상태 관리
+
+요약: 결과는 `FeedbackProvider`(매치 목록 하나에 1개)에 matchId별로 둔다. 패널이 접혀도(언마운트) 진행 중 요청과 결과가 사라지지 않는다.
+
+| 항목 | 규칙 |
+|------|------|
+| 저장 모양 | `Record<matchId, Entry>`, `Entry = {kind:"loading", startedAt} \| {kind:"done", view} \| {kind:"error", view}` + 목록 전체 `limitReached: boolean` |
+| 시작 | [AI 분석하기] → 이미 `loading`·`done`이면 아무 것도 안 함(중복 요청 방지) → `loading` 저장 → `fetch('/api/feedback', {method:"POST", body, signal: AbortSignal.timeout(40_000)})` |
+| 결과 기억 | `done`은 페이지가 살아 있는 동안 유지. 접었다 펼치면 바로 ③. 새로 고침·다른 소환사 검색이면 사라진다(서버 캐시가 있어 다시 눌러도 백엔드 비용은 없음) |
+| 오류 | `error`는 패널을 접으면 지운다 → 다시 펼치면 ①. [다시 시도]는 같은 요청을 1번 다시 보낸다(사용자가 누를 때만) |
+| 한도 초과 | 429 `daily`를 받으면 `limitReached = true` → 다른 판의 ① 버튼도 비활성 + 한도 문구(승인 2026-11-03). 새로 고침하면 풀리고, 누르면 다시 429를 받는다 |
+| `retryAfterSec` | 503 busy·504는 [다시 시도] 옆에 남은 초를 보여 주고 그동안 비활성(1~60초, 없으면 15초) |
+| 소환사 전환 | `key={puuid}`라 다른 소환사로 바뀌면 통째로 새로 시작. 진행 중 요청 결과는 버린다(언마운트 뒤 상태 변경 없음) |
+| 서버 렌더 | 패널은 펼쳐야 생기므로 수화 전 문제 없음. 버튼은 JS가 없으면 동작하지 않는다(펼치기 자체가 JS) |
+- (Build) 중복 요청 방지는 state보다 먼저 바뀌는 `useRef` 집합(진행 중·완료 matchId)으로 한다. 같은 렌더 안 연타도 요청 1건.
+
+#### 프록시 `/api/feedback`과 35초 타임아웃
+
+요약: 백엔드는 최대 30초 안에 답하거나 504를 준다. 프록시는 35초까지 기다리고, 브라우저는 40초까지 기다린다(바깥일수록 길게).
+
+| 단계 | 시간 제한 | 넘으면 |
+|------|-----------|--------|
+| 백엔드 처리 | 30초 | 504 `ANALYSIS_TIMEOUT` (`retryAfterSec: 15`). 백엔드는 분석을 계속해 캐시에 넣는다 |
+| Next 서버 → 백엔드 (`postApi`) | **35초** (`FEEDBACK_TIMEOUT_MS`) | 프록시가 504 `ANALYSIS_TIMEOUT`(`retryAfterSec: 15`)으로 바꿔 돌려준다 |
+| 브라우저 → `/api/feedback` | 40초 | 화면 "잠시 뒤 다시"(504와 같은 문구) |
+
+| 프록시 검사 (백엔드로 보내기 전) | 실패 |
+|------|------|
+| `Content-Type: application/json`, 본문 2KB 이하, JSON 객체 | 400 `INVALID_PARAMETER` |
+| `matchId` `^KR_[0-9]{1,15}$` | 400 |
+| `puuid` `isValidPuuid`(변경 08 재사용) | 400 |
+| `API_BASE_URL` 없음·연결 실패·JSON 아님 | 503 `UNAVAILABLE` |
+
+- 백엔드가 준 `status`·`code`는 그대로 전달한다. `details`는 허용한 키만 복사(`reason`·`retryAfterSec`·`resetAt`·`limit`). `Retry-After` 헤더는 전달하지 않아도 된다(화면은 `details`만 본다).
+- 로그: `[api] POST /matches/{matchId}/feedback → HTTP 429 ANALYSIS_LIMIT_REACHED` 정도. 본문(`puuid`)은 절대 남기지 않는다.
+- GET `/api/feedback`은 Next 기본 405. 링크 미리 가져오기로 비용이 생길 길이 없다.
+
 ---
 
 ## 7. 상태 처리
@@ -707,6 +842,26 @@ CS 칸은 `w-24`(96px)를 유지하고 줄 높이를 고정한 4줄이다 (D61).
 | 라인전 15분 골드 (변경 08) | 로딩=회색 막대, 값=`45:55`, 없음·재시도 소진·묶음 오류=`-` (페이지 전체는 정상). 자세한 표는 5-9 |
 
 - **Riot 502/503·백엔드 연결 실패는 오류를 던지지 않고 `page.tsx`가 `SummonerStatus` 컴포넌트로 직접 그린다.** 처음에는 `Error.message`에 상태 코드를 담아 던지고 `error.tsx`에서 문구를 고르는 방식을 시도했으나, **production 빌드에서 Next가 서버 컴포넌트가 던진 오류의 `message`를 클라이언트로 보내지 않고 가린다**(보안 동작)는 것을 직접 확인해 설계를 바꿨다. `error.tsx`는 이제 Data Dragon 실패 같은 예상 밖 오류만 잡는다.
+
+### AI 게임 분석 오류 문구 (변경 10)
+
+> **쉬운 요약**: 분기는 `code`(+`details.reason`)로만 한다. 문구는 짧고, 사용자가 할 일이 있을 때만 버튼을 둔다.
+
+요약: 분기는 `code`(+`details.reason`)로만 한다. 문구는 짧고, 사용자가 할 일이 있을 때만 버튼을 둔다.
+
+| HTTP · `code` (`reason`) | 화면 문구 | 버튼 |
+|------|------|------|
+| 429 `ANALYSIS_LIMIT_REACHED` (`daily`) | 오늘 분석 한도를 모두 썼어요. 자정(한국 시간)에 다시 열려요. | 분석 버튼 비활성(모든 판) |
+| 429 `ANALYSIS_LIMIT_REACHED` (`budget`) | 지금은 분석을 쓸 수 없어요. | 없음 |
+| 422 `ANALYSIS_UNSUPPORTED` (모든 reason) | 솔로·자유랭크 15분 이상 경기만 분석할 수 있어요. (`no_position`·`no_timeline`은 "이 경기는 분석에 필요한 기록이 없어요.") | 없음 |
+| 404 `MATCH_NOT_FOUND` (`participant`) | 검색 결과가 오래됐어요. 다시 검색해 주세요. | [다시 검색] → 현재 주소로 새로 고침(`router.refresh()`) |
+| 404 `MATCH_NOT_FOUND` (`match`) | 경기 정보를 찾을 수 없어요. | 없음 |
+| 503 `ANALYSIS_BUSY`, 504 `ANALYSIS_TIMEOUT`, 브라우저 40초 초과 | 분석이 조금 오래 걸리고 있어요. N초 뒤 다시 눌러 주세요. | [다시 시도] (N초 뒤 활성) |
+| 502 `RIOT_UNAVAILABLE` | Riot 서버가 바빠요. 잠시 후 다시 눌러 주세요. | [다시 시도] |
+| 503 `ANALYSIS_DISABLED` | AI 분석은 준비 중이에요. | 분석 버튼 비활성 |
+| 503 `RIOT_KEY_EXPIRED`, 500, 400, 503 `UNAVAILABLE`, 응답 모양 이상 | 지금은 분석할 수 없어요. 잠시 후 다시 시도해 주세요. | [다시 시도] |
+
+- 400은 프론트 버그라 콘솔(`console.error`)에 남긴다. 사용자 문구는 "지금은 분석할 수 없어요"로 통일(05-18의 "요청이 잘못됐습니다"보다 사용자에게 할 일이 분명하다, D77).
 
 ---
 
@@ -841,6 +996,23 @@ CS 칸은 `w-24`(96px)를 유지하고 줄 높이를 고정한 4줄이다 (D61).
 - [ ] 회귀 없음: 360px 매치 행 359px·요약 카드 207px, 통계 화면 헤더 정상, 콘솔 오류 0
 - [ ] 타입 검사·린트·`next build` 통과, 새 의존성·환경 변수 0
 
+### AI 게임 분석 (변경 10)
+- [ ] 목업과 같은 모양: 1280px(매치 칸 800px)·360px에서 ①~⑤·대상 아님 상태, 가로 스크롤 0
+- [ ] 420·440 + 900초 이상 판에만 [AI 분석하기]. 그 밖(일반·칼바람·14분 판)은 버튼 없이 안내 한 줄 (가짜 응답 또는 실제 목록)
+- [ ] 버튼 1번 → `/api/feedback` POST 1건 → 백엔드 POST 1건. 분석 중 연타·접었다 펼치기에도 요청 1건. 결과 뒤 접었다 펼치면 요청 0건
+- [ ] 분석 중 버튼 비활성·경과 초·자리 표시. 접어도 끝나면 다시 펼쳤을 때 결과
+- [ ] 결과: 요약, 영역 3줄(좋은 점/부족한 점 색+아이콘+글자), `note`, 빈 영역 문구, 결정적 장면 0~3개 모두 표시 확인(가짜 응답)
+- [ ] 템플릿 `llm_error`·`llm_off` 작은 표시 (백엔드 LLM 끔으로 실제 확인 + 가짜 응답)
+- [ ] 7장 "AI 게임 분석 오류 문구" 오류 표 전 항목 문구·버튼 (가짜 응답 서버). 429 `daily` 뒤 다른 판 버튼도 비활성. 503 busy·504 `retryAfterSec` 동안 [다시 시도] 비활성
+- [ ] 프록시 형식 오류(Content-Type·2KB 초과·깨진 JSON·잘못된 matchId·puuid) 400, 백엔드로 안 나감. GET 405
+- [ ] 타임아웃: 가짜 서버가 36초 지연 → 프록시 504 → 화면 "잠시 뒤 다시". 기존 다른 API는 10초 그대로
+- [ ] 로그·URL에 `puuid` 없음 (프록시·`postApi` 로그 확인)
+- [ ] 화면 어디에도 등급·점수·판정어 없음 (응답에 없어야 정상이며, 가짜 응답에 `grade`를 넣어도 그리지 않음)
+- [ ] 접근성: 토글 `aria-expanded`/`aria-controls`, 상태 줄 1회 알림, 오류 `alert`, 키보드만으로 펼치기→분석→결과 읽기 가능, 포커스가 사라지지 않음
+- [ ] 회귀 없음: 접힌 상태 행 높이 1280px 133px·360px 359px, 라인전 칸·요약 카드 정상, 콘솔 오류 0
+- [ ] 타입 검사·린트·`next build` 통과, 새 런타임 의존성·환경 변수 0
+- Review 수준: 사용자 결정(2026-11-03)으로 이번 변경은 **독립 Review 없이** Build가 자체 검증까지 하고 `front_build.md`에 기록한다(CLAUDE.md 3장). 실제 LLM 호출은 Build 1회.
+
 ---
 
 ## 11. 결정 사항
@@ -931,6 +1103,13 @@ CS 칸은 `w-24`(96px)를 유지하고 줄 높이를 고정한 4줄이다 (D61).
 | D69 | 프로필 헤더 티어 기준 큐는 솔로/듀오 → 자유랭크 → Unranked. 자유랭크가 기준일 때만 "자유랭크" 접두. 기준 큐 `hotStreak`면 "연승 중" 알약. 헤더에서 "KR" 표기는 뺀다. 이름 복사 버튼은 이번에 넣지 않는다 | 솔로가 대표 큐다. 지역은 URL·검색 규칙상 항상 KR이라 정보량이 없다. 복사 버튼은 요청에 없었다 | 승인 2026-10-30 |
 | D70 | 검색바 확대: 데스크톱(`sm`+) 헤더 64px·sticky 유지, 입력 높이 44px·`text-base`·폼 최대 560px. 모바일은 헤더 2줄(검색창 전체 너비)·sticky 해제 | 헤더가 약 109px로 커져 모바일에서 항상 화면을 차지하면 본문이 줄어든다. 데스크톱은 64px라 sticky 유지 비용이 작다 | 승인 2026-10-30 |
 | D71 | `RefreshButton`은 `useSyncExternalStore`(1초 구독)로 현재 시각을 읽는다. 서버 스냅샷은 `fetchedAt`이라 서버·하이드레이션 출력이 같다(쿨다운 60초·"방금 전"). 쿨다운 초는 `aria-live`에 넣지 않고, `role="status"` 문구는 상태가 바뀔 때만 달라지게(숫자 없음) 한다 | effect 안 `setState` 없이 시각을 다루고, 스크린리더가 1초마다 읽지 않게 한다 | 2026-10-30 |
+| D72 | 백엔드 POST는 **Route Handler 프록시 `/api/feedback`**에서 부른다 (Server Action 아님) | 변경 08 `/api/lane-gold`와 같은 구조라 검사·로그·오류 변환을 한 곳에 둘 수 있고, Server Action은 배포마다 바뀌는 액션 ID·POST 재시도 동작을 따로 신경 써야 한다 | 2026-11-03 |
+| D73 | 결과·진행 상태는 **목록 단위 Provider**에 둔다 (패널 안 `useState` 아님) | 패널을 접으면 언마운트되므로 패널 상태에 두면 진행 중 요청·결과가 사라져 다시 펼칠 때 재호출된다(사용자 결정 9) | 2026-11-03 |
+| D74 | 결정적 장면의 벌어짐/좁혀짐에 **승/패 색을 쓰지 않는다** | `direction`은 격차 크기 변화일 뿐 누가 유리해졌는지가 아니다. 색을 쓰면 잘못된 의미를 준다 | 2026-11-03 |
+| D75 | 영역 판정어(잘함/보통/부족)·점수를 만들지 않는다. 좋은 점/부족한 점 **개수 요약도 만들지 않는다** | 사용자 결정 7. 개수("부족 5개")도 점수처럼 읽힌다 | 2026-11-03 |
+| D76 | 타임아웃 사슬 30초(백엔드) < 35초(프록시) < 40초(브라우저) | 안쪽이 먼저 끝나야 백엔드의 504와 `retryAfterSec`가 화면까지 전달된다 | 2026-11-03 |
+| D77 | 400은 사용자에게 "지금은 분석할 수 없어요"로 보인다 | 400은 프론트 버그라 사용자가 할 수 있는 일이 없다. 원인은 콘솔 로그로 본다 | 2026-11-03 |
+| D78 | 결과를 localStorage에 저장하지 않는다 | 사용자 결정 9는 "페이지 안"이고, 서버 메모리 캐시가 있어 다시 눌러도 비용이 없다. 저장소에 남기면 puuid·문장 관리 문제가 생긴다 | 2026-11-03 |
 
 ### 변경 07 부가 기록
 
@@ -980,7 +1159,7 @@ CS 칸은 `w-24`(96px)를 유지하고 줄 높이를 고정한 4줄이다 (D61).
 | Review | `frontend/docs/front_review.md`(이번 검토로 교체), `frontend/docs/front_overview.md`(덮어써 갱신 + 변경 이력 1줄), 검토 중 고친 `frontend/` 코드와 `front_build.md`의 해당 기록, `docs/career_log.md`(맨 아래 **추가만**) | `frontend/docs/front_spec.md`, `.env`, `.env.example`, `docs/contracts/*`, `backend/`, `db/` |
 
 - 저장소 루트의 `CLAUDE.md`, `api.md`는 수정하지 않는다.
-- Build·Review는 확인을 위해 `backend/`에서 `npm start`로 API를 띄우고 GET만 호출할 수 있다. 끝나면 종료한다. 수집(`collect`)·집계·DB 쓰기는 하지 않는다.
+- Build·Review는 확인을 위해 `backend/`에서 `npm start`로 API를 띄우고 GET만 호출할 수 있다. 예외: 분석 POST(계약 2-7)는 `FEEDBACK_LLM_ENABLED=false` 백엔드(템플릿, 0원) 또는 가짜 응답 서버로 확인하고, 실제 LLM 호출은 사용자가 승인한 횟수만 한다(변경 10). 끝나면 종료한다. 수집(`collect`)·집계·DB 쓰기는 하지 않는다.
 - 상태 확인용 가짜 응답 서버와 복사본은 scratchpad에서만 만든다.
 - `.env` 값은 읽기만 하고 문서·로그·응답에 쓰지 않는다. `.env`에 값을 넣는 일은 사용자에게 요청한다.
 - 계약을 바꿔야 하면 직접 고치지 않고 이 문서 12장에 적어 메인 에이전트에게 보고한다.
