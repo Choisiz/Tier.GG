@@ -1,0 +1,972 @@
+{
+  "label": "replay.set5.claude-opus-5-5.low",
+  "promptVersion": "2026-11-03.1",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "totals": {
+    "slots": 54,
+    "firstPass": 51,
+    "numberFirstPass": 52,
+    "retried": 3,
+    "templated": 0,
+    "templateMode": 0,
+    "costUsd": 0.37118360000000006,
+    "finalNumber": 0,
+    "finalDirection": 0,
+    "finalForbidden": 0
+  },
+  "results": [
+    {
+      "matchId": "KR_8437852704",
+      "participantId": 5,
+      "position": "UTILITY",
+      "role": "SUPPORT_DAMAGE",
+      "note": "세나 판 (설계 9장), 패, 23.1분",
+      "feedback": {
+        "mode": "llm",
+        "summary": {
+          "text": "라인전은 상대 애쉬에게 밀렸고, 오브젝트 싸움과 그 밖의 운영 모두 부족했습니다. 15분 싸움에서 1킬을 내고 4킬을 내주며 팀 골드 격차가 약 3,900 벌어졌습니다.",
+          "factIds": [
+            "laning.opponent",
+            "keyMoment.0.startMin",
+            "keyMoment.0.killsOurs",
+            "keyMoment.0.killsTheirs",
+            "keyMoment.0.gapChangeAbs"
+          ],
+          "source": "llm"
+        },
+        "sections": {
+          "laning": {
+            "good": [],
+            "bad": [
+              {
+                "subjectId": "laning.gold",
+                "text": "15분 골드가 3,958로 상대 애쉬의 4,661보다 703 적었습니다.",
+                "factIds": [
+                  "laning.referenceMin",
+                  "laning.gold.me",
+                  "laning.gold.enemy",
+                  "laning.gold.diffAbs",
+                  "laning.opponent"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "laning.kda",
+                "text": "15분까지 0킬 2데스 3어시스트로, 상대 애쉬보다 킬과 어시스트를 더하고 데스를 뺀 값이 4 낮았습니다.",
+                "factIds": [
+                  "laning.referenceMin",
+                  "laning.kda.me.kills",
+                  "laning.kda.me.deaths",
+                  "laning.kda.me.assists",
+                  "laning.opponent",
+                  "laning.kda.formula",
+                  "laning.kda.diffAbs"
+                ],
+                "source": "llm"
+              }
+            ]
+          },
+          "fight": {
+            "good": [],
+            "bad": [
+              {
+                "subjectId": "fight.vision",
+                "text": "오브젝트 4개 전 시야 점수 합이 2로, 오브젝트당 0.5에 그쳤습니다.",
+                "factIds": [
+                  "fight.vision.objectives",
+                  "fight.vision.points",
+                  "fight.vision.perObjective"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "fight.advantage",
+                "text": "낀 오브젝트 싸움 2번에서 득실 중 우리 팀 몫이 4.5%로 낮았습니다.",
+                "factIds": [
+                  "fight.advantage.fights",
+                  "fight.advantage.sharePct"
+                ],
+                "source": "llm"
+              }
+            ]
+          },
+          "macro": {
+            "good": [
+              {
+                "subjectId": "macro.side",
+                "text": "포탑 피해량 2,017, 분당 87.4로 포탑에 꾸준히 피해를 넣었습니다.",
+                "factIds": [
+                  "macro.side.turretDamage",
+                  "macro.side.perMinute"
+                ],
+                "source": "llm"
+              }
+            ],
+            "bad": [
+              {
+                "subjectId": "macro.vision",
+                "text": "오브젝트 싸움 밖 시야 점수 합이 21로, 분당 0.91에 머물렀습니다.",
+                "factIds": [
+                  "macro.vision.points",
+                  "macro.vision.perMinute"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "macro.advantage",
+                "text": "낀 오브젝트 밖 싸움 5번에서 득실 중 우리 팀 몫이 25.4%로 낮았습니다.",
+                "factIds": [
+                  "macro.advantage.fights",
+                  "macro.advantage.sharePct"
+                ],
+                "source": "llm"
+              }
+            ]
+          }
+        },
+        "keyMoments": [
+          {
+            "index": 0,
+            "text": "15분 싸움에서 1킬, 4킬을 내주며 골드 격차가 3,324에서 7,219로 벌어졌고, 우리 바텀 1차 포탑을 잃었습니다.",
+            "factIds": [
+              "keyMoment.0.startMin",
+              "keyMoment.0.killsOurs",
+              "keyMoment.0.killsTheirs",
+              "keyMoment.0.goldGapBeforeAbs",
+              "keyMoment.0.goldGapAfterAbs",
+              "keyMoment.0.followUp.0"
+            ],
+            "source": "llm"
+          },
+          {
+            "index": 1,
+            "text": "16분 싸움에서 3킬을 내주며 골드 격차가 약 3,900 벌어졌고, 상대 팀이 전령을 잡았습니다.",
+            "factIds": [
+              "keyMoment.1.startMin",
+              "keyMoment.1.killsTheirs",
+              "keyMoment.1.gapChangeAbs",
+              "keyMoment.1.followUp.1"
+            ],
+            "source": "llm"
+          },
+          {
+            "index": 2,
+            "text": "22분 싸움에서 4킬씩 주고받아 골드 격차가 465 좁혀졌지만, 우리 미드 억제기를 잃었습니다.",
+            "factIds": [
+              "keyMoment.2.startMin",
+              "keyMoment.2.killsOurs",
+              "keyMoment.2.gapChangeAbs",
+              "keyMoment.2.followUp.1"
+            ],
+            "source": "llm"
+          }
+        ],
+        "meta": {
+          "engineVersion": "2026-11-02.2",
+          "promptVersion": "2026-11-03.1",
+          "model": "claude-opus-5-5",
+          "effort": "low",
+          "attempts": 1,
+          "verification": {
+            "firstPass": 11,
+            "firstTotal": 11,
+            "numberFirstPass": 11,
+            "retried": 0,
+            "templated": 0,
+            "failures": [],
+            "retryFailures": [],
+            "extras": []
+          },
+          "usage": {
+            "input": 6034,
+            "cacheWrite": 4244,
+            "cacheRead": 0,
+            "output": 1434
+          },
+          "costUsd": 0.074036,
+          "durationMs": 5,
+          "fallbackReason": null
+        }
+      },
+      "finalCheck": {
+        "number": 0,
+        "direction": 0,
+        "forbidden": 0,
+        "other": 0,
+        "details": []
+      },
+      "recording": "KR_8437852704.p5.2026-11-03.1.claude-opus-5-5.low.2.json",
+      "replayMismatches": []
+    },
+    {
+      "matchId": "KR_8419421568",
+      "participantId": 6,
+      "position": "TOP",
+      "role": "TOP_TANK",
+      "note": "승, 27.8분",
+      "feedback": {
+        "mode": "llm",
+        "summary": {
+          "text": "라인전은 티모 상대로 우세했고 오브젝트 싸움은 잘했으며 그 밖의 운영은 보통이었습니다. 17분 싸움에서 우리 팀이 6킬을 내며 골드 격차가 약 2,000 벌어졌습니다.",
+          "factIds": [
+            "laning.opponent",
+            "keyMoment.0.startMin",
+            "keyMoment.0.killsOurs",
+            "keyMoment.0.gapChangeAbs"
+          ],
+          "source": "llm"
+        },
+        "sections": {
+          "laning": {
+            "good": [
+              {
+                "subjectId": "laning.gold",
+                "text": "15분 골드가 6,299로 상대 티모보다 1,823 많았습니다.",
+                "factIds": [
+                  "laning.referenceMin",
+                  "laning.gold.me",
+                  "laning.opponent",
+                  "laning.gold.diffAbs"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "laning.level",
+                "text": "15분 레벨이 12로 상대 티모의 10보다 2 높았습니다.",
+                "factIds": [
+                  "laning.referenceMin",
+                  "laning.level.me",
+                  "laning.opponent",
+                  "laning.level.enemy",
+                  "laning.level.diffAbs"
+                ],
+                "source": "llm"
+              }
+            ],
+            "bad": []
+          },
+          "fight": {
+            "good": [
+              {
+                "subjectId": "fight.advantage",
+                "text": "오브젝트 싸움 4번에 참여했고, 득실 중 우리 팀 몫이 69.5%였습니다.",
+                "factIds": [
+                  "fight.advantage.fights",
+                  "fight.advantage.sharePct"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "fight.damage",
+                "text": "0~15분 챔피언 딜 비중이 26.1%로 탱탑 기대치 18%보다 8.1%p 높았습니다.",
+                "factIds": [
+                  "fight.damage.phase0StartMin",
+                  "fight.damage.phase0EndMin",
+                  "fight.damage.share0",
+                  "player.role",
+                  "fight.damage.expected0",
+                  "fight.damage.diff0Abs"
+                ],
+                "source": "llm"
+              }
+            ],
+            "bad": []
+          },
+          "macro": {
+            "good": [
+              {
+                "subjectId": "macro.advantage",
+                "text": "오브젝트 밖 싸움 8번에 참여했고, 득실 중 우리 팀 몫이 87.1%였습니다.",
+                "factIds": [
+                  "macro.advantage.fights",
+                  "macro.advantage.sharePct"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "macro.solo",
+                "text": "단독 킬 2번, 단독 데스 0번으로 혼자 잡힌 적이 없었습니다.",
+                "factIds": [
+                  "macro.solo.kills",
+                  "macro.solo.deaths"
+                ],
+                "source": "llm"
+              }
+            ],
+            "bad": [
+              {
+                "subjectId": "macro.side",
+                "text": "포탑 피해량이 3,490, 분당 125.8로 사이드 압박이 낮았습니다.",
+                "factIds": [
+                  "macro.side.turretDamage",
+                  "macro.side.perMinute"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "macro.farm",
+                "text": "CS가 90에서 게임 끝 165로 늘었지만, 마지막 12.8분 동안 분당 CS가 5.9에 그쳤습니다.",
+                "factIds": [
+                  "macro.farm.cs15",
+                  "macro.farm.csEnd",
+                  "macro.farm.minutes",
+                  "macro.farm.perMinute"
+                ],
+                "source": "llm_retry"
+              }
+            ]
+          }
+        },
+        "keyMoments": [
+          {
+            "index": 0,
+            "text": "17분 싸움에서 우리 팀이 6킬, 상대가 3킬을 내며 골드 격차가 약 2,000 벌어졌습니다. 이어서 상대 바텀 2차 포탑을 깼습니다.",
+            "factIds": [
+              "keyMoment.0.startMin",
+              "keyMoment.0.killsOurs",
+              "keyMoment.0.killsTheirs",
+              "keyMoment.0.gapChangeAbs",
+              "keyMoment.0.followUp.0"
+            ],
+            "source": "llm"
+          },
+          {
+            "index": 1,
+            "text": "23분 싸움에서 우리 팀이 5킬을 내며 골드 격차가 약 2,700 벌어졌습니다. 이어서 상대 탑 2차 포탑을 깼습니다.",
+            "factIds": [
+              "keyMoment.1.startMin",
+              "keyMoment.1.killsOurs",
+              "keyMoment.1.gapChangeAbs",
+              "keyMoment.1.followUp.0"
+            ],
+            "source": "llm"
+          },
+          {
+            "index": 2,
+            "text": "26분 싸움에서 우리 팀이 4킬을 내며 골드 격차가 2,990 벌어졌습니다. 이어서 상대 미드 억제기를 깼습니다.",
+            "factIds": [
+              "keyMoment.2.startMin",
+              "keyMoment.2.killsOurs",
+              "keyMoment.2.gapChangeAbs",
+              "keyMoment.2.followUp.0"
+            ],
+            "source": "llm"
+          }
+        ],
+        "meta": {
+          "engineVersion": "2026-11-02.2",
+          "promptVersion": "2026-11-03.1",
+          "model": "claude-opus-5-5",
+          "effort": "low",
+          "attempts": 2,
+          "verification": {
+            "firstPass": 11,
+            "firstTotal": 12,
+            "numberFirstPass": 11,
+            "retried": 1,
+            "templated": 0,
+            "failures": [
+              {
+                "slot": "macro.bad.1",
+                "rule": "number",
+                "detail": "\"15\"가 이 문장의 factIds 값과 맞지 않음 (쓸 수 있는 값: macro.farm.cs15=90, macro.farm.csEnd=165, macro.farm.perMinute=5.88)"
+              },
+              {
+                "slot": "macro.bad.1",
+                "rule": "number",
+                "detail": "\"15\"가 이 문장의 factIds 값과 맞지 않음 (쓸 수 있는 값: macro.farm.cs15=90, macro.farm.csEnd=165, macro.farm.perMinute=5.88)"
+              }
+            ],
+            "retryFailures": [],
+            "extras": []
+          },
+          "usage": {
+            "input": 14260,
+            "cacheWrite": 2827,
+            "cacheRead": 4244,
+            "output": 1609
+          },
+          "costUsd": 0.1042038,
+          "durationMs": 3,
+          "fallbackReason": null
+        }
+      },
+      "finalCheck": {
+        "number": 0,
+        "direction": 0,
+        "forbidden": 0,
+        "other": 0,
+        "details": []
+      },
+      "recording": "KR_8419421568.p6.2026-11-03.1.claude-opus-5-5.low.json",
+      "replayMismatches": []
+    },
+    {
+      "matchId": "KR_8419458143",
+      "participantId": 2,
+      "position": "JUNGLE",
+      "role": "JUNGLE_DAMAGE",
+      "note": "패, 15.3분",
+      "feedback": {
+        "mode": "llm",
+        "summary": {
+          "text": "라인전은 렉사이에 열세였고, 오브젝트 싸움과 그 밖의 운영 모두 부족했습니다. 8분 싸움에서 우리 팀 2킬, 상대 팀 3킬로 골드 격차가 795 벌어졌습니다.",
+          "factIds": [
+            "laning.opponent",
+            "keyMoment.0.startMin",
+            "keyMoment.0.killsOurs",
+            "keyMoment.0.killsTheirs",
+            "keyMoment.0.gapChangeAbs"
+          ],
+          "source": "llm"
+        },
+        "sections": {
+          "laning": {
+            "good": [],
+            "bad": [
+              {
+                "subjectId": "laning.gold",
+                "text": "15분 골드가 4,244로 상대 렉사이보다 1,512 적었습니다. 그 전에 3번 데스가 있었습니다.",
+                "factIds": [
+                  "laning.referenceMin",
+                  "laning.gold.me",
+                  "laning.opponent",
+                  "laning.gold.diffAbs",
+                  "laning.deathsBefore.count"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "laning.level",
+                "text": "15분 레벨이 8로 상대 렉사이의 10보다 2 낮았습니다.",
+                "factIds": [
+                  "laning.referenceMin",
+                  "laning.level.me",
+                  "laning.opponent",
+                  "laning.level.enemy",
+                  "laning.level.diffAbs"
+                ],
+                "source": "llm"
+              }
+            ]
+          },
+          "fight": {
+            "good": [],
+            "bad": [
+              {
+                "subjectId": "fight.objective",
+                "text": "오브젝트 막타는 0번이었습니다.",
+                "factIds": [
+                  "fight.objective.lastHits"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "fight.advantage",
+                "text": "낀 오브젝트 싸움 2번에서 득실 중 우리 팀 몫은 15.4%에 그쳤습니다.",
+                "factIds": [
+                  "fight.advantage.fights",
+                  "fight.advantage.sharePct"
+                ],
+                "source": "llm"
+              }
+            ]
+          },
+          "macro": {
+            "good": [
+              {
+                "subjectId": "macro.vision",
+                "text": "오브젝트 싸움 밖에서 시야 점수 11을 모아 분당 0.72를 기록했습니다.",
+                "factIds": [
+                  "macro.vision.points",
+                  "macro.vision.perMinute"
+                ],
+                "source": "llm"
+              }
+            ],
+            "bad": [
+              {
+                "subjectId": "macro.advantage",
+                "text": "낀 오브젝트 밖 싸움 1번에서 우리 팀 몫은 0%였습니다.",
+                "factIds": [
+                  "macro.advantage.fights",
+                  "macro.advantage.sharePct"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "macro.side",
+                "text": "포탑 피해량이 0으로 사이드 압박이 없었습니다.",
+                "factIds": [
+                  "macro.side.turretDamage"
+                ],
+                "source": "llm"
+              }
+            ]
+          }
+        },
+        "keyMoments": [
+          {
+            "index": 0,
+            "text": "8.2분 싸움에서 5킬 중 상대 팀이 3킬을 가져가 골드 격차가 1,421에서 2,216으로 벌어졌습니다. 이후 상대 팀이 공허 유충을 잡았습니다.",
+            "factIds": [
+              "keyMoment.0.startMin",
+              "keyMoment.0.kills",
+              "keyMoment.0.killsTheirs",
+              "keyMoment.0.goldGapBeforeAbs",
+              "keyMoment.0.goldGapAfterAbs",
+              "keyMoment.0.followUp.0"
+            ],
+            "source": "llm"
+          }
+        ],
+        "meta": {
+          "engineVersion": "2026-11-02.2",
+          "promptVersion": "2026-11-03.1",
+          "model": "claude-opus-5-5",
+          "effort": "low",
+          "attempts": 1,
+          "verification": {
+            "firstPass": 9,
+            "firstTotal": 9,
+            "numberFirstPass": 9,
+            "retried": 0,
+            "templated": 0,
+            "failures": [],
+            "retryFailures": [],
+            "extras": []
+          },
+          "usage": {
+            "input": 3472,
+            "cacheWrite": 0,
+            "cacheRead": 4244,
+            "output": 1051
+          },
+          "costUsd": 0.035756800000000005,
+          "durationMs": 1,
+          "fallbackReason": null
+        }
+      },
+      "finalCheck": {
+        "number": 0,
+        "direction": 0,
+        "forbidden": 0,
+        "other": 0,
+        "details": []
+      },
+      "recording": "KR_8419458143.p2.2026-11-03.1.claude-opus-5-5.low.json",
+      "replayMismatches": []
+    },
+    {
+      "matchId": "KR_8419451137",
+      "participantId": 3,
+      "position": "MIDDLE",
+      "role": "MID_DAMAGE",
+      "note": "승, 19.3분",
+      "feedback": {
+        "mode": "llm",
+        "summary": {
+          "text": "라인전은 상대 다이애나보다 우세했고, 오브젝트 싸움은 부족했으며, 그 밖의 운영은 잘했습니다. 16분 싸움에서 우리 팀이 4킬을 내며 골드 격차가 약 4,000 벌어졌고, 이어서 상대 미드 1차 포탑을 깼습니다.",
+          "factIds": [
+            "laning.opponent",
+            "keyMoment.0.startMin",
+            "keyMoment.0.killsOurs",
+            "keyMoment.0.gapChangeAbs",
+            "keyMoment.0.followUp.0"
+          ],
+          "source": "llm"
+        },
+        "sections": {
+          "laning": {
+            "good": [
+              {
+                "subjectId": "laning.gold",
+                "text": "15분 골드가 6,006으로 상대 다이애나의 5,958보다 48 많았습니다.",
+                "factIds": [
+                  "laning.referenceMin",
+                  "laning.gold.me",
+                  "laning.gold.enemy",
+                  "laning.gold.diffAbs",
+                  "laning.opponent"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "laning.level",
+                "text": "15분 레벨이 11로 상대 다이애나의 9보다 2 높았습니다.",
+                "factIds": [
+                  "laning.referenceMin",
+                  "laning.level.me",
+                  "laning.level.enemy",
+                  "laning.level.diffAbs",
+                  "laning.opponent"
+                ],
+                "source": "llm"
+              }
+            ],
+            "bad": []
+          },
+          "fight": {
+            "good": [
+              {
+                "subjectId": "fight.advantage",
+                "text": "낀 오브젝트 싸움 4번에서 득실 중 우리 팀 몫이 78.1%였습니다.",
+                "factIds": [
+                  "fight.advantage.fights",
+                  "fight.advantage.sharePct"
+                ],
+                "source": "llm"
+              }
+            ],
+            "bad": [
+              {
+                "subjectId": "fight.damage",
+                "text": "15분 이후 챔피언 딜 비중이 6.9%로, 기대 비중 22%보다 15.1%p 낮았습니다.",
+                "factIds": [
+                  "fight.damage.phase1StartMin",
+                  "fight.damage.share1",
+                  "fight.damage.expected1",
+                  "fight.damage.diff1Abs"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "fight.vision",
+                "text": "오브젝트 3개 전 시야 점수 합이 1로, 오브젝트당 0.33에 그쳤습니다.",
+                "factIds": [
+                  "fight.vision.objectives",
+                  "fight.vision.points",
+                  "fight.vision.perObjective"
+                ],
+                "source": "llm"
+              }
+            ]
+          },
+          "macro": {
+            "good": [
+              {
+                "subjectId": "macro.advantage",
+                "text": "낀 오브젝트 밖 싸움 2번에서 득실 중 우리 팀 몫이 83.3%였습니다.",
+                "factIds": [
+                  "macro.advantage.fights",
+                  "macro.advantage.sharePct"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "macro.side",
+                "text": "포탑 피해량 13,705, 분당 709.5로 사이드 압박이 강했습니다.",
+                "factIds": [
+                  "macro.side.turretDamage",
+                  "macro.side.perMinute"
+                ],
+                "source": "llm"
+              }
+            ],
+            "bad": []
+          }
+        },
+        "keyMoments": [
+          {
+            "index": 0,
+            "text": "16분 싸움에서 우리 팀이 4킬, 상대 0킬로 골드 격차가 3,650에서 7,616으로 벌어졌고, 이어서 상대 미드 1차 포탑을 깼습니다.",
+            "factIds": [
+              "keyMoment.0.startMin",
+              "keyMoment.0.killsOurs",
+              "keyMoment.0.killsTheirs",
+              "keyMoment.0.goldGapBeforeAbs",
+              "keyMoment.0.goldGapAfterAbs",
+              "keyMoment.0.followUp.0"
+            ],
+            "source": "llm"
+          },
+          {
+            "index": 1,
+            "text": "11분 싸움에서 우리 팀이 6킬, 상대 2킬로 골드 격차가 약 3,500 벌어졌습니다.",
+            "factIds": [
+              "keyMoment.1.startMin",
+              "keyMoment.1.killsOurs",
+              "keyMoment.1.killsTheirs",
+              "keyMoment.1.gapChangeAbs"
+            ],
+            "source": "llm"
+          },
+          {
+            "index": 2,
+            "text": "14분 싸움에서 킬이 3대 3으로 갈리며 골드 격차가 약 1,700 좁혀졌고, 우리 탑 1차 포탑을 잃었습니다.",
+            "factIds": [
+              "keyMoment.2.startMin",
+              "keyMoment.2.killsOurs",
+              "keyMoment.2.killsTheirs",
+              "keyMoment.2.gapChangeAbs",
+              "keyMoment.2.followUp.0"
+            ],
+            "source": "llm"
+          }
+        ],
+        "meta": {
+          "engineVersion": "2026-11-02.2",
+          "promptVersion": "2026-11-03.1",
+          "model": "claude-opus-5-5",
+          "effort": "low",
+          "attempts": 1,
+          "verification": {
+            "firstPass": 11,
+            "firstTotal": 11,
+            "numberFirstPass": 11,
+            "retried": 0,
+            "templated": 0,
+            "failures": [],
+            "retryFailures": [],
+            "extras": []
+          },
+          "usage": {
+            "input": 5535,
+            "cacheWrite": 0,
+            "cacheRead": 4244,
+            "output": 1441
+          },
+          "costUsd": 0.0518088,
+          "durationMs": 2,
+          "fallbackReason": null
+        }
+      },
+      "finalCheck": {
+        "number": 0,
+        "direction": 0,
+        "forbidden": 0,
+        "other": 0,
+        "details": []
+      },
+      "recording": "KR_8419451137.p3.2026-11-03.1.claude-opus-5-5.low.json",
+      "replayMismatches": []
+    },
+    {
+      "matchId": "KR_8419447142",
+      "participantId": 4,
+      "position": "BOTTOM",
+      "role": "ADC",
+      "note": "패, 30.7분",
+      "feedback": {
+        "mode": "llm",
+        "summary": {
+          "text": "미스 포츈으로 라인전은 제리에게 밀렸고, 오브젝트 싸움은 잘했지만 그 밖의 운영은 부족했습니다. 23.6분 싸움에서 상대 팀만 3킬을 올려 골드 격차가 300 벌어졌고, 앞선 팀이 상대 팀으로 바뀌었습니다.",
+          "factIds": [
+            "player.champion",
+            "laning.opponent",
+            "keyMoment.0.startMin",
+            "keyMoment.0.killsTheirs",
+            "keyMoment.0.gapChangeAbs",
+            "keyMoment.0.leaderAfter"
+          ],
+          "source": "llm_retry"
+        },
+        "sections": {
+          "laning": {
+            "good": [],
+            "bad": [
+              {
+                "subjectId": "laning.gold",
+                "text": "15분 골드가 5,899로 상대 제리의 6,770보다 871 적었습니다. 11.1분에 1번 데스가 있었습니다.",
+                "factIds": [
+                  "laning.referenceMin",
+                  "laning.gold.me",
+                  "laning.gold.enemy",
+                  "laning.gold.diffAbs",
+                  "laning.opponent",
+                  "laning.deathsBefore.0.min",
+                  "laning.deathsBefore.count"
+                ],
+                "source": "llm"
+              },
+              {
+                "subjectId": "laning.level",
+                "text": "15분 레벨이 8로 상대 제리의 9보다 1 낮았습니다.",
+                "factIds": [
+                  "laning.referenceMin",
+                  "laning.level.me",
+                  "laning.level.enemy",
+                  "laning.level.diffAbs",
+                  "laning.opponent"
+                ],
+                "source": "llm"
+              }
+            ]
+          },
+          "fight": {
+            "good": [
+              {
+                "subjectId": "fight.damage",
+                "text": "15분 이후 챔피언 딜 비중이 28.7%로 원딜 기대치 23%보다 5.7%p 높았습니다. 0~15분에도 26.3%로 기대치보다 높았습니다.",
+                "factIds": [
+                  "fight.damage.phase1StartMin",
+                  "fight.damage.share1",
+                  "player.role",
+                  "fight.damage.expected1",
+                  "fight.damage.diff1Abs",
+                  "fight.damage.phase0StartMin",
+                  "fight.damage.phase0EndMin",
+                  "fight.damage.share0"
+                ],
+                "source": "llm"
+              }
+            ],
+            "bad": [
+              {
+                "subjectId": "fight.vision",
+                "text": "오브젝트 8개 전 시야 점수 합이 4로, 오브젝트당 0.5에 그쳤습니다.",
+                "factIds": [
+                  "fight.vision.objectives",
+                  "fight.vision.points",
+                  "fight.vision.perObjective"
+                ],
+                "source": "llm"
+              }
+            ]
+          },
+          "macro": {
+            "good": [
+              {
+                "subjectId": "macro.vision",
+                "text": "오브젝트 싸움 밖에서 시야 점수 18을 모아 분당 0.59를 기록했습니다.",
+                "factIds": [
+                  "macro.vision.points",
+                  "macro.vision.perMinute"
+                ],
+                "source": "llm"
+              }
+            ],
+            "bad": [
+              {
+                "subjectId": "macro.farm",
+                "text": "라인전 이후 15.7분 동안 분당 CS가 7.4개에 그쳐, 125개였던 CS가 게임 끝 242개에 머물렀습니다.",
+                "factIds": [
+                  "macro.farm.minutes",
+                  "macro.farm.perMinute",
+                  "macro.farm.cs15",
+                  "macro.farm.csEnd"
+                ],
+                "source": "llm_retry"
+              },
+              {
+                "subjectId": "macro.advantage",
+                "text": "오브젝트 밖 싸움 7번의 득실 중 우리 팀 몫이 15.4%로 낮았습니다.",
+                "factIds": [
+                  "macro.advantage.fights",
+                  "macro.advantage.sharePct"
+                ],
+                "source": "llm"
+              }
+            ]
+          }
+        },
+        "keyMoments": [
+          {
+            "index": 0,
+            "text": "23.6분 싸움에서 상대 팀만 3킬을 올리며 골드 격차가 300 벌어졌고, 앞선 팀이 상대 팀으로 바뀌었습니다. 이후 우리 미드 2차 포탑을 잃었습니다.",
+            "factIds": [
+              "keyMoment.0.startMin",
+              "keyMoment.0.killsTheirs",
+              "keyMoment.0.gapChangeAbs",
+              "keyMoment.0.leaderAfter",
+              "keyMoment.0.followUp.0"
+            ],
+            "source": "llm"
+          },
+          {
+            "index": 1,
+            "text": "25.7분 싸움에서 1킬 5데스로 골드 격차가 4,712까지 벌어졌습니다. 이후 우리 미드 억제기를 잃었습니다.",
+            "factIds": [
+              "keyMoment.1.startMin",
+              "keyMoment.1.killsOurs",
+              "keyMoment.1.killsTheirs",
+              "keyMoment.1.goldGapAfterAbs",
+              "keyMoment.1.followUp.1"
+            ],
+            "source": "llm"
+          },
+          {
+            "index": 2,
+            "text": "16.6분 싸움에서 우리 팀 1킬, 상대 팀 3킬로 우리 팀이 앞서던 골드 격차가 1,796 좁혀졌습니다. 이후 우리 바텀 1차 포탑을 잃었습니다.",
+            "factIds": [
+              "keyMoment.2.startMin",
+              "keyMoment.2.killsOurs",
+              "keyMoment.2.killsTheirs",
+              "keyMoment.2.leaderBefore",
+              "keyMoment.2.gapChangeAbs",
+              "keyMoment.2.followUp.0"
+            ],
+            "source": "llm"
+          }
+        ],
+        "meta": {
+          "engineVersion": "2026-11-02.2",
+          "promptVersion": "2026-11-03.1",
+          "model": "claude-opus-5-5",
+          "effort": "low",
+          "attempts": 2,
+          "verification": {
+            "firstPass": 9,
+            "firstTotal": 11,
+            "numberFirstPass": 10,
+            "retried": 2,
+            "templated": 0,
+            "failures": [
+              {
+                "slot": "summary",
+                "rule": "shape",
+                "detail": "이 칸에서 쓸 수 없는 fact ID: keyMoment.1.startMin"
+              },
+              {
+                "slot": "summary",
+                "rule": "shape",
+                "detail": "이 칸에서 쓸 수 없는 fact ID: keyMoment.1.killsOurs"
+              },
+              {
+                "slot": "summary",
+                "rule": "shape",
+                "detail": "이 칸에서 쓸 수 없는 fact ID: keyMoment.1.killsTheirs"
+              },
+              {
+                "slot": "summary",
+                "rule": "shape",
+                "detail": "이 칸에서 쓸 수 없는 fact ID: keyMoment.1.gapChangeAbs"
+              },
+              {
+                "slot": "macro.bad.0",
+                "rule": "number",
+                "detail": "\"15\"가 이 문장의 factIds 값과 맞지 않음 (쓸 수 있는 값: macro.farm.perMinute=7.43, macro.farm.cs15=125, macro.farm.csEnd=242)"
+              },
+              {
+                "slot": "macro.bad.0",
+                "rule": "number",
+                "detail": "\"15\"가 이 문장의 factIds 값과 맞지 않음 (쓸 수 있는 값: macro.farm.perMinute=7.43, macro.farm.cs15=125, macro.farm.csEnd=242)"
+              }
+            ],
+            "retryFailures": [],
+            "extras": []
+          },
+          "usage": {
+            "input": 14526,
+            "cacheWrite": 0,
+            "cacheRead": 7071,
+            "output": 2293
+          },
+          "costUsd": 0.1053782,
+          "durationMs": 3,
+          "fallbackReason": null
+        }
+      },
+      "finalCheck": {
+        "number": 0,
+        "direction": 0,
+        "forbidden": 0,
+        "other": 0,
+        "details": []
+      },
+      "recording": "KR_8419447142.p4.2026-11-03.1.claude-opus-5-5.low.json",
+      "replayMismatches": []
+    }
+  ]
+}

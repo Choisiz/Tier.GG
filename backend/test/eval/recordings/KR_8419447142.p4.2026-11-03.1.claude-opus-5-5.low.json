@@ -1,0 +1,64 @@
+{
+  "matchId": "KR_8419447142",
+  "participantId": 4,
+  "engineVersion": "2026-11-02.2",
+  "promptVersion": "2026-11-03.1",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-03T05:43:18.056Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "4a62ec59618b3d146db43bef58c01d5c20663eba59ec0d51ddab21e7a13dda74",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"미스 포츈으로 라인전은 제리에게 밀렸고, 오브젝트 싸움은 잘했지만 그 밖의 운영은 부족했습니다. 25.7분 싸움에서 우리 팀 1킬, 상대 팀 5킬로 골드 격차가 3,725 벌어졌습니다.\",\"factIds\":[\"player.champion\",\"laning.opponent\",\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.gapChangeAbs\"]},\"sections\":{\"laning\":{\"good\":[],\"bad\":[{\"subjectId\":\"laning.gold\",\"text\":\"15분 골드가 5,899로 상대 제리의 6,770보다 871 적었습니다. 11.1분에 1번 데스가 있었습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.gold.me\",\"laning.gold.enemy\",\"laning.gold.diffAbs\",\"laning.opponent\",\"laning.deathsBefore.0.min\",\"laning.deathsBefore.count\"]},{\"subjectId\":\"laning.level\",\"text\":\"15분 레벨이 8로 상대 제리의 9보다 1 낮았습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.level.me\",\"laning.level.enemy\",\"laning.level.diffAbs\",\"laning.opponent\"]}]},\"fight\":{\"good\":[{\"subjectId\":\"fight.damage\",\"text\":\"15분 이후 챔피언 딜 비중이 28.7%로 원딜 기대치 23%보다 5.7%p 높았습니다. 0~15분에도 26.3%로 기대치보다 높았습니다.\",\"factIds\":[\"fight.damage.phase1StartMin\",\"fight.damage.share1\",\"player.role\",\"fight.damage.expected1\",\"fight.damage.diff1Abs\",\"fight.damage.phase0StartMin\",\"fight.damage.phase0EndMin\",\"fight.damage.share0\"]}],\"bad\":[{\"subjectId\":\"fight.vision\",\"text\":\"오브젝트 8개 전 시야 점수 합이 4로, 오브젝트당 0.5에 그쳤습니다.\",\"factIds\":[\"fight.vision.objectives\",\"fight.vision.points\",\"fight.vision.perObjective\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.vision\",\"text\":\"오브젝트 싸움 밖에서 시야 점수 18을 모아 분당 0.59를 기록했습니다.\",\"factIds\":[\"macro.vision.points\",\"macro.vision.perMinute\"]}],\"bad\":[{\"subjectId\":\"macro.farm\",\"text\":\"15분 이후 분당 CS가 7.4개로, 15분 125개에서 게임 끝 242개에 머물렀습니다.\",\"factIds\":[\"macro.farm.perMinute\",\"macro.farm.cs15\",\"macro.farm.csEnd\"]},{\"subjectId\":\"macro.advantage\",\"text\":\"오브젝트 밖 싸움 7번의 득실 중 우리 팀 몫이 15.4%로 낮았습니다.\",\"factIds\":[\"macro.advantage.fights\",\"macro.advantage.sharePct\"]}]}},\"keyMoments\":[{\"index\":0,\"text\":\"23.6분 싸움에서 상대 팀만 3킬을 올리며 골드 격차가 300 벌어졌고, 앞선 팀이 상대 팀으로 바뀌었습니다. 이후 우리 미드 2차 포탑을 잃었습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.leaderAfter\",\"keyMoment.0.followUp.0\"]},{\"index\":1,\"text\":\"25.7분 싸움에서 1킬 5데스로 골드 격차가 4,712까지 벌어졌습니다. 이후 우리 미드 억제기를 잃었습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.goldGapAfterAbs\",\"keyMoment.1.followUp.1\"]},{\"index\":2,\"text\":\"16.6분 싸움에서 우리 팀 1킬, 상대 팀 3킬로 우리 팀이 앞서던 골드 격차가 1,796 좁혀졌습니다. 이후 우리 바텀 1차 포탑을 잃었습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.killsTheirs\",\"keyMoment.2.leaderBefore\",\"keyMoment.2.gapChangeAbs\",\"keyMoment.2.followUp.0\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 6062,
+          "cacheWrite": 0,
+          "cacheRead": 4244,
+          "output": 1624
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 12791
+    },
+    {
+      "attempt": 2,
+      "kind": "retry",
+      "requestHash": "8e4cb8c523e0bc37f543588de667ec9c81bd7c8c77ee05d8e9344864d32ee33f",
+      "response": {
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "",
+            "signature": "CAQS2AkKEAgTGAI4AUIIdGhpbmtpbmcSDMbgYV79KrXccPXh/hoMQdYKLH8+vPq1qbA1IjC1cYm39/4z9NhjAnZAf021VJLXP2Wsj/BfMhziOwIESTDUbKpdUhBWNM+o0GqUFUsq9QgDGLaRcAbQUh1sZEHMsfAJ9ZS9chH1OnOQzPRXRUtzF4pCrBltpjCpLkl4On3X1po1XZT2KfpD1w96h5c3fgyEE4mCrKNc2DQPCQNAm2Ub5QFPxQ9U7bJyX8/mAD3kw02+ufeAqovMLL+WjJ9clVw0kOi4rGZC3i5s6dWgYkwB1MvufH89xhdbIYWN2bqg/QUkLYoeC3W6E0dAVmUKgwRPATovR3/ICgxNgkJqaX5Mh8jk/a3kT4hN8z3aIGeunko2zZiGNjHMVhkAsI8PGT90AYyZQN9Ny6N8gIKE3iYNSVM9+ng7PrDOGlyRSfn/8kJPWSYuwm9Kx/q7dLie7Ofa8ioxmPNfElpWXJm/u6fIAbnwDtkMEihDYppuYydTinye41FD+rxGPr7/frd3kYetso9NrRgaAoLIPy6g3Gtb51RaL+WDZeKlJ/bGB5UXLD85MMPd5WNHmZUD0Tu/Z+LyO703G57t1jeyiHy7fjcxPHj+lKK8umwEaaSFxn7/EPrGpmJg0J+djLZFuuJLqWUZPx8XcUrRDuupGfkPm6S5QjJP22gn60hOw7Kiy5JW71W5OcAZkt10foKzzaa3DbEbfqBoY7C4f+phnWhZeXW2mq379JE/WrCLwMlyGE/dwG5fN3rUb5N2GDkDTPlNtLo50eSF51ykWojE7eReidNvILzokJNNtOzYOP2KJt4IPJ4jGOAex+//U3lfYlY6G7QmQOIzI8fpnRxRLB1AJilE6YkFjYqJtI52N9gBLfSCU3oizaKuElIRSJtKGlnaOt15OF21X7JxxGD2n80qbmri8GYg8ZnQRXX3uQmOjNdR8APbzJhcRxHzpJ8IgVrZgkfjUg4/LzJOOf9IFuexAsnf1BQ+FnQadVcHKrqmZlqceRkixnbMO3QcKx9wIAb2f722VIRBjj0+JRNJQzGrq8UOTlKnOMc19s6r8Tm42/C4ThALcud01n4Ml7ge54wCfGgGtTq+TSJ1t59l8Q7OaBsMW6QCpUS4AK3HFG1tjsX6grkLLyD4xdcq8q9fW2kSFqOfXmsorHAagpMnFg62GlVWx7ZYQb0/+Yl3SFrrjFZxVkpFT4Dt6sAhm4cOvQn7e6rv7+/c3ROgC9rIVAB/xtZoHJaKPJn3bLjteYaeKWMMBP5A/OdZntXESJw2khvFGPNGqyhBQxKnx6SjUFTaYI5ag981xmYjkPVaHfOqbPJiSgZsuDAA2AW4ZR7JSGuKbF/IpZ6oIIMvJ8uaoqjm/5wC41sDZF3l8P0iGkL+TKyr5I4e++7va7eTQUxNYo+jfkeegCfKHVsZ3Y9cSLbP7+bUe0vzqKVqOVpk8II1teKAt+vokvr5NXnQoo5wsTu4HLlhOKrIser0sP8vBJZKO+6caGndd9d1CxebqaD/uvbe64I5eHHbqwhcM6bUdF7bnfEgLYxA8mW11L+P4PgtbkEGxGWJpPULbgkgxJ2gLIP/GetJMt6gFK2Wz3r2yidnU/OdYhUDAeB3mLeSmV1fHv2SSmCztgTUGAE="
+          },
+          {
+            "type": "text",
+            "text": "{\"fixes\":[{\"slot\":\"summary\",\"text\":\"미스 포츈으로 라인전은 제리에게 밀렸고, 오브젝트 싸움은 잘했지만 그 밖의 운영은 부족했습니다. 23.6분 싸움에서 상대 팀만 3킬을 올려 골드 격차가 300 벌어졌고, 앞선 팀이 상대 팀으로 바뀌었습니다.\",\"factIds\":[\"player.champion\",\"laning.opponent\",\"keyMoment.0.startMin\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.leaderAfter\"]},{\"slot\":\"macro.bad.0\",\"text\":\"라인전 이후 15.7분 동안 분당 CS가 7.4개에 그쳐, 125개였던 CS가 게임 끝 242개에 머물렀습니다.\",\"factIds\":[\"macro.farm.minutes\",\"macro.farm.perMinute\",\"macro.farm.cs15\",\"macro.farm.csEnd\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 8464,
+          "cacheWrite": 0,
+          "cacheRead": 2827,
+          "output": 669
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 8777
+    }
+  ]
+}

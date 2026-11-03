@@ -1,0 +1,35 @@
+{
+  "matchId": "KR_8437852704",
+  "participantId": 5,
+  "engineVersion": "2026-11-02.2",
+  "promptVersion": "2026-11-03.1",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-03T05:34:17.391Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "55d80596c987f015b54113b4910bde87af8b66790a13c1c655582969f2e0ae8b",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"라인전은 상대 애쉬에게 밀렸고, 오브젝트 싸움과 그 밖의 운영 모두 부족했습니다. 15분 싸움에서 우리 팀 킬 1, 상대 팀 킬 4로 골드 격차가 약 3,900 벌어졌습니다.\",\"factIds\":[\"laning.opponent\",\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\"]},\"sections\":{\"laning\":{\"good\":[],\"bad\":[{\"subjectId\":\"laning.gold\",\"text\":\"15분 골드가 3,958로 상대 애쉬의 4,661보다 703 적었습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.gold.me\",\"laning.gold.enemy\",\"laning.gold.diffAbs\",\"laning.opponent\"]},{\"subjectId\":\"laning.kda\",\"text\":\"15분까지 킬 0, 데스 2, 어시스트 3으로, 킬과 어시스트를 더하고 데스를 뺀 값이 1이었고 상대 애쉬는 5로 4 차이가 났습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.kda.me.kills\",\"laning.kda.me.deaths\",\"laning.kda.me.assists\",\"laning.kda.formula\",\"laning.kda.me\",\"laning.opponent\",\"laning.kda.enemy\",\"laning.kda.diffAbs\"]}]},\"fight\":{\"good\":[],\"bad\":[{\"subjectId\":\"fight.vision\",\"text\":\"오브젝트 4개 앞에서 시야 점수 합이 2로, 오브젝트당 0.5에 그쳤습니다.\",\"factIds\":[\"fight.vision.objectives\",\"fight.vision.points\",\"fight.vision.perObjective\"]},{\"subjectId\":\"fight.advantage\",\"text\":\"낀 오브젝트 싸움 2번에서 득실 중 우리 팀 몫이 4.5%로 낮았습니다.\",\"factIds\":[\"fight.advantage.fights\",\"fight.advantage.sharePct\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.side\",\"text\":\"포탑 피해량 2,017, 분당 87.4로 포탑 압박은 잘했습니다.\",\"factIds\":[\"macro.side.turretDamage\",\"macro.side.perMinute\"]}],\"bad\":[{\"subjectId\":\"macro.vision\",\"text\":\"오브젝트 싸움 밖 시야 점수 합이 21로, 분당 0.91에 머물렀습니다.\",\"factIds\":[\"macro.vision.points\",\"macro.vision.perMinute\"]},{\"subjectId\":\"macro.advantage\",\"text\":\"낀 오브젝트 밖 싸움 5번에서 득실 중 우리 팀 몫이 25.4%로 낮았습니다.\",\"factIds\":[\"macro.advantage.fights\",\"macro.advantage.sharePct\"]}]}},\"keyMoments\":[{\"index\":0,\"text\":\"15분 싸움에서 우리 팀 킬 1, 상대 팀 킬 4로 골드 격차가 약 3,900 벌어졌고, 우리 바텀 1차 포탑을 잃었습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},{\"index\":1,\"text\":\"16.7분 싸움에서 상대 팀만 3킬을 올려 골드 격차가 9,531로 벌어졌고, 우리 미드 1차 포탑을 잃었습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.goldGapAfterAbs\",\"keyMoment.1.followUp.0\"]},{\"index\":2,\"text\":\"22.2분 싸움은 킬 4 대 4로 골드 격차가 465 좁혀졌지만, 우리 미드 억제기를 잃었습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.killsTheirs\",\"keyMoment.2.gapChangeAbs\",\"keyMoment.2.followUp.1\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 6034,
+          "cacheWrite": 4244,
+          "cacheRead": 0,
+          "output": 1477
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 15432
+    }
+  ]
+}

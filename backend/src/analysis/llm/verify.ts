@@ -1,0 +1,313 @@
+// 검증기 (ai_spec 2-6): 문장마다 모양·방향·숫자·금지어·길이·이름을 검사한다.
+// 판단은 코드가 한다. LLM 문장의 숫자는 그 문장의 factIds가 가리키는 fact의 표기(또는 어림 규칙)와만 대조한다.
+import type { Fact, FactSheet, Slot } from './facts.js';
+import {
+  AREAS,
+  DIRECTION_WORDS,
+  FORBIDDEN_PATTERNS,
+  INTERPRETIVE_WORDS,
+  NUMBER_NAME_PATTERNS,
+  VERDICT_OPPOSITE,
+  VERDICT_WORDS,
+  type Area,
+} from './labels.js';
+
+export type VerifyRule = 'shape' | 'direction' | 'number' | 'forbidden' | 'length' | 'name';
+
+export interface VerifyFailure {
+  slot: string;
+  rule: VerifyRule;
+  detail: string;
+}
+
+export interface SlotText {
+  text: string;
+  factIds: string[];
+}
+
+export const LIMITS = {
+  itemChars: 120,
+  itemSentences: 2,
+  summaryChars: 200,
+  summarySentences: 2,
+} as const;
+
+// ---------- 숫자 뽑기 ----------
+
+export interface NumberToken {
+  raw: string;
+  value: number;
+  /** 약/정도 = about, 넘게/이상/남짓 = over, 가까이/미만/이하 = under */
+  approx: 'about' | 'over' | 'under' | null;
+}
+
+const KOREAN_NUM: Readonly<Record<string, number>> = {
+  한: 1,
+  두: 2,
+  세: 3,
+  네: 4,
+  다섯: 5,
+  여섯: 6,
+  일곱: 7,
+  여덟: 8,
+  아홉: 9,
+  열: 10,
+};
+const KOREAN_UNIT = '(?:번|명|개|킬|데스|차례|회|판|마리)';
+const KOREAN_RE = new RegExp(`(^|[^가-힣])(한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\\s*${KOREAN_UNIT}(?!째)(도)?`, 'g');
+const NUMBER_RE = /(약\s*)?([-−])?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?(\s*(?:넘게|이상|남짓|가까이|미만|이하|정도))?/g;
+
+/** 문장에서 숫자를 모두 뽑는다 (쉼표·소수·부호·어림 표현·한글 수사+단위). 이름 속 숫자("1차 포탑")는 뺀다 */
+export function extractNumbers(text: string): NumberToken[] {
+  let t = text;
+  for (const re of NUMBER_NAME_PATTERNS) t = t.replace(new RegExp(re.source, 'g'), (m) => ' '.repeat(m.length));
+  const out: NumberToken[] = [];
+  for (const m of t.matchAll(NUMBER_RE)) {
+    const idx = m.index ?? 0;
+    const sign = m[2];
+    // "15-20" 같은 범위의 '-'는 부호가 아니다
+    const prev = sign ? t[idx + (m[1]?.length ?? 0) - 1] : undefined;
+    const negative = !!sign && !(prev !== undefined && /\d/.test(prev));
+    const value = Number(m[3]!.replace(/,/g, '') + (m[4] ?? '')) * (negative ? -1 : 1);
+    const word = m[5]?.trim();
+    const approx = m[1] || word === '정도' ? 'about' : word && ['넘게', '이상', '남짓'].includes(word) ? 'over' : word ? 'under' : null;
+    out.push({ raw: m[0].trim(), value, approx });
+  }
+  for (const m of t.matchAll(KOREAN_RE)) {
+    const n = m[3] === '도' && m[2] === '한' ? 0 : KOREAN_NUM[m[2]!]!;
+    out.push({ raw: m[0].trim(), value: n, approx: null });
+  }
+  return out;
+}
+
+function displayValues(f: Fact): number[] {
+  return f.display.map((d) => Number(d.replace(/,/g, ''))).filter((n) => Number.isFinite(n));
+}
+
+/** 숫자 하나가 fact 하나의 표기·어림 규칙과 맞는지 */
+export function numberMatchesFact(tok: NumberToken, f: Fact): boolean {
+  if (typeof f.value !== 'number') return false;
+  const exact = displayValues(f).some((d) => Math.abs(d - tok.value) < 1e-9);
+  const step = f.approx?.step;
+  if (tok.approx === null) return exact;
+  if (!step) return false; // 어림 표현은 approx가 있는 fact만
+  const v = f.value;
+  if (tok.approx === 'about') return exact || Math.round(v / step) * step === tok.value;
+  if (tok.approx === 'over') return v > tok.value && v - tok.value <= step;
+  return v < tok.value && tok.value - v <= step;
+}
+
+// ---------- 칸 하나 검사 ----------
+
+const hasAny = (text: string, words: readonly string[]) => words.some((w) => text.includes(w));
+
+function sentenceCount(text: string): number {
+  return text
+    .split(/(?<=[.!?。])\s+|(?<=[다요])\.(?!\d)/)
+    .map((s) => s.trim())
+    .filter((s) => s.replace(/[.!?。\s]/g, '').length > 0).length;
+}
+
+const PARTICLE_AFTER =
+  /^(?:$|[^가-힣]|은|는|이|가|을|를|의|와|과|도|로|으로|에게|에서|한테|보다|처럼|까지|만|께|랑|이랑)/;
+
+/** 문장에 나온 챔피언 이름 (이름 뒤가 끝·비한글·조사일 때만 이름으로 본다) */
+export function findChampionNames(text: string, allNames: readonly string[]): string[] {
+  const found: string[] = [];
+  for (const name of allNames) {
+    let from = 0;
+    for (;;) {
+      const i = text.indexOf(name, from);
+      if (i < 0) break;
+      const before = i === 0 ? '' : text[i - 1]!;
+      const after = text.slice(i + name.length);
+      if ((before === '' || !/[가-힣]/.test(before)) && PARTICLE_AFTER.test(after)) {
+        found.push(name);
+        break;
+      }
+      from = i + 1;
+    }
+  }
+  // 긴 이름 안의 짧은 이름(예: "리 신" 속 "신")은 하나로 본다
+  return found.filter((n) => !found.some((m) => m !== n && m.includes(n)));
+}
+
+export interface VerifyContext {
+  sheet: FactSheet;
+  /** Data Dragon 챔피언 한국어 이름 전체 */
+  allChampionNames: readonly string[];
+}
+
+export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): VerifyFailure[] {
+  const fails: VerifyFailure[] = [];
+  const add = (rule: VerifyRule, detail: string) => fails.push({ slot: slot.slot, rule, detail });
+  const { sheet } = ctx;
+  const text = st.text.trim();
+
+  // 1. 모양: 빈 문장, 없는 fact ID, 이 칸에서 쓸 수 없는 fact ID
+  if (text.length === 0) add('shape', '빈 문장');
+  const allowed = new Set(slot.factIds);
+  for (const id of st.factIds) {
+    if (!sheet.byId.has(id)) add('shape', `없는 fact ID: ${id}`);
+    else if (!allowed.has(id)) add('shape', `이 칸에서 쓸 수 없는 fact ID: ${id}`);
+  }
+
+  // 2. 방향
+  if (slot.area === 'summary') {
+    const v = sheet.result.summary;
+    const verdicts = [v.laning, v.fight, v.macro].filter((x): x is NonNullable<typeof x> => x !== null);
+    for (const verdict of verdicts) {
+      if (!hasAny(text, VERDICT_WORDS[verdict])) add('direction', `요약에 판정어 "${verdict}"(또는 동의어)가 없음`);
+      for (const opp of VERDICT_OPPOSITE[verdict]) {
+        if (verdicts.includes(opp)) continue; // 다른 영역의 판정어일 수 있음
+        const w = VERDICT_WORDS[opp].find((x) => text.includes(x));
+        if (w) add('direction', `요약에 반대 방향 단어 "${w}" (판정 ${verdict})`);
+      }
+    }
+    if (v.keyMomentIndex !== null) {
+      const km = sheet.result.keyMoments[v.keyMomentIndex];
+      if (km) {
+        const opp = km.direction === 'widened' ? 'narrowed' : 'widened';
+        const w = DIRECTION_WORDS[opp].find((x) => text.includes(x));
+        if (w) add('direction', `결정적 장면은 격차가 ${km.direction === 'widened' ? '벌어졌는데' : '좁혀졌는데'} "${w}"`);
+      }
+    }
+  } else if (slot.area === 'keyMoment' && slot.index !== null) {
+    const km = sheet.result.keyMoments[slot.index];
+    if (km) {
+      const opp = km.direction === 'widened' ? 'narrowed' : 'widened';
+      if (!hasAny(text, DIRECTION_WORDS[km.direction])) add('direction', `격차 방향 단어(${DIRECTION_WORDS[km.direction].join('/')})가 없음`);
+      const w = DIRECTION_WORDS[opp].find((x) => text.includes(x));
+      if (w) add('direction', `격차가 ${km.direction === 'widened' ? '벌어졌는데' : '좁혀졌는데'} "${w}"`);
+    }
+  }
+
+  // 3. 숫자
+  const facts = st.factIds.map((id) => sheet.byId.get(id)).filter((f): f is Fact => f !== undefined);
+  for (const tok of extractNumbers(text)) {
+    if (!facts.some((f) => numberMatchesFact(tok, f))) {
+      const near = facts.filter((f) => typeof f.value === 'number').map((f) => `${f.id}=${f.display[0]}`);
+      add('number', `"${tok.raw}"가 이 문장의 factIds 값과 맞지 않음${near.length ? ` (쓸 수 있는 값: ${near.slice(0, 6).join(', ')})` : ' (factIds에 숫자 fact 없음)'}`);
+    }
+  }
+
+  // 4. 금지어·해석어
+  for (const { re, why } of FORBIDDEN_PATTERNS) if (re.test(text)) add('forbidden', why);
+  const interp = INTERPRETIVE_WORDS.find((w) => text.includes(w));
+  if (interp && !text.includes('보입니다')) add('forbidden', `해석어 "${interp}"는 "~것으로 보입니다"로 끝맺어야 함`);
+
+  // 5. 길이
+  const isSummary = slot.area === 'summary';
+  const maxChars = isSummary ? LIMITS.summaryChars : LIMITS.itemChars;
+  const maxSent = isSummary ? LIMITS.summarySentences : LIMITS.itemSentences;
+  if (text.length > maxChars) add('length', `${text.length}자 (최대 ${maxChars}자)`);
+  const sc = sentenceCount(text);
+  if (sc > maxSent) add('length', `${sc}문장 (최대 ${maxSent}문장)`);
+
+  // 6. 이름
+  for (const n of findChampionNames(text, ctx.allChampionNames)) {
+    if (!sheet.allowedNames.includes(n)) add('name', `이 판의 내 챔피언·상대 라이너가 아닌 "${n}"`);
+  }
+  return fails;
+}
+
+// ---------- 첫 답 전체 검사 ----------
+
+export interface LlmItem {
+  subjectId: string;
+  text: string;
+  factIds: string[];
+}
+
+export interface FirstAnswer {
+  summary: SlotText;
+  sections: Record<Area, { good: LlmItem[]; bad: LlmItem[] }>;
+  keyMoments: { index: number; text: string; factIds: string[] }[];
+}
+
+export interface RetryAnswer {
+  fixes: { slot: string; text: string; factIds: string[] }[];
+}
+
+export interface AnswerCheck {
+  /** 칸 → 답 문장 (칸에 맞는 답이 있을 때) */
+  texts: Map<string, SlotText>;
+  /** 통과한 칸 */
+  passed: Set<string>;
+  failures: VerifyFailure[];
+  /** 칸에 대응하지 않는 답 (엔진이 안 고른 과목 등) */
+  extras: VerifyFailure[];
+}
+
+/** 답을 칸에 맞춰 나누고 칸마다 검사한다. 빠진 칸은 shape 실패 */
+export function checkFirstAnswer(answer: FirstAnswer, ctx: VerifyContext): AnswerCheck {
+  const texts = new Map<string, SlotText>();
+  const extras: VerifyFailure[] = [];
+  texts.set('summary', answer.summary);
+  for (const area of AREAS) {
+    for (const kind of ['good', 'bad'] as const) {
+      const slots = ctx.sheet.slots.filter((s) => s.area === area && s.kind === kind);
+      const items = answer.sections[area][kind];
+      const used = new Set<number>();
+      for (const s of slots) {
+        const j = items.findIndex((it, k) => !used.has(k) && it.subjectId === s.subjectId);
+        if (j >= 0) {
+          used.add(j);
+          texts.set(s.slot, { text: items[j]!.text, factIds: items[j]!.factIds });
+        }
+      }
+      items.forEach((it, k) => {
+        if (!used.has(k)) extras.push({ slot: `${area}.${kind}`, rule: 'shape', detail: `엔진이 고르지 않은 과목: ${it.subjectId}` });
+      });
+    }
+  }
+  const kmUsed = new Set<number>();
+  for (const km of answer.keyMoments) {
+    const s = ctx.sheet.slots.find((x) => x.area === 'keyMoment' && x.index === km.index);
+    if (!s || kmUsed.has(km.index)) {
+      extras.push({ slot: 'keyMoment', rule: 'shape', detail: `범위 밖이거나 중복된 결정적 장면 index: ${km.index}` });
+      continue;
+    }
+    kmUsed.add(km.index);
+    texts.set(s.slot, { text: km.text, factIds: km.factIds });
+  }
+  return finish(texts, extras, ctx);
+}
+
+function finish(texts: Map<string, SlotText>, extras: VerifyFailure[], ctx: VerifyContext): AnswerCheck {
+  const failures: VerifyFailure[] = [];
+  const passed = new Set<string>();
+  for (const s of ctx.sheet.slots) {
+    const st = texts.get(s.slot);
+    if (!st) {
+      failures.push({ slot: s.slot, rule: 'shape', detail: '이 칸의 문장이 없음' });
+      continue;
+    }
+    const f = verifySlot(s, st, ctx);
+    if (f.length === 0) passed.add(s.slot);
+    failures.push(...f);
+  }
+  return { texts, passed, failures, extras };
+}
+
+/** 재시도 답: 요청한 칸만 받아 검사 */
+export function checkRetryAnswer(answer: RetryAnswer, wanted: readonly string[], ctx: VerifyContext): { texts: Map<string, SlotText>; passed: Set<string>; failures: VerifyFailure[] } {
+  const texts = new Map<string, SlotText>();
+  const failures: VerifyFailure[] = [];
+  const passed = new Set<string>();
+  for (const fx of answer.fixes) {
+    if (wanted.includes(fx.slot) && !texts.has(fx.slot)) texts.set(fx.slot, { text: fx.text, factIds: fx.factIds });
+  }
+  for (const slotId of wanted) {
+    const s = ctx.sheet.slots.find((x) => x.slot === slotId)!;
+    const st = texts.get(slotId);
+    if (!st) {
+      failures.push({ slot: slotId, rule: 'shape', detail: '재시도 답에 이 칸이 없음' });
+      continue;
+    }
+    const f = verifySlot(s, st, ctx);
+    if (f.length === 0) passed.add(slotId);
+    failures.push(...f);
+  }
+  return { texts, passed, failures };
+}

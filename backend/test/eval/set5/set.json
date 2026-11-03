@@ -1,0 +1,50 @@
+{
+  "description": "2단계 기준선 평가 판 5개 (포지션별 1판). 세나 판은 fixture를 가리킨다. 계정 식별 값은 가림 (ai_spec 2-9)",
+  "items": [
+    {
+      "matchId": "KR_8437852704",
+      "match": "../../fixtures/KR_8437852704.match.json",
+      "timeline": "../../fixtures/KR_8437852704.timeline.json",
+      "participantId": 5,
+      "position": "UTILITY",
+      "role": "SUPPORT_DAMAGE",
+      "note": "세나 판 (설계 9장), 패, 23.1분"
+    },
+    {
+      "matchId": "KR_8419421568",
+      "match": "KR_8419421568.match.json",
+      "timeline": "KR_8419421568.timeline.json",
+      "participantId": 6,
+      "position": "TOP",
+      "role": "TOP_TANK",
+      "note": "승, 27.8분"
+    },
+    {
+      "matchId": "KR_8419458143",
+      "match": "KR_8419458143.match.json",
+      "timeline": "KR_8419458143.timeline.json",
+      "participantId": 2,
+      "position": "JUNGLE",
+      "role": "JUNGLE_DAMAGE",
+      "note": "패, 15.3분"
+    },
+    {
+      "matchId": "KR_8419451137",
+      "match": "KR_8419451137.match.json",
+      "timeline": "KR_8419451137.timeline.json",
+      "participantId": 3,
+      "position": "MIDDLE",
+      "role": "MID_DAMAGE",
+      "note": "승, 19.3분"
+    },
+    {
+      "matchId": "KR_8419447142",
+      "match": "KR_8419447142.match.json",
+      "timeline": "KR_8419447142.timeline.json",
+      "participantId": 4,
+      "position": "BOTTOM",
+      "role": "ADC",
+      "note": "패, 30.7분"
+    }
+  ]
+}

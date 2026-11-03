@@ -1,0 +1,59 @@
+{
+  "matchId": "KR_8419421568",
+  "participantId": 6,
+  "engineVersion": "2026-11-02.2",
+  "promptVersion": "2026-11-03.1",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-03T05:42:35.353Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "a83209dafd719b4f16927c7160db4b157441259eefdf2aaf286860faff39eb2b",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"라인전은 티모 상대로 우세했고 오브젝트 싸움은 잘했으며 그 밖의 운영은 보통이었습니다. 17분 싸움에서 우리 팀이 6킬을 내며 골드 격차가 약 2,000 벌어졌습니다.\",\"factIds\":[\"laning.opponent\",\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.gapChangeAbs\"]},\"sections\":{\"laning\":{\"good\":[{\"subjectId\":\"laning.gold\",\"text\":\"15분 골드가 6,299로 상대 티모보다 1,823 많았습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.gold.me\",\"laning.opponent\",\"laning.gold.diffAbs\"]},{\"subjectId\":\"laning.level\",\"text\":\"15분 레벨이 12로 상대 티모의 10보다 2 높았습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.level.me\",\"laning.opponent\",\"laning.level.enemy\",\"laning.level.diffAbs\"]}],\"bad\":[]},\"fight\":{\"good\":[{\"subjectId\":\"fight.advantage\",\"text\":\"오브젝트 싸움 4번에 참여했고, 득실 중 우리 팀 몫이 69.5%였습니다.\",\"factIds\":[\"fight.advantage.fights\",\"fight.advantage.sharePct\"]},{\"subjectId\":\"fight.damage\",\"text\":\"0~15분 챔피언 딜 비중이 26.1%로 탱탑 기대치 18%보다 8.1%p 높았습니다.\",\"factIds\":[\"fight.damage.phase0StartMin\",\"fight.damage.phase0EndMin\",\"fight.damage.share0\",\"player.role\",\"fight.damage.expected0\",\"fight.damage.diff0Abs\"]}],\"bad\":[]},\"macro\":{\"good\":[{\"subjectId\":\"macro.advantage\",\"text\":\"오브젝트 밖 싸움 8번에 참여했고, 득실 중 우리 팀 몫이 87.1%였습니다.\",\"factIds\":[\"macro.advantage.fights\",\"macro.advantage.sharePct\"]},{\"subjectId\":\"macro.solo\",\"text\":\"단독 킬 2번, 단독 데스 0번으로 혼자 잡힌 적이 없었습니다.\",\"factIds\":[\"macro.solo.kills\",\"macro.solo.deaths\"]}],\"bad\":[{\"subjectId\":\"macro.side\",\"text\":\"포탑 피해량이 3,490, 분당 125.8로 사이드 압박이 낮았습니다.\",\"factIds\":[\"macro.side.turretDamage\",\"macro.side.perMinute\"]},{\"subjectId\":\"macro.farm\",\"text\":\"15분 CS 90에서 게임 끝 165로, 15분 이후 분당 CS가 5.9에 그쳤습니다.\",\"factIds\":[\"macro.farm.cs15\",\"macro.farm.csEnd\",\"macro.farm.perMinute\"]}]}},\"keyMoments\":[{\"index\":0,\"text\":\"17분 싸움에서 우리 팀이 6킬, 상대가 3킬을 내며 골드 격차가 약 2,000 벌어졌습니다. 이어서 상대 바텀 2차 포탑을 깼습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},{\"index\":1,\"text\":\"23분 싸움에서 우리 팀이 5킬을 내며 골드 격차가 약 2,700 벌어졌습니다. 이어서 상대 탑 2차 포탑을 깼습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.gapChangeAbs\",\"keyMoment.1.followUp.0\"]},{\"index\":2,\"text\":\"26분 싸움에서 우리 팀이 4킬을 내며 골드 격차가 2,990 벌어졌습니다. 이어서 상대 미드 억제기를 깼습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.gapChangeAbs\",\"keyMoment.2.followUp.0\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 6189,
+          "cacheWrite": 0,
+          "cacheRead": 4244,
+          "output": 1475
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 11227
+    },
+    {
+      "attempt": 2,
+      "kind": "retry",
+      "requestHash": "feff223462c16a411f3c752ddb70304bcd8e3ac0daf28144031e95edf66a0a8c",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"fixes\":[{\"slot\":\"macro.bad.1\",\"text\":\"CS가 90에서 게임 끝 165로 늘었지만, 마지막 12.8분 동안 분당 CS가 5.9에 그쳤습니다.\",\"factIds\":[\"macro.farm.cs15\",\"macro.farm.csEnd\",\"macro.farm.minutes\",\"macro.farm.perMinute\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 8071,
+          "cacheWrite": 2827,
+          "cacheRead": 0,
+          "output": 134
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 3267
+    }
+  ]
+}

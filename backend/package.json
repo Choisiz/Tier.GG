@@ -12,12 +12,14 @@
     "start": "node --env-file=../.env --import tsx src/server.ts",
     "collect": "node --env-file=../.env --import tsx src/cli/collect.ts",
     "analyze": "node --import tsx src/cli/analyze.ts",
+    "feedback": "node --env-file=../.env --import tsx src/cli/feedback.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "node --import tsx --test \"test/unit/**/*.test.ts\"",
     "test:integration": "node --env-file=../.env --import tsx --test --test-concurrency=1 \"test/integration/**/*.test.ts\""
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.4.0",
     "express": "^5.3.0",
     "pg": "^8.23.1"
   },
