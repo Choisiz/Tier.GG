@@ -1,5 +1,5 @@
 // createApp(db): 테스트에서 롤백 연결이나 가짜 db를 넣을 수 있게 db를 인자로 받는다.
-// 읽기 전용 GET만. CORS 헤더는 주지 않는다 (결정 D6). 수집 코드를 부르지 않는다.
+// 조회는 GET만, 분석 1개(POST /matches/:matchId/feedback, 변경 05)만 POST. CORS 헤더는 주지 않는다 (결정 D6). 수집 코드를 부르지 않는다.
 import express, { type Express } from 'express';
 import type { Queryable } from '../db/tx.js';
 import { createLogger, shortPuuid, type Logger } from '../lib/logger.js';
@@ -10,6 +10,7 @@ import { metaRouter } from './routes/meta.js';
 import { summonersRouter } from './routes/summoners.js';
 import type { LaneGoldFn } from './laneGold.js';
 import type { SummonerSearchFn } from './summonerSearch.js';
+import { unavailableFeedback, type FeedbackFn } from './feedback/service.js';
 import { createStaleWarner } from './window.js';
 
 /**
@@ -32,6 +33,8 @@ export interface ApiDeps {
   summonerSearch: SummonerSearchFn;
   /** 라인전 15분 골드(변경 04). server.ts가 실제 RiotClient로 만들어 넣는다 */
   laneGold: LaneGoldFn;
+  /** 게임 피드백 분석(변경 05). server.ts가 조립해 넣는다 */
+  feedback: FeedbackFn;
 }
 
 /** summonerSearch를 넘기지 않은 createApp 호출(예: 기존 테스트)에서 /summoners를 부르면 500 */
@@ -48,10 +51,18 @@ const unavailableLaneGold: LaneGoldFn = async () => {
   throw new ApiError(500, 'INTERNAL_ERROR', '라인전 조회가 설정되지 않았습니다.');
 };
 
+/** feedback을 넘기지 않은 createApp(기존 테스트)에서 분석을 부르면 500 */
+const unconfiguredFeedback: FeedbackFn = unavailableFeedback(
+  new ApiError(500, 'INTERNAL_ERROR', '게임 분석이 설정되지 않았습니다.'),
+);
+
+/** POST를 받는 유일한 경로 (변경 05) */
+const FEEDBACK_PATH_RE = /^\/api\/v1\/matches\/[^/]+\/feedback\/?$/;
+
 export function createApp(
   db: ApiDb,
   logger: Logger = createLogger('api'),
-  opts: { now?: () => number; summonerSearch?: SummonerSearchFn; laneGold?: LaneGoldFn } = {},
+  opts: { now?: () => number; summonerSearch?: SummonerSearchFn; laneGold?: LaneGoldFn; feedback?: FeedbackFn } = {},
 ): Express {
   const deps: ApiDeps = {
     db,
@@ -60,6 +71,7 @@ export function createApp(
     warnIfStale: createStaleWarner(logger),
     summonerSearch: opts.summonerSearch ?? unavailableSummonerSearch,
     laneGold: opts.laneGold ?? unavailableLaneGold,
+    feedback: opts.feedback ?? unconfiguredFeedback,
   };
   const app = express();
   app.disable('x-powered-by');
@@ -75,9 +87,10 @@ export function createApp(
     next();
   });
 
-  // GET(HEAD)만 받는다. 그 밖의 메서드는 없는 경로와 같게 404
+  // GET(HEAD)과 분석 경로의 POST만 받는다. 그 밖의 메서드는 없는 경로와 같게 404
   app.use((req, _res, next) => {
     if (req.method === 'GET' || req.method === 'HEAD') return next();
+    if (req.method === 'POST' && FEEDBACK_PATH_RE.test(req.path)) return next();
     return notFoundHandler(req, _res, next);
   });
 

@@ -1,151 +1,162 @@
-# 백엔드 검토 기록 — 변경 04 (킬관여 · 라인전 15분 골드) 검토
+# 백엔드 검토 기록 — 변경 05 (게임 피드백 분석 API) 검토
 
-> 검토일: 2026-10-30 (KST)
-> 기준: `CLAUDE.md` 3·9장, `backend/docs/back_spec.md`(변경 04, 결정 X1~X7), `docs/contracts/api_contract.md` 2-5(`matches[].killParticipation`)·2-6(`GET /matches/lane-gold`), `backend/docs/back_build.md`
-> 방법: API 계약이 바뀌는 변경이라 3장 예외에 해당해 **전체 독립 Review**를 했다. Build 결과를 신뢰하지 않고 typecheck·lint·단위·통합 테스트를 직접 다시 돌렸고, 임시 포트(4100~4102)에 서버를 띄워 실제 Riot과 `너희는개다#KR1`로 실측했다. 기존 4000 서버는 건드리지 않았고 임시 서버는 모두 종료했다.
+> 검토일: 2026-11-03 (KST)
+> 기준: `CLAUDE.md` 3·9·11·12장, `backend/docs/back_spec.md`(5-9, 6-4, 7-6, 9-5, 10-8, 결정 F1~F21), `backend/docs/back_build.md`(2-9, 4-8, 5장 24~30, 7장), `docs/contracts/api_contract.md` v4(1장, 2-7, 3장)
+> 방법: 계약이 바뀌고(1장 "GET만" → POST 1개) 사용자 요청이 유료 외부 호출로 이어지는 첫 경로라 **전체 독립 Review**를 했다. 3장 기준에 따라 Build의 typecheck·lint·test 결과는 신뢰하고, diff를 읽어 로직·설계 결함을 찾고 임시 포트 4100에 서버를 띄워 표본 확인했다. 작은 결함 1건을 고친 뒤에는 typecheck·lint·test를 다시 돌렸다. 임시 서버는 모두 종료했다.
 > 이 문서는 **가장 최근 검토만** 둔다. 해결되지 않은 문제는 `back_overview.md` 10장에 있다.
 > 상태 표기: ✅ 통과 / ⚠️ 문제 있음 / ❌ 실패 / ⏸️ 확인 못 함
 
 ## 목차
 
 - [1. 결론](#1-결론)
-- [2. 검사·테스트 재실행](#2-검사테스트-재실행)
-- [3. 요구사항·완료 기준 대조](#3-요구사항완료-기준-대조)
-- [4. 실제 Riot 실측](#4-실제-riot-실측)
-- [5. 오류 처리](#5-오류-처리)
-- [6. Build가 지목한 집중 지점 6가지](#6-build가-지목한-집중-지점-6가지)
+- [2. 검사·테스트](#2-검사테스트)
+- [3. 계약 v4와 구현 대조](#3-계약-v4와-구현-대조)
+- [4. 비용 보호](#4-비용-보호)
+- [5. 처리 순서와 Riot 오류](#5-처리-순서와-riot-오류)
+- [6. Data Dragon](#6-data-dragon)
 - [7. 보안·로그](#7-보안로그)
-- [8. 범위 확인](#8-범위-확인)
-- [9. 발견 사항 (심각도순)](#9-발견-사항-심각도순)
+- [8. 경계 (`!ai` 코드)](#8-경계-ai-코드)
+- [9. 실제 확인](#9-실제-확인)
+- [10. 발견 사항 (심각도순)](#10-발견-사항-심각도순)
+- [11. 고친 것](#11-고친-것)
 
 ---
 
 ## 1. 결론
 
-> 요약: **PASS with issues.** 치명·중요 결함은 없다. 킬관여와 라인전 15분 골드가 계약 2-5·2-6과 실제 Riot 응답에서 일치하고, 손계산(KR_8437852704 → 3958:4661 = 46%)도 맞는다. 같은 요청을 반복하면 Riot 호출 0회였다. 경미 3건(동시 요청 시 "대기 1.5초" 규칙이 지켜지지 않을 수 있음, 계약 문구의 "중복 ID는 400"이 구현에 없음, 캐시 TTL이 갱신 시점부터 다시 시작)이 있고, **프론트 Build 착수를 막는 것은 없다.**
+> 요약: **코드는 PASS with issues, 실제 확인은 일부 보류.** 치명·중요 결함은 없다. 비용 보호(스위치 → 하루 상한 예약 → 예산 예약 → 동시 실행)와 처리 순서가 계획·계약대로 짜여 있고 단위 테스트가 경쟁 상황까지 다룬다. 다만 검토 시점에 **Riot 개발 키가 만료**(401/403)되어 있어, 실제 Riot 데이터를 쓰는 템플릿 1판과 **사용자 승인된 실제 LLM 1판은 하지 못했다**(Anthropic 호출 0회, 비용 $0). 키 재발급 뒤 LLM 1판만 다시 확인하면 된다.
 
 | 구분 | 결과 |
 |------|------|
-| 판정 | **PASS with issues** (치명 0, 중요 0, 경미 3) |
-| 프론트 Build 착수 전 고칠 것 | **없음.** 단, 계약 2-6 "같은 이름 반복은 400" 문구는 구현과 다르니 백엔드가 정정하거나 검사를 추가하는 편이 좋다 (프론트는 중복 없는 ID를 보내므로 영향 없음) |
+| 판정 | **PASS with issues — 실제 LLM 1판 ⏸️** (치명 0, 중요 0, 경미 4, 정보 3, 사용자 결정 1) |
+| 고친 것 | L1 장부 파일이 깨지면 API 서버 전체가 켜지지 않던 문제 → 분석 기능만 끄도록 (`server.ts`) |
+| 프론트 Plan 착수 | 막는 것 없음. 계약 v4 2-7 그대로 쓰면 된다 |
+| 공개 전 필수 | 사용자 결정 1: API 예산 상한 $0.25로는 실제 LLM 분석이 사실상 1번뿐 (10장 D1) |
 
 ---
 
-## 2. 검사·테스트 재실행
+## 2. 검사·테스트
 
 | 항목 | 결과 |
 |------|------|
-| `npm run typecheck` | ✅ 오류 0 |
-| `npm run lint` | ✅ 오류·경고 0 |
-| `npm test` (단위) | ✅ **164개 통과** / 실패 0 |
-| `npm run test:integration` | ✅ **17개 통과** (실제 Supabase, ROLLBACK) |
+| Build 결과(신뢰) | typecheck 0, lint 0, 단위 372/372, 통합 17/17 (`back_build.md` 4-8) |
+| 고친 뒤 재실행 | ✅ `typecheck` 0, ✅ `lint` 0, ✅ `npm test` **372/372** |
+| 테스트 범위 확인 | 사전 검사 순서, 금지 키 재귀 검사, KST 자정, 장부 복원(어제·retry·비용 0 제외), 예산 예약 경쟁(동시 2요청), 세마포어 2+4, 같은 키 동시 3요청 → Riot 2·LLM 1·하루 1, 21번째 429·캐시 적중은 200, auth → 자리 반납 + 차단기, 402 로그, 504 뒤 백그라운드 완료·추가 LLM 0, Riot 대기 6초 → 503 busy, 꺼짐이면 본문 검사 전 503 — 모두 테스트 이름과 본문으로 확인 |
 
 ---
 
-## 3. 요구사항·완료 기준 대조
+## 3. 계약 v4와 구현 대조
 
-| # | 요구 | 결과 | 근거 |
-|---|------|------|------|
-| 1 | 킬관여: `challenges.killParticipation` 우선, 없으면 (킬+어시)÷팀킬합, 0이면 null, 정수 % | ✅ | 코드 `dto.ts killParticipationPercent`. 실측 20게임 중 18건은 `challenges` 값, 70초·251초 게임 2건(킬·어시 0, 팀킬 0)은 `null`. 단위 테스트가 두 경로와 100 초과 비절단을 확인 |
-| 2 | 라인전: 15분 프레임(`frames[15]`) `totalGold`, 같은 `individualPosition`의 적 정확히 1명, `나÷(나+상대)` 정수 % | ✅ | `pairForLane`·`extractGold15`·`gold15Result`. 실측 4게임을 Riot 원본으로 손계산해 일치 |
-| 3 | 15분 미만 / 포지션 없음 / 상대 0명·2명+ / 참가자 아님 / timeline 404 → `unavailable` | ✅ | 70초·251초 게임은 `unavailable`이고 timeline 호출 없음(생략 규칙). 단위 테스트가 나머지 경우를 포함 |
-| 4 | 호출 생략: 15분 미만·대상 아님이면 timeline을 부르지 않음 | ✅ | 로그 `riotCalls=9`(10개 중 `unavailable` 1건은 호출 안 함) |
-| 5 | 결정 X1 limiter 1초 18회 / 120초 90회 | ✅ | `config/summoner.ts`. 운영 규칙(수집 CLI와 동시 운용 금지)이 주석·문서에 있음 |
-| 6 | 결정 X2 캐시 6시간·5,000개 | ✅ | `MATCH_LANE_CACHE_TTL_MS`, `MATCH_LANE_CACHE_MAX`, 단위 테스트 |
-| 7 | 결정 X3 ID 10개·대기 1.5초 초과분 pending | ⚠️ | 단일 요청에서는 맞음. 동시 요청 경쟁은 발견 사항 1 |
-| 8 | 결정 X4 `getMatch` 상세 캐시 안 함 | ✅ | 캐시에는 길이·참가자 10명의 id/puuid/팀/포지션·gold15 숫자만 저장, timeline 원본은 버림(단위 테스트) |
-| 9 | 결정 X5 pending이어도 HTTP 200 + `retryAfterSec` | ✅ | 가짜 laneGold로 200·`no-store` 확인, 서비스 테스트로 올림 초·상한 120·`null` 확인 |
-| 10 | 요청 로그 puuid 앞 8자 | ✅ | 아래 7장 |
-| 11 | 계약 2-5·2-6 필드·타입 | ✅ | 아래 4장 (⚠️ 중복 ID 문구만 불일치) |
-
----
-
-## 4. 실제 Riot 실측
-
-임시 서버 `API_PORT=4100`, 소환사 `너희는개다#KR1`.
-
-| 호출 | 결과 |
-|------|------|
-| 검색 (캐시 미스) | 200, **3.8초**, 매치 20건. `matches[]` 키에 `killParticipation` 있음 (정수 또는 null). 값 예: 42, 50, 60, 53, 48 … |
-| lane-gold #1 (ID 10개, 캐시 비어 있음) | 200, **0.89초**, `ready=9 unavailable=1 pending=0 riotCalls=9 cacheHits=1` |
-| lane-gold #2 (다른 ID 10개) | 200, 0.82초, `ready=9 unavailable=1`, riotCalls=9 |
-| 같은 요청 반복 2회 | 200, **1.9ms·1.0ms**, `riotCalls=0 cacheHits=10` |
-| 한 소환사 신규 검색 총 Riot 호출 | 검색 약 24회 + timeline 18회 ≈ **42회** (limiter 90회/120초 안) |
-
-계약 2-6 필드 대조: 응답 `{results[], retryAfterSec}`. `results[]`가 요청 `matchIds`와 **같은 순서·같은 개수**, 각 항목 `matchId`(string), `state`(`ready`/`unavailable`), `myPercent`·`myGold`·`enemyGold`(int, `unavailable`이면 null), 최상위 `retryAfterSec: null` — 모두 계약과 일치. 헤더 `Cache-Control: no-store`.
-
-Riot 원본으로 직접 손계산한 4게임 (내 Riot 호출 7회, 서버와 별개):
-
-| matchId | 포지션 | 원본 | 서버 응답 |
-|---------|--------|------|-----------|
-| KR_8437852704 | UTILITY | 프레임 25, 적 1명, 3958 : 4661 → **46%**. challenges KP 0.5 = (2+4)/12 | `46`, 3958/4661, KP 50 ✅ |
-| KR_8434770707 | UTILITY | 프레임 29, 4622 : 4381 → **51%**. KP 0.7272 = 32/44 | `51`, 4622/4381, KP 73 ✅ |
-| KR_8437911448 | JUNGLE | 70초, challenges 없음, 팀킬 0 | `unavailable`, KP null ✅ |
-| KR_8434862195 | UTILITY | 251초, challenges 없음, 팀킬 0 | `unavailable`, KP null ✅ |
-
----
-
-## 5. 오류 처리
-
-| 시험 | 방법 | 결과 |
+| 항목 | 결과 | 근거 |
 |------|------|------|
-| 잘못된 파라미터 | 실서버 curl | ✅ `matchIds` 누락·11개·소문자 `kr_1`·`KR_1/../x`·`puuid` 개행 문자 → 모두 400 `INVALID_PARAMETER`. 임의 URL이 Riot으로 나갈 수 없음(`^KR_[0-9]{1,15}$`) |
-| 중복 ID `KR_1,KR_1` | 실서버 curl | ⚠️ **200**이고 2개 항목으로 응답. 계약 2-6은 "같은 이름 반복은 400"이라 적음 (발견 사항 2) |
-| 키 만료 (잘못된 키를 프로세스 환경에만 넣음, 포트 4101) | 실서버 | ✅ lane-gold 503 `RIOT_KEY_EXPIRED`, 검색도 503, **같은 서버의 `/health`는 200** (서버 생존). 서버 로그에 요청당 `ERROR` 1줄, 키 값 없음 |
-| 키 없음 (`RIOT_API_KEY=` 비움, 포트 4102) | 실서버 | ✅ lane-gold·검색 모두 503 `RIOT_KEY_EXPIRED`(메시지 "키가 설정되지 않아"). 잘못된 파라미터는 키 없음 503보다 먼저 400 |
-| 한도 초과 → pending + `retryAfterSec` | 가짜 클라이언트 단위 테스트, 코드 읽기 | ✅ 실제 한도는 넘기지 않음 |
-| 429·5xx 소진 → 502 | 단위 테스트(`laneGold.test.ts`), 코드 읽기 | ✅ `RiotRetryExhaustedError` → 502 `RIOT_UNAVAILABLE`, 이미 받은 경기 정보는 캐시에 남음. ⏸️ 실제 Riot 장애로는 시험하지 못함(만들 수 없음) |
-| 예상 못한 오류 | 코드 읽기 | ✅ 그대로 던져 500 `INTERNAL_ERROR` (예: Riot 400) |
+| 요청 검사 | ✅ | `matchId` `^KR_[0-9]{1,15}$`, 본문 2KB·`application/json`·객체·`puuid` 형식. `puuid`·본문 값은 `details`에 없음 (실측 9건, 9장) |
+| 메서드 | ✅ | 이 경로 POST만 통과. 같은 경로 GET·PUT·OPTIONS, 다른 경로 POST → 404 `NOT_FOUND` (실측) |
+| 응답 필드 | ✅ | `dto.ts`가 계약 표의 필드만 만든다. 금지 키 18개 재귀 테스트. `templateReason`은 `mode="llm"`이면 null |
+| `keyMoments` | ✅ | 엔진 index → 시각·방향, 0~3개(F21). 엔진에 없는 index는 버림 |
+| 오류 코드·reason | ✅ | 404 `match`/`participant`, 422 `queue`/`too_short`/`no_position`/`no_timeline`, 429 `daily`(limit·resetAt)/`budget`, 502, 503 `RIOT_KEY_EXPIRED`/`ANALYSIS_DISABLED`/`ANALYSIS_BUSY`, 504, 500 |
+| `Retry-After` | ✅ | 429 daily(자정까지 초)·503 busy·504에 헤더. 429 `budget`은 헤더 없음(언제 풀릴지 모름 — 계약 문구와 일치) |
+| `Cache-Control` | ✅ | 성공·오류 모두 `no-store` |
+| CORS | ✅ | `Origin` 붙인 OPTIONS → 404, `Access-Control-*` 헤더 없음 |
 
 ---
 
-## 6. Build가 지목한 집중 지점 6가지
+## 4. 비용 보호
 
-| 지점 | 판단 |
-|------|------|
-| (a) 진행 중 Promise 공유·pending 판단·병렬 경쟁 | **공유는 정상**: 같은 matchId를 두 요청이 가져가도 Riot 1회(테스트 통과, `flights`는 `finally`로 정리, 실패는 합류한 요청에도 같이 전달되어 미처리 거부 없음). **limiter 직전 검사는 "확인 후 예약" 방식이 아니라 경쟁이 있다** → 발견 사항 1 |
-| (b) 호출 생략과 gold15 캐시 경계 | ✅ `gold15`가 `undefined`(미조회)/`null`(계산 불가를 기억)/객체로 구분됨. 15분 미만·대상 아님은 timeline을 부르지 않고 gold15도 캐시하지 않아 불필요한 기억이 없음. **`cache.set`이 TTL을 다시 시작함**을 확인(0시에 넣고 5시간에 다시 set → 10시간에도 살아 있음). 경기당 `set`은 최대 2번(정보, gold15)이고 끝난 게임은 불변이라 **실제 피해 없음, 문서화로 충분** → 발견 사항 3 |
-| (c) 동시 요청 중 오류 집계(`ctx.error`) | ✅ 첫 오류가 `ctx.error`에 남고 `stopped=true`로 새 호출을 멈추며, 응답은 오류 종류만 보고 503/502/그대로(500)로 매핑. 키 만료와 재시도 소진이 한 요청에서 섞이면 먼저 난 쪽이 이김(허용 범위) |
-| (d) 캐시 5,000개에서 검색 저장과 laneGold 저장이 서로 밀어내는가 | ✅ 둘은 **별개 캐시**(검색 DTO 캐시 200개 vs 경기 캐시 5,000개)라 서로 밀어내지 않음. 검색이 경기 캐시에 넣는 건 20건/검색, 이미 gold15가 있으면 덮어쓰지 않음. 경기 캐시 안에서는 오래 넣은 것부터 삭제 → 약 250명 검색분. 존재하지 않는 matchId를 5,000개 이상 요청하면 캐시를 밀어낼 수 있음(경미, 발견 사항 1과 같은 성격) |
-| (e) 계약 2-6 문구와 구현 일치 | 파라미터·필드·상태·오류 표는 일치. **"같은 이름 반복은 400"만 구현에 없음** → 발견 사항 2 |
-| (f) `server.ts` 키 없음 경로 일관성 | ✅ 검색·lane-gold가 같은 `keyMissing` 함수를 공유해 같은 503 `RIOT_KEY_EXPIRED`와 메시지. 챔피언 통계 API는 그대로 동작 |
+> 요약: 네 겹 모두 코드로 확인했다. 꺼짐이면 LLM 클라이언트·장부를 만들기 전에 반환하고, 예약은 "먼저 잡고 끝나면 정산" 순서이며 모든 실패 경로가 `finally`에서 반납한다.
+
+| 항목 | 결과 | 확인 내용 |
+|------|------|-----------|
+| 스위치 순서 | ✅ | `buildFeedback`: 설정 오류·`FEEDBACK_ENABLED≠true` → `createAnthropicClient`·`fileLedger` 전에 503 함수 반환. 라우트는 `feedback.unavailable`이면 `express.json` 전에 503 (실측: 깨진 본문도 503) |
+| LLM 스위치 | ✅ | 클라이언트는 `FEEDBACK_LLM_ENABLED=true` + 키 + 가격표 모델 + 하루 상한 > 0일 때만 생성. 시작 로그 `llm=off(FEEDBACK_LLM_ENABLED=false) … key=있음` (값 없음) |
+| 하루 상한 | ✅ | `tryReserve`(used+reserved < limit) → `settle(비용>0)`. 비용 0이면 반납. KST 날짜 키로 초기화. 재시작 시 API 장부의 오늘 `kind="first"`·`costUsd>0` 줄 수로 복원 |
+| 예산 예약 | ✅ | `장부 합 + 진행 중 예약 합 + 이번 판 최악 > 상한`이면 429 `budget`. 최악 = 1차 max_tokens 전부 + 재시도 최악. `generateTexts`의 `assertBudget`도 그대로 동작(이중 장치) |
+| 동시 실행 | ✅ | 세마포어 2 + 대기 4, 넘치면 503 busy(15초). 자리는 분석 종료 때 반환(504로 끊긴 요청도 분석이 끝날 때) |
+| 같은 키 공유 | ✅ | `flights` Map. 리더만 Riot·LLM·하루 셈. 성공·실패 모두 끝나면 삭제, 실패 Promise는 `.catch`로 처리되지 않은 거절이 남지 않음 |
+| 504 뒤 | ✅ | `Promise.race`만 끊고 분석은 계속, 끝나면 캐시. 타이머는 `finally`에서 정리 |
+| 401·402 차단 | ✅ | `auth`·`billing`·`model_not_found` → 차단기 10분, 오류 로그 1번(402는 "크레딧 소진") |
+| 장부 위치 | ✅ | `backend/logs/feedback-api-ledger.jsonl`, `git check-ignore` → 루트 `.gitignore:38 logs/`. CLI 평가 장부와 분리. 검토 뒤에도 파일 없음(호출 0) |
+
+---
+
+## 5. 처리 순서와 Riot 오류
+
+| 항목 | 결과 | 확인 내용 |
+|------|------|-----------|
+| 싼 검사 먼저 | ✅ | 캐시 → 제한기 대기 → getMatch → 참가자 → 큐 → 길이 → 10명 포지션 → (여기까지 통과해야) getTimeline → Data Dragon → 엔진 → LLM. 참가자 검사가 엔진보다 먼저라 404가 NO_POSITION보다 먼저 |
+| Riot 대기 | ✅ | 리더만 `limiterWaitMs() > 5,000`이면 503 busy(`retryAfterSec` 1~60), Riot 0회 |
+| 오류 매핑 | ✅ | getMatch 404 → 404 `match`, timeline 404·빈 프레임·`NO_FRAMES` → 422 `no_timeline`, 401/403 → 503 (실측: `riotCalls=1`, timeline 안 부름), 재시도 소진 → 502, `MATCH_MISMATCH` → 500. 오류는 캐시하지 않음 |
+
+---
+
+## 6. Data Dragon
+
+| 항목 | 결과 | 확인 내용 |
+|------|------|-----------|
+| 패치별 받기 | ✅ | `gameVersion` → `메이저.마이너`(정규식) → `versions.json`(1시간) → 접두어 첫 버전 → `champion.json`. 버전 최대 4개, 진행 중 공유 |
+| 실패 대비 | ✅ | 받기 실패·형식 다름·버전 없음 → 스냅숏 16.21.1 + 경고 10분 1번. 분석은 계속 |
+| 시간 제한 | ✅ | `AbortSignal.timeout(3,000)` (본문 읽기까지 포함) |
+| 경로 조작 | ✅ | 요청 값은 `gameVersion`의 숫자 접두어만 쓰고, URL에 넣는 버전은 Data Dragon 목록에서 고른 값을 `encodeURIComponent`로 넣는다. 사용자 입력이 경로에 들어가지 않는다 (I1 참고) |
 
 ---
 
 ## 7. 보안·로그
 
+| 항목 | 결과 | 확인 내용 |
+|------|------|-----------|
+| puuid | ✅ | 본문에만 → 요청 로그(`originalUrl`)에 없음. 분석 로그는 앞 8자(`AAAAbbbb…`). 실측 서버 로그에서 보낸 puuid 원문·잘못된 puuid 문자열 **0건** |
+| 키 | ✅ | `redact`에 `ANTHROPIC_API_KEY` 값과 `sk-ant-…` 모양 추가. 시작 로그는 `key=있음`만. 이번 검토의 서버 로그 4개에 키 값 없음 |
+| 본문 크기 | ✅ | 라우트 전용 `express.json({limit:'2kb'})`. 3KB → 400 `body` (실측) |
+| POST 범위 | ✅ | `FEEDBACK_PATH_RE` 한 경로만. 그 밖 404 |
+| `.env` | ✅ | 읽지도 고치지도 않음. 스위치는 프로세스 환경 변수로만 줌 |
+
+---
+
+## 8. 경계 (`!ai` 코드)
+
 | 항목 | 결과 |
 |------|------|
-| 키가 로그·응답·문서에 노출 | ✅ `.env`의 키 값 전체를 저장소와 임시 로그에서 `grep -F`로 찾았으나 0건. `RGAPI-` 형태는 테스트의 가짜 값 2곳(`client.test.ts`, `rules.test.ts`)뿐 |
-| 요청 로그의 puuid 축약 | ✅ 실서버 로그 `GET /api/v1/matches/lane-gold?puuid=8AcDYcY9…&matchIds=…`. 서비스 로그도 `shortPuuid`. 검색 URL에는 puuid가 없음. 단, 정규식이 **첫 `puuid=`만** 줄이므로 `puuid=A&puuid=B`처럼 두 번 보낸 잘못된 요청(400)의 두 번째 값은 로그에 길게 남음 (영향 매우 작음, 발견 사항 외 메모) |
-| 입력 검증으로 임의 URL 방지 | ✅ matchId는 `^KR_[0-9]{1,15}$`, puuid는 `^[0-9A-Za-z_-]{1,100}$`. Riot 호출 경로에는 검증된 값만 들어감. 400 응답의 `details.value`는 사용자가 보낸 값을 그대로 돌려줌(기존 규칙과 같음) |
+| `src/analysis/**`, `src/cli/**`, `test/unit/analysis/**`, `test/eval/**` | ✅ `git status` 변경 0 (import만) |
+| `@anthropic-ai/sdk` import | ✅ `analysis/llm/client.ts`만 (백엔드는 `createAnthropicClient` 호출) |
+| `db/`, db 계약, `frontend/` | ✅ 이번 변경 없음 (`frontend/docs/*`의 수정은 다른 작업) |
 
 ---
 
-## 8. 범위 확인
+## 9. 실제 확인
 
-`git diff --name-only` 기준 이번 백엔드 변경은 `backend/src/api/*`, `src/config/summoner.ts`, `src/riot/{client,types}.ts`, `src/server.ts`, 테스트, `backend/docs`, `docs/contracts/api_contract.md`에 한정됨. `db/`, `backend/src/collector/*`, `backend/src/cli/collect.ts`, `db_contract` 수정 **없음**. 작업 트리의 `frontend/*` 수정은 이번 백엔드 Build가 아니라 별도의 프론트 문서·코드 변경이다 (이번 검토 범위 밖).
+> 요약: 임시 포트 4100에서 세 번 띄워 확인하고 모두 종료했다. 4000 포트는 떠 있지 않았고 건드리지 않았다. **Riot 키가 만료되어** 실제 경기 분석(템플릿 1판, LLM 1판)은 하지 못했다. Riot 호출 **2회**(둘 다 401/403), Anthropic **0회**, 비용 **$0**.
+
+| # | 설정 | 확인 | 결과 |
+|---|------|------|------|
+| 1 | 기본(새 변수 없음) | 시작 로그 `enabled=false`, POST → 503 `ANALYSIS_DISABLED`, 깨진 본문도 503 | ✅ |
+| 2 | `FEEDBACK_ENABLED=true FEEDBACK_LLM_ENABLED=false` | 시작 로그 `llm=off(FEEDBACK_LLM_ENABLED=false) … budget=$0.25 spent=$0.0000 today=0/20 key=있음` | ✅ |
+| 3 | 같은 서버 | GET·PUT·OPTIONS(Origin 붙임)·다른 경로 POST → 404 `NOT_FOUND`, CORS 헤더 없음 | ✅ |
+| 4 | 같은 서버 | `NA_1` → 400 `matchId`(value 포함), 깨진 JSON·배열·`text/plain`·3KB → 400 `body`(값 없음), `"a b<script>"` → 400 `puuid`(값 없음) | ✅ |
+| 5 | 같은 서버 | 검색 `너희는개다-KR1` → **503 `RIOT_KEY_EXPIRED`** (Riot 1회). 분석 `KR_8441587549` → **503 `RIOT_KEY_EXPIRED`**, 로그 `riotCalls=1 outcome="503 RIOT_KEY_EXPIRED" costUsd=0 today=0/20` (timeline·LLM 안 부름) | ✅ (키 만료 경로) |
+| 6 | 장부에 깨진 줄을 임시로 둠 | 고친 뒤: 오류 로그 1줄 + 서버는 켜짐 + POST → 503 `ANALYSIS_DISABLED`. 확인 후 임시 장부 삭제 | ✅ (L1 수정 확인) |
+| 7 | **실제 LLM 1판** (`FEEDBACK_LLM_ENABLED=true`) | 검색이 401/403이라 puuid·경기를 얻을 수 없음 → **하지 않음** | ⏸️ |
+
+- 실제 Riot 템플릿 경로(200 `llm_off`, 반복 시 `template_hit`, 422 `too_short`, 404 `participant`/`match`)는 Build가 키가 살아 있을 때 확인했다(`back_build.md` 4-8 #6).
+- **다음에 할 일**: 사용자가 Riot 키를 재발급하면 같은 절차(포트 4100, 프로세스 환경 변수만)로 LLM 1판(재시도 포함 최대 2회 호출, 예상 약 $0.07·최악 약 $0.22)을 돌려 `mode:"llm"`·30초 안·금지 필드 없음·반복 시 Riot 0·LLM 0·장부 1줄·하루 +1·장부 비용 = 로그 비용을 확인한다.
 
 ---
 
-## 9. 발견 사항 (심각도순)
+## 10. 발견 사항 (심각도순)
 
-### 경미
+| # | 심각도 | 내용 | 조치 |
+|---|--------|------|------|
+| D1 | **사용자 결정** | 기본 예산 $0.25에서 판당 최악 약 $0.216을 예약하므로 장부 합이 약 $0.034를 넘으면 그 뒤 모든 LLM 분석이 **429 `budget`**(템플릿도 아님)이다. 첫 실제 1판(약 $0.07) 뒤 곧바로 막힌다. 동시 2개도 예산상 1개만 통과한다. 누적 상한이라 날이 바뀌어도 풀리지 않는다 | 보고만. 화면 공개 전 `FEEDBACK_API_BUDGET_USD` 상향(예: 하루 20판 × 약 $0.07 ≈ $1.4/일 기준으로 정함) 또는 월 단위 장부(F11) 결정 필요 |
+| L1 | 경미 (고침) | API 장부에 깨진 줄(쓰는 도중 종료 등)이 있으면 시작 때 `JSON.parse` 예외로 **API 서버 전체가 켜지지 않았다**(챔피언 통계까지 중단) | `server.ts`에서 복원 실패 시 오류 로그 + 분석만 503. 요청 중 장부 읽기 실패는 500(돈이 나가지 않는 쪽)으로 그대로 둠 |
+| L2 | 경미 | 진행 중 분석이 KST 자정을 넘겨 끝나면 그 1회가 **새 날**의 사용 수로 들어간다(`settle`이 날짜를 넘긴 뒤 `used++`) | 보고만. 하루 1회 오차, 영향 작음 |
+| L3 | 경미 | Data Dragon이 내려가 있으면 실패를 기억하지 않아 분석마다 `versions.json`을 다시 시도해 최대 3초씩 늦어진다(경고 로그는 10분 1번) | 보고만. 30초 상한 안이고 드묾 |
+| L4 | 경미 | 템플릿 경로(LLM 끔)와 422·404 경로는 하루 상한·속도 제한이 없어, 같은 요청을 반복하면 Riot 1~2회씩 쓴다(캐시되지 않는 오류). API 제한기(18/90)가 상한 역할 | 보고만. 계획의 "사용자별 속도 제한 안 함"과 같음 (overview 10-1과 같은 계열) |
+| I1 | 정보 | Data Dragon 버전 문자열을 `^\d+\.\d+\.\d+$`로 따로 검사하지 않는다. 신뢰하는 CDN 값이고 `encodeURIComponent`로 넣어 경로 조작은 안 되지만, 엄격 검사를 더하면 더 안전 | 다음에 이 파일을 고칠 때 |
+| I2 | 정보 | 504 뒤에도 분석이 끝까지 돌며 하루 자리·동시 실행 자리를 쥔다(`generateTexts`에 취소 신호 없음) | 계획 5-9-9 참고 1과 같음 |
+| I3 | 정보 | 시간 초과·네트워크 오류로 끝난 LLM 호출은 장부 `costUsd=0`이지만 실제로는 일부 청구됐을 수 있다 → 그 판은 하루 상한에도 안 셈 | 계획 5-9-9 참고 2와 같음. 콘솔 대조 |
 
-**1. 동시에 여러 요청·워커가 한도 직전에 몰리면 "대기 1.5초 초과분은 pending" 규칙이 깨진다.**
-`runFlight`가 `limiterWaitMs()`로 대기 시간을 본 뒤 호출을 시작하는데, 이 값은 아직 `acquire()`에 대기 중인 호출을 세지 않는다. 그래서 여러 워커가 동시에 "대기 0"을 보고 모두 통과한 뒤 같은 한도 앞에서 줄을 선다.
-- 재현(가짜 호출·실제 `RateLimiter`, 한도 4초에 5회, 요청 2개×ID 10개 동시): **두 요청 모두 8.0초 걸림**(pending은 각각 8개, 호출 14회). 이상적으로는 1.5초 안에 끝나야 함.
-- 실제 설정(1초 18회, 120초 90회)에서는 "한도 끝에 걸친 순간"에 몰린 최대 `5 × 동시 요청 수` 호출이 한도가 풀릴 때까지(최대 약 120초) 기다릴 수 있다. 개발 단계의 소수 사용자에서는 사실상 발생하지 않는다.
-- 같은 이유로 존재하지 않는 matchId를 계속 요청하면 일부러 한도와 경기 캐시를 소모할 수 있다(사용자별 속도 제한이 없음). 공개 배포 전에 다룰 문제다.
-- 권장: 대기 중인 호출 수를 대기 시간 계산에 포함하거나, 검사와 `acquire`를 하나로 묶어 "예약" 방식으로 바꾼다. 프론트 착수를 막지 않는다.
+---
 
-**2. 계약 2-6 "같은 이름 반복은 400"이 구현에 없다.**
-`KR_1,KR_1`은 200이고 같은 항목이 두 번 온다(결과 순서·개수 규칙은 지켜짐, 내부적으로 Riot은 1번만 호출). 계약 문구를 "중복 허용"으로 고치거나 `parseMatchIdsParam`에 중복 검사를 추가해 둘을 맞춘다. 프론트는 중복 없는 ID를 보내므로 영향 없음.
+## 11. 고친 것
 
-**3. `cache.set`이 TTL을 다시 시작한다.**
-경기 캐시 항목의 6시간은 마지막 `set` 시점부터 센다(정보 저장 후 gold15 저장 시 한 번 더 갱신, 최대 약 12시간). 끝난 게임은 안 변하므로 정확성 문제는 없다. 계약 2-6은 "6시간"이라고만 적었으므로 "대략 6시간"으로 읽으면 충분하고, 문서화로 충분하다 (`back_overview.md` 6장에 적음).
-
-### 메모 (조치 없음)
-
-- 서버 로그에 요청 URL(`matchIds` 전체)이 남는다. matchId는 공개 정보라 문제 없음.
-- 한 번의 신규 검색이 최대 44회를 쓰므로 120초에 2명 이상이 연달아 검색하면 limiter 대기가 길어진다(결정 X1의 알려진 비용).
+| 파일 | 내용 | 재검증 |
+|------|------|--------|
+| `backend/src/server.ts` | `buildFeedback`에서 장부 복원(`countTodayFromLedger(ledger.entries())`)을 `try`로 감싸, 실패하면 `logger.error` 1줄 + `unavailableFeedback(503 ANALYSIS_DISABLED)` | typecheck 0, lint 0, 단위 372/372, 실제 서버(9장 #6) |

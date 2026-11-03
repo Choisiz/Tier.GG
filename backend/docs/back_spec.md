@@ -1,9 +1,9 @@
 # 백엔드 계획서 — 수집 워커 + 챔피언 통계 API
 
-> 상태: **승인됨** (v1 2026-10-14, 변경 01 2026-10-15, 변경 02 2026-10-16, 변경 03 2026-10-27, 변경 04 2026-10-30)
+> 상태: **승인됨** (v1 2026-10-14, 변경 01 2026-10-15, 변경 02 2026-10-16, 변경 03 2026-10-27, 변경 04 2026-10-30, 변경 05 2026-11-03)
 > 읽는 계약: `docs/contracts/db_contract.md`, `docs/contracts/db_contract.dbml` **v8** (최근 14일 기준, 변경 04: 룬 보조 정렬·수집 범위 티어당 250명)
-> 작성하는 계약: `docs/contracts/api_contract.md` **v3** (전적 검색 추가 2026-10-27, 킬관여·라인전 15분 골드 추가 2026-10-30)
-> 이 문서는 **지금 계획만** 적는다. 패치 기준이던 v1 계획과 변경 01·02·03·04 원문(04의 설계 비교·실측 근거 포함)은 git 기록(`87cfc78`, 변경 02~04는 각 Build 커밋 이전)에 남아 있다.
+> 작성하는 계약: `docs/contracts/api_contract.md` **v4** (전적 검색 추가 2026-10-27, 킬관여·라인전 15분 골드 추가 2026-10-30, 게임 피드백 분석 POST 추가 2026-11-03)
+> 이 문서는 **지금 계획만** 적는다. 패치 기준이던 v1 계획과 변경 01·02·03·04·05 원문(04의 설계 비교·실측 근거, 05의 사용자 결정 질문 포함)은 git 기록(`87cfc78`, 변경 02~04는 각 Build 커밋 이전)에 남아 있다.
 
 ## 목차
 
@@ -34,14 +34,19 @@
   - [5-6. 프론트 사용 방식에 맞춘 점](#5-6-프론트-사용-방식에-맞춘-점)
   - [5-7. 전적 검색 (변경 03)](#5-7-전적-검색-변경-03)
   - [5-8. 킬관여·라인전 15분 골드 (변경 04)](#5-8-킬관여라인전-15분-골드-변경-04)
+  - [5-9. 게임 피드백 분석 (변경 05)](#5-9-게임-피드백-분석-변경-05)
 - [6. 오류 처리와 로깅](#6-오류-처리와-로깅)
+  - [6-4. 게임 피드백 분석 로그와 비밀값 (변경 05)](#6-4-게임-피드백-분석-로그와-비밀값-변경-05)
 - [7. 설정값](#7-설정값)
+  - [7-6. 게임 피드백 분석 (config/feedback.ts, 변경 05)](#7-6-게임-피드백-분석-configfeedbackts-변경-05)
 - [8. 의존성](#8-의존성)
 - [9. 테스트 전략](#9-테스트-전략)
+  - [9-5. 게임 피드백 분석 테스트와 비용 (변경 05)](#9-5-게임-피드백-분석-테스트와-비용-변경-05)
 - [10. 완료 기준](#10-완료-기준)
   - [10-5. 변경 02 (L1~L5, 계약 문구, 프리셋)](#10-5-변경-02-l1l5-계약-문구-프리셋)
   - [10-6. 변경 03 (전적 검색)](#10-6-변경-03-전적-검색)
   - [10-7. 변경 04 (킬관여·라인전 15분 골드)](#10-7-변경-04-킬관여라인전-15분-골드)
+  - [10-8. 변경 05 (게임 피드백 분석)](#10-8-변경-05-게임-피드백-분석)
 - [11. 계약 변경 요청](#11-계약-변경-요청)
 - [12. 결정 사항](#12-결정-사항)
 - [13. 작업 범위](#13-작업-범위)
@@ -541,6 +546,319 @@ backend/
 
 **하지 않기로 한 것**: (a) 라인전을 2-5 응답에 합치기(A안): 첫 화면이 약 2배 느려지고 한도를 즉시 소진한다. (b) 검색의 `getMatch` 상세를 경기 캐시에 통째로 넣어 24회를 4회로 줄이기: 상세 1개가 수십~백 KB라 메모리가 커지고 라인전과 별개의 최적화라 다음 변경으로 미룬다. (c) timeline 원본 캐시: 0.6MB라 5,000개면 3GB.
 
+### 5-9. 게임 피드백 분석 (변경 05)
+
+> 요약: 매치 행을 펼친 안쪽 "AI 분석" 버튼이 부르는 `POST /api/v1/matches/:matchId/feedback`(api_contract v4 2-7). Riot match·timeline 2회 → `!ai` 판정 엔진 → LLM 문장 → 숫자 검증 → 템플릿 대체를 그대로 호출하고 서버 메모리에 캐시한다. DB는 쓰지 않는다. 코드는 `src/api/feedback/`.
+
+#### 5-9-0. 한눈에 보기와 사용자 결정
+
+요약: 매치 행 안의 "AI 분석" 버튼을 누르면 프론트(Next 서버)가 `POST /api/v1/matches/:matchId/feedback`을 부른다. 백엔드는 Riot에서 그 판의 match·timeline을 받아(2회) `!ai` 2단계 파이프라인(엔진 → LLM 문장 → 숫자 검증 → 재시도 → 템플릿)을 **그대로 호출**하고, 결과를 서버 메모리에 캐시한다. DB는 쓰지 않는다. 계약 1장 "GET만" 규칙이 바뀌므로 **전체 독립 Review** 대상이다.
+
+| # | 사용자 결정 (2026-11-03, 추천대로 승인, 12장 F1~F7) | 반영한 곳 |
+|---|------|------|
+| 1 | 화면 위치: 매치 행을 펼친 안쪽 (프론트 몫) | 5-9-11 |
+| 2 | 분석 대상: **검색한 소환사 본인만** (요청 `puuid`가 그 판 참가자여야 함) | 5-9-1, 5-9-4 ③ |
+| 3 | 분석할 판: **솔로랭크(420)·자유랭크(440), 15분(900초) 이상**. 그 밖은 422 | 5-9-4 ④⑤ |
+| 4 | 하루 분석 상한 **20회**: 실제 LLM 호출이 일어난 분석만 셈, 캐시 적중 제외, KST 자정 초기화 | 5-9-8 |
+| 5 | 상한 초과 시 템플릿 대신 **"오늘 분석 한도 초과" 오류(429)** | 5-9-3 |
+| 6 | 결과 저장: **서버 메모리 캐시**(재시작하면 사라짐). DB 테이블 없음 | 5-9-7 |
+| 7 | 버튼을 눌렀을 때만 분석 (자동 분석 없음) | 5-9-11 |
+
+- RAG는 3·4단계 뒤에 붙는다. 지금은 RAG 없는 2단계 파이프라인을 쓰고, 응답에 `meta.knowledgeVersion: null` 자리를 미리 둬서 **RAG를 붙여도 응답 모양이 바뀌지 않게** 한다(캐시 키에도 미리 넣는다).
+- 하지 않는 것: DB 저장, 자동 분석, 다른 참가자 분석, 비동기 작업 번호(폴링), 사용자별 속도 제한, 스트리밍(SSE), `!ai` 코드 수정.
+
+#### 5-9-1. 엔드포인트와 요청 검증
+
+요약: 비용이 드는 요청이라 **POST**로 연다. `puuid`는 본문(JSON)에 넣어 요청 로그·URL에 남지 않게 한다.
+
+```http
+POST /api/v1/matches/KR_8437852704/feedback
+Content-Type: application/json
+
+{ "puuid": "abcd1234…" }
+```
+
+| 이름 | 위치 | 검사 (기존 `validate.ts` 재사용) | 실패 |
+|------|------|------|------|
+| `matchId` | 경로 | `^KR_[0-9]{1,15}$` (2-6과 같음) | 400 `INVALID_PARAMETER` `details.param="matchId"` |
+| `puuid` | 본문 | `parsePuuidParam`과 같은 규칙(영숫자·`-`·`_`, 1~100자) | 400 `details.param="puuid"` |
+| 본문 | - | `Content-Type: application/json`, 크기 **2KB 이하**, JSON 객체. 모르는 필드는 무시 | 깨진 JSON·너무 큼·객체 아님·Content-Type 다름 → 400 `details.param="body"` |
+
+**POST로 하는 이유 (계약 1장 "GET만" 변경)**
+
+| 이유 | 설명 |
+|------|------|
+| 부작용이 있다 | LLM 비용이 들고, 하루 상한을 쓰고, 캐시를 만든다. HTTP 의미상 GET(안전·멱등)이 아니다 |
+| 실수 호출 방지 | GET이면 링크 미리 가져오기·크롤러·브라우저 자동 재시도·Next의 GET 캐시/프리페치가 의도치 않게 유료 호출을 만들 수 있다 |
+| puuid 노출 줄이기 | 본문에 두면 URL·요청 로그·프록시 로그에 남지 않는다 (lane-gold는 쿼리라 로그에서 잘라야 했다, X7) |
+
+- 바뀌는 규칙: "메서드: GET만" → "**GET(조회) + 이 POST 1개(분석)**". 다른 경로의 POST·그 밖의 메서드는 지금처럼 404 `NOT_FOUND`. 이 경로의 GET도 404.
+- CORS는 그대로 켜지 않는다 (D6). 프론트는 Next 서버(Route Handler 또는 Server Action)에서 부른다. 브라우저에서 직접 부르지 않는다.
+- 같은 요청을 다시 보내도 캐시로 같은 결과가 오므로 실질적으로 멱등이다(첫 호출만 비용).
+
+#### 5-9-2. 응답 모양
+
+요약: `!ai`의 `FeedbackResult`에서 **화면에 필요한 것만** 골라 준다. 등급·총점·점수·가중치·모델 이름·토큰·비용은 넣지 않는다(서버 로그에만).
+
+```jsonc
+// 200 OK, Cache-Control: no-store
+{
+  "matchId": "KR_8437852704",
+  "championId": 235,
+  "position": "UTILITY",              // TOP | JUNGLE | MIDDLE | BOTTOM | UTILITY
+  "role": "SUPPORT_DAMAGE",           // 엔진 유형 10개 중 하나 (프론트가 한글 이름표로)
+  "win": false,
+  "mode": "llm",                      // "llm" | "template"
+  "templateReason": null,             // mode가 "template"일 때만: "llm_off" | "llm_error"
+  "summary": { "text": "라인전에서 밀렸고, … 승부가 기울었습니다." },
+  "sections": {
+    "laning": { "good": [], "bad": [ { "subjectId": "laning.gold", "text": "15분 골드가 상대 애쉬보다 약 700 적었습니다." } ], "note": null },
+    "fight":  { "good": [], "bad": [ { "subjectId": "fight.damage", "text": "…" } ], "note": null },
+    "macro":  { "good": [ { "subjectId": "macro.vision", "text": "…" } ], "bad": [], "note": null }
+  },
+  "keyMoments": [
+    { "startSec": 906, "endSec": 936, "direction": "widened", "text": "15분 바텀 싸움에서 …" }
+  ],
+  "meta": {
+    "engineVersion": "2026-11-02.2",
+    "promptVersion": "2026-11-03.1",
+    "knowledgeVersion": null,          // RAG(4단계) 뒤 문자열. 지금은 항상 null
+    "championDataVersion": "16.21.1",  // 유형 판정에 쓴 Data Dragon 버전 (5-9-5)
+    "generatedAt": "2026-11-03T12:00:00.000Z"
+  }
+}
+```
+
+| 필드 | 출처 | 규칙 |
+|------|------|------|
+| `championId`·`position`·`role`·`win` | `AnalysisResult.player` | 그대로 |
+| `mode` | `FeedbackResult.mode` | `"llm"` = LLM 답을 썼다(일부 문장은 템플릿일 수 있음). `"template"` = LLM 답을 전혀 못 씀 |
+| `templateReason` | 백엔드 | `mode="llm"`이면 `null`. `"llm_off"` = LLM을 끈 설정(7-6)·키 없음, `"llm_error"` = LLM 오류·거절·잘림·시간 초과·크레딧 문제 등. 세부 원인(`fallbackReason`)은 로그에만 |
+| `summary.text` | `FeedbackResult.summary.text` | 1~2문장, 최대 200자 |
+| `sections.<영역>.good[]`/`bad[]` | `FeedbackResult.sections` | 각 최대 2개. `{subjectId, text}`만. 문장 1개 최대 120자·2문장 (`!ai` 검증기 규칙) |
+| `sections.<영역>.note` | `FeedbackResult.sections.<영역>.note` | 라인전 비교 불가일 때 템플릿 한 줄("이 판은 라인전 상대를 비교할 수 없었습니다"), 그 밖은 `null` |
+| `keyMoments[]` | `FeedbackResult.keyMoments[i].index` → `AnalysisResult.keyMoments[index]` | `startSec`·`endSec`·`direction`(`widened`/`narrowed`)·`text`. **0~3개** (feedback_design 2-1 최대 3개, 세나 판 3개) |
+| `meta.*` | 버전들 + 만든 시각 | 캐시 적중이면 `generatedAt`은 처음 만든 시각 (캐시 적중 표시는 따로 하지 않음, W6과 같은 판단) |
+
+- **넣지 않는 것**: `grade`·`gradePoint`·`score`·`total`·`weight`·`impact`·영역 `verdict`, `factIds`·`source`, `model`·`effort`·`usage`·`costUsd`·`durationMs`·`verification`·`fallbackReason`, `puuid`. (영역 판정어 `잘함/보통/부족`은 등급처럼 보일 수 있어 이번엔 넣지 않는다. 필요하면 나중에 필드 추가로 가능)
+- RAG 뒤에도 같은 모양: 문장 출처 조각을 보여 주게 되면 항목에 `sources?` 같은 **필드를 더하는** 방식(계약 1장 "필드 추가는 같은 버전")으로 한다.
+- DTO 변환은 순수 함수 `toFeedbackDto(result, feedback, meta)`로 두고, **응답 JSON 키 전체를 재귀로 훑어 금지 키가 없음을 단위 테스트로 확인**한다.
+
+#### 5-9-3. 오류 코드
+
+요약: Riot·입력 문제와 "분석하지 않는 판", "한도 초과"는 오류로 알린다. **LLM 문제는 오류가 아니라 200 + 템플릿 문장**이다(사용자는 항상 결과를 받는다). 단, 하루 상한·예산 초과는 사용자 결정 5에 따라 **429 오류**다.
+
+| HTTP | `code` | 언제 | `details` | 새 코드 |
+|------|--------|------|-----------|---------|
+| 400 | `INVALID_PARAMETER` | `matchId`·`puuid`·본문 형식 | `{param, value?}` (`puuid`·본문 값은 넣지 않음) | 기존 |
+| 404 | `MATCH_NOT_FOUND` | Riot에 그 판이 없음(getMatch 404) / `puuid`가 그 판 참가자가 아님 | `{reason: "match" \| "participant"}` | **새** |
+| 422 | `ANALYSIS_UNSUPPORTED` | 분석하지 않는 판 | `{reason: "queue" \| "too_short" \| "no_position" \| "no_timeline"}` | **새** |
+| 429 | `ANALYSIS_LIMIT_REACHED` | 오늘 분석 상한 도달 / 누적 예산 도달 (그리고 캐시에 결과가 없음) | `{reason: "daily", limit: 20, resetAt: "…Z"}` 또는 `{reason: "budget"}` | **새** |
+| 502 | `RIOT_UNAVAILABLE` | Riot 429·5xx 재시도 소진 | - | 기존 |
+| 503 | `RIOT_KEY_EXPIRED` | Riot 401/403 (이 요청만 실패) | - | 기존 |
+| 503 | `ANALYSIS_DISABLED` | 분석 기능이 꺼져 있음 (`FEEDBACK_ENABLED=false`) | - | **새** |
+| 503 | `ANALYSIS_BUSY` | 동시 분석이 꽉 참 / Riot 호출 한도 대기가 김 | `{retryAfterSec}` (1~60) | **새** |
+| 504 | `ANALYSIS_TIMEOUT` | 30초 안에 못 끝냄. **서버는 분석을 계속해 캐시에 넣는다** → 다시 누르면 결과가 나올 수 있음 | `{retryAfterSec: 15}` | **새** |
+| 500 | `INTERNAL_ERROR` | 그 밖 (`MATCH_MISMATCH` 등) | - | 기존 |
+
+- 422 `reason` 뜻: `queue` = 420·440이 아님(일반·칼바람·URF 등), `too_short` = 900초 미만(다시하기 포함), `no_position` = 10명 중 `teamPosition`이 빈 참가자가 있음, `no_timeline` = timeline이 404이거나 프레임이 없음(`NO_FRAMES`).
+- 429·503·504에는 `Retry-After` 헤더도 함께 준다(`retryAfterSec` 또는 `resetAt`까지 초). 프론트는 `details`만 봐도 된다.
+
+**LLM 쪽 상황별 처리 (오류 아님)**
+
+| 상황 (`fallbackReason`) | 응답 | 하루 상한에 셈 | 캐시 | 그 밖 |
+|------|------|------|------|------|
+| `FEEDBACK_LLM_ENABLED=false` 또는 `ANTHROPIC_API_KEY` 없음 | 200 `mode:"template"`, `templateReason:"llm_off"` | 안 셈 | 템플릿 캐시(10분) | 0원. 프론트 개발용 |
+| `auth`(401/403), `billing`(402 크레딧 부족), `model_not_found` | 200 template `llm_error` | 안 셈(비용 0) | 템플릿 캐시(10분) | **차단기**: 10분 동안 LLM을 부르지 않음, `logger.error` 1회(402면 "크레딧 소진, 콘솔 확인") |
+| `rate`(429)·`server`(5xx/529)·`timeout`·`network` | 200 template `llm_error` | 비용이 기록됐으면 셈 | 템플릿 캐시(10분) | SDK 재시도 0회(시간 제한 때문, 5-9-8) |
+| `refusal`·`max_tokens`·`parse` | 200 template `llm_error` | 셈(토큰을 썼음) | 템플릿 캐시(10분) | 거절률은 로그로 본다 |
+| 칸 일부만 검증 실패 → 그 칸만 템플릿 | 200 `mode:"llm"` | 셈 | 정상 캐시(7일) | 로그에 `templated=N` |
+| `budget` (pre-check 뒤 재시도 단계에서만 날 수 있음) | 첫 호출이면 429 `budget`, 재시도면 그 칸만 템플릿 | - | - | 5-9-8 예약으로 거의 안 생김 |
+
+#### 5-9-4. 처리 흐름 (파이프라인)
+
+요약: 싼 검사부터 하고, 비싼 일(timeline, LLM)은 마지막에 한다. "참가자인가"를 엔진보다 먼저 직접 확인해 **NO_POSITION보다 404가 먼저** 나오게 한다(`ai_overview` 해결되지 않은 점).
+
+| 단계 | 하는 일 | Riot | 실패 |
+|------|---------|------|------|
+| ① 스위치 | `FEEDBACK_ENABLED=false`면 즉시 | 0 | 503 `ANALYSIS_DISABLED` |
+| ② 입력 | `matchId`·본문 검사 | 0 | 400 |
+| ③ 캐시 | 결과 캐시 → 템플릿 캐시 → 진행 중 Promise 순서로 찾음 (5-9-7). 있으면 바로 반환 | 0 | - |
+| ④ Riot 대기 확인 | `riot.limiterWaitMs() > 5,000`이면 시작하지 않음 (lane-gold의 pending과 같은 생각, 기다리는 상한만 다름) | 0 | 503 `ANALYSIS_BUSY` |
+| ⑤ match | `getMatch(matchId)` 1회 | 1 | 404→`MATCH_NOT_FOUND(match)`, 401/403→503, 429·5xx 소진→502 |
+| ⑥ 사전 검사 | **참가자**(`participants[].puuid === puuid`, 아니면 404 `participant`) → **큐**(`queueId` 420·440) → **길이**(`gameDuration ≥ 900`) → **포지션**(10명 모두 `teamPosition`이 5개 중 하나). 이 검사에서 걸리면 timeline을 부르지 않는다 | 0 | 404 / 422 |
+| ⑦ timeline | `getTimeline(matchId)` 1회 | 1 | 404→422 `no_timeline`, 그 밖은 ⑤와 같음 |
+| ⑧ 챔피언 데이터 | 판의 `gameVersion`에 맞는 태그·한국어 이름 (5-9-5) | 0 | 실패해도 스냅숏으로 계속 |
+| ⑨ 엔진 | `analyzeMatch({match, timeline, puuid, championTags})` (순수 함수, 수 ms) | 0 | `AnalysisError`: `PLAYER_NOT_FOUND`→404, `NO_POSITION`→422, `NO_FRAMES`→422 `no_timeline`, `MATCH_MISMATCH`→500 |
+| ⑩ LLM 여부 | LLM 끔·키 없음·차단기 열림 → 템플릿 경로(`client: null`)로 ⑫ | 0 | - |
+| ⑪ 한도 예약 | 하루 상한 자리 1개 + 예산(최악 비용) 예약, 동시 실행 자리 얻기 (5-9-8) | 0 | 429 / 503 `ANALYSIS_BUSY` |
+| ⑫ 문장 | `createFeedbackFromResult(deps)(result)` — LLM 1~2회 → 검증 → 템플릿 | 0 | LLM 문제는 200 template |
+| ⑬ 정리 | 실제 비용이 0이면 하루 상한 자리 반환. 예산 예약 해제. DTO 변환, 캐시 저장, 로그 1줄 | 0 | - |
+
+- **Riot 호출 수**: 캐시 미스 판당 **2회**(match + timeline), 사전 검사에서 걸리면 1회, 캐시 적중이면 0회. 기존 API 전용 제한기(1초 18회/120초 90회)를 공유한다.
+- **전적 검색 캐시의 match 재사용 여부: 하지 않는다.** 소환사 캐시(60초)는 화면용 DTO만, 경기 캐시(`matchLaneCache`)는 참가자 10명의 포지션·`gold15` 숫자만 가진다. 엔진은 match 원본(참가자 전체 필드)이 필요해 둘 다 쓸 수 없다. 원본을 캐시에 넣는 것은 X4에서 "메모리가 커져 미룸"으로 정했고, 분석은 버튼을 눌러야만 하니 +1회는 감당할 만하다. (⑥ 사전 검사만 `matchLaneCache`로 먼저 해 Riot 0회로 404·422를 줄 수도 있지만, 큐 ID·길이가 그 캐시에 없어 이번에는 하지 않는다.)
+- 타입: `riot/types.ts`의 `MatchDto`·`TimelineDto`를 엔진 입력 타입(`AnalysisMatch`·`AnalysisTimeline`)으로 넘긴다. 구조가 같지만 선택 필드 차이로 타입이 안 맞으면 `api/feedback/` 안의 작은 변환 함수에서 맞춘다(`riot/types.ts`에 엔진용 필드를 선택 필드로 더하는 것도 허용 — 수집기 영향 없음, 변경 04와 같은 방식).
+- **puuid 키 주의**: Riot puuid는 API 키(앱)마다 다르게 암호화될 수 있다(`ai_overview` 8번). 개발 키를 재발급한 뒤 프론트가 예전 검색 결과의 puuid를 보내면 ⑥에서 404 `participant`가 날 수 있다 → 프론트는 "다시 검색해 주세요"로 안내(5-9-11).
+
+#### 5-9-5. Data Dragon 챔피언 태그 공급
+
+요약: 엔진은 챔피언 태그(유형 판정)와 한국어 이름(문장)을 받는다. 지금은 테스트 fixture(16.21.1) 하나에 고정돼 있다. **판의 패치에 맞는 Data Dragon을 처음 필요할 때 받아 메모리에 두고, 실패하면 저장소 스냅숏을 쓰는** 방식으로 정했다(12장 F13).
+
+| 안 | 방법 | 장점 | 단점 |
+|----|------|------|------|
+| A. 스냅숏만 | fixture를 `backend/data/ddragon/champion-tags.16.21.1.json`으로 복사해 서버 시작 때 읽음 | 네트워크 0, 단순 | 새 챔피언이 나오면 태그 없음(엔진이 빈 태그로 판정하고 경고). 사람이 파일을 갱신해야 함 |
+| **B. 패치별 지연 로딩 + A 대비 (채택)** | 판의 `info.gameVersion`(`16.21.534.1234`) → `메이저.마이너` → Data Dragon `versions.json`에서 그 접두어의 첫 버전(`16.21.1`) → `cdn/{ver}/data/ko_KR/champion.json`을 받아 태그·이름 표를 만듦. 버전별로 메모리에 최대 4개. 받기 실패·시간 초과(3초)면 A 스냅숏 사용 + 경고 로그(10분 1번) | 판의 패치와 맞음, 새 챔피언 자동 반영, 키 없음·무료 | 새 외부 호출(Data Dragon CDN, 버전당 1번 약 150KB). 첫 분석이 최대 3초 느려질 수 있음 |
+| C. 서버 시작 때 최신 1개만 | 시작 때 최신 버전 받음 | 단순 | 옛 패치 판도 최신 태그 (태그는 거의 안 바뀌어 실제 차이 작음) |
+
+- B의 세부: `versions.json`은 1시간 캐시. 같은 버전을 동시에 받으면 진행 중 Promise 공유. `championTagsFromJson`·`championNamesFromJson`(`!ai` 공개 함수)이 `{data:{…}}` 형식을 이미 읽으므로 변환 코드 불필요. 응답 `meta.championDataVersion`과 캐시 키에 실제로 쓴 버전을 넣는다.
+- 새 의존성 없음(Node 내장 `fetch`). 단위 테스트는 가짜 fetch.
+- 엔진의 덮어쓰기 목록(`ROLE_OVERRIDES`)은 그대로 `!ai` 코드에 있다.
+
+#### 5-9-6. 의존성 조립 (server.ts)
+
+요약: 무거운 것(Anthropic SDK 클라이언트, 장부, 캐시)은 **서버 시작 때 1번** 만들고 `createApp`에 함수 하나(`feedback`)로 주입한다. 기존 `summonerSearch`·`laneGold`와 같은 방식(W7).
+
+```
+server.ts
+ ├ loadFeedbackEnv()            // config/env.ts: FEEDBACK_* , ANTHROPIC_API_KEY (값은 로그에 안 남김, "있음/없음"만)
+ ├ FEEDBACK_ENABLED=false → feedback = 항상 503 ANALYSIS_DISABLED
+ ├ Riot 키 없음            → feedback = 항상 503 RIOT_KEY_EXPIRED (기존 keyMissing과 같음)
+ ├ llmClient = (FEEDBACK_LLM_ENABLED && 키 있음) ? createAnthropicClient({ apiKey, timeoutMs: 25_000, maxRetries: 0 }) : null
+ ├ ledger    = fileLedger(backend/logs/feedback-api-ledger.jsonl)   // API 전용 장부 (5-9-8)
+ ├ champData = createChampionData({ fetch, snapshotPath, logger })  // 5-9-5
+ └ feedback  = createFeedbackService({ riot(기존 API용 RiotClient 공유), llmClient, ledger, champData, caches, limits, now, logger })
+createApp(db, undefined, { summonerSearch, laneGold, feedback })
+```
+
+- 시작 로그 1줄: `피드백 API enabled=true llm=on|off(이유) model=… effort=… dailyLimit=20 budget=$0.25 spent=$0.0000 today=0/20`. 키 값은 절대 출력하지 않는다.
+- `createApp`의 `feedback` 기본값은 기존처럼 "설정 안 됨 → 500" 함수(기존 테스트가 영향받지 않게).
+- `@anthropic-ai/sdk`는 계속 `analysis/llm/client.ts`만 import한다(`!ai` 규칙). 백엔드는 `createAnthropicClient`를 부를 뿐이다.
+
+#### 5-9-7. 캐시와 진행 중 요청 공유
+
+요약: 끝난 게임은 안 바뀌므로 한 번 만든 결과를 재사용한다. 같은 판을 동시에 눌러도 LLM은 1번만 부른다.
+
+| 항목 | 값 |
+|------|-----|
+| 캐시 키 | `matchId | puuid | engineVersion | promptVersion | knowledgeVersion(지금 "none") | model | effort | championDataVersion`. 규칙·프롬프트·모델·태그가 바뀌면 자연히 새로 만든다 |
+| 키 계산 시점 | `championDataVersion`은 match를 받아야 알 수 있다 → 먼저 **앞 부분 키**(`matchId|puuid|engine|prompt|knowledge|model|effort`)로 찾고, 값 안의 `championDataVersion`은 응답에만 쓴다 (같은 판의 패치는 바뀌지 않으므로 앞 부분 키로 충분). |
+| 결과 캐시 | `createSummonerCache<FeedbackDto>` 재사용(Map, TTL, 최대 개수, 넣은 순서로 삭제). **TTL 7일, 최대 500개**(결과 1개 약 3~6KB → 최대 약 3MB). `mode="llm"`만 |
+| 템플릿 캐시 | 같은 구현, **TTL 10분, 최대 200개**. `mode="template"`(LLM 끔·오류). LLM이 회복되면 10분 뒤 다시 만든다 |
+| 찾는 순서 | 결과 캐시 → 템플릿 캐시 → 진행 중 Promise. 단, `FEEDBACK_LLM_ENABLED`가 켜져 있고 차단기가 닫혀 있으면 템플릿 캐시 중 `llm_off`는 무시(설정을 켠 뒤 바로 LLM이 돌게) |
+| 진행 중 공유 | `Map<앞 부분 키, Promise<FeedbackDto>>`. 첫 요청(리더)만 Riot·LLM을 부르고, 같은 키 요청은 같은 Promise를 기다린다. 리더가 끝나면(성공·실패 모두) 지운다. 하루 상한은 **리더만** 센다 |
+| 실패 캐시 | 오류(404·422·502·503)는 캐시하지 않는다. 422는 다시 눌러도 같지만 Riot 1~2회라 감당 가능 (프론트가 버튼을 숨겨 줄인다, 5-9-11) |
+| 재시작 | 사라진다(사용자 결정 6). 같은 판을 다시 분석하면 비용이 다시 든다 |
+
+#### 5-9-8. 하루 상한, 예산, 동시 실행, 시간 제한
+
+요약: 돈이 새지 않게 네 겹으로 막는다 — ① 하루 20회 ② 누적 예산(장부) ③ 동시 실행 2개 ④ 응답 30초. 동시 요청에서도 상한을 넘지 않도록 "**먼저 예약하고, 끝나면 정산**"한다.
+
+**① 하루 상한 (`FEEDBACK_DAILY_LIMIT`, 기본 20)**
+
+| 항목 | 규칙 |
+|------|------|
+| 세는 것 | 실제 LLM 비용이 생긴 분석(장부에 `costUsd > 0`인 호출이 1개 이상)만. 캐시 적중·진행 중 공유·템플릿(`llm_off`)·비용 0 오류(401/402 등)는 안 셈 |
+| 예약 | ⑪에서 `used + reserved < limit`이면 자리 1개 예약, 아니면 429 `daily`. 끝나고 실제 비용이 0이면 반납 |
+| 초기화 | **KST 자정**(UTC 15:00). 날짜 키 `YYYY-MM-DD`(KST)가 바뀌면 0 |
+| 재시작 | 시작 때 API 장부에서 **오늘(KST) 날짜의 `kind="first"`·`costUsd>0` 줄 수**로 복원한다(재시작으로 상한이 풀리지 않게). 장부에는 puuid가 없고 matchId·participantId만 있다 |
+| 응답 | `429 ANALYSIS_LIMIT_REACHED {reason:"daily", limit, resetAt}`, `Retry-After`=자정까지 초 |
+
+**② 예산 (`FEEDBACK_API_BUDGET_USD`, 기본 0.25)**
+
+| 항목 | 규칙 |
+|------|------|
+| 장부 | **API 전용 파일** `backend/logs/feedback-api-ledger.jsonl` (루트 `.gitignore`의 `logs/`로 git 제외). `!ai`의 `fileLedger`를 그대로 쓰고, `generateTexts`가 호출마다 줄을 더한다. CLI 평가 장부(`test/eval/usage-ledger.jsonl`, git 커밋)와 섞지 않는다 — 평가 기록이 사용자 트래픽으로 더러워지지 않고, 예산을 따로 정할 수 있다 |
+| 상한 뜻 | API 장부 **누적** 합. 5단계 배분($0.25)을 기본값으로 하고, 공개 운영 때 사용자가 올린다. (월 단위로 바꾸려면 장부를 이번 달 줄만 보는 감싼 `Ledger`로 넘기면 된다 — 12장 F11) |
+| 예약 | ⑪에서 `장부 합 + 진행 중 예약 합 + 이번 판 최악 비용 > 상한`이면 시작하지 않고 429 `budget`. 최악 비용 = `worstCallCost(1차 입력 어림, 3000) + worstCallCost(재시도 입력 어림, 1500)` (`!ai`의 `pricing`·`prompt` 공개 함수로 계산, 약 $0.22). 끝나면 예약 해제 |
+| 이중 장치 | `generateTexts` 안의 `assertBudget`(호출마다 장부 + 최악 ≤ 상한)도 그대로 동작한다. 동시 2개가 같은 순간 통과해 상한을 넘는 문제는 위 예약으로 막는다 |
+| 입력 어림 보정 | 장부 실측으로 계수 계산(`calibration`). API 장부에 같은 모델·프롬프트 실측이 없으면 2단계 실측 계수 **1.64**를 상수로 쓴다 (평가 장부 파일을 서버가 읽지 않게) |
+| 바깥 안전망 | Anthropic 콘솔 월 지출 한도(사용자 설정, `!ai` 질문 11) |
+
+**③ 동시 실행**
+
+| 항목 | 값 |
+|------|-----|
+| LLM 동시 실행 | 최대 **2개** (세마포어). 대기열 최대 **4개**, 대기 중에도 ④ 시간 제한이 흐른다 |
+| 꽉 참 | 대기열도 꽉 차면 바로 503 `ANALYSIS_BUSY {retryAfterSec: 15}` |
+| Riot 대기 | ④ 단계 `limiterWaitMs() > 5초`면 503 `ANALYSIS_BUSY {retryAfterSec: ceil(대기)}` (최대 60). 5초 이하면 제한기에서 기다린다 |
+
+**④ 응답 시간 (동기, 30초)**
+
+| 항목 | 값 | 이유 |
+|------|-----|------|
+| 서버 응답 상한 | **30초** (`FEEDBACK_DEADLINE_MS`). 넘으면 504 `ANALYSIS_TIMEOUT {retryAfterSec:15}` | 2단계 실측 판당 평균 13.7초(재시도 포함). 재시도 있는 판도 대부분 30초 안 |
+| 상한을 넘겨도 | 분석 Promise는 **계속 돌고 끝나면 캐시에 넣는다**(진행 중 Map에도 남음). 사용자가 다시 누르면 진행 중 Promise에 붙거나 캐시 적중 → **추가 비용 0** | LLM 호출을 중간에 끊을 수 없다(`generateTexts`에 취소 신호 없음). 이미 낸 비용을 버리지 않는다 |
+| LLM 호출 1번 상한 | SDK `timeoutMs: 25,000`, `maxRetries: 0` (CLI 기본 60초·1회 재시도보다 짧게) | 1차 + 재시도 최악이 50초로 묶인다. 시간 초과는 템플릿 |
+| Riot | 기존 클라이언트 그대로 (요청 10초, 429·5xx 재시도) | |
+
+- 프론트 타임아웃: 이 엔드포인트만 **35초**(서버 30초 + 여유). 기본 10초(`API_TIMEOUT_MS`)는 그대로.
+
+#### 5-9-9. 기존 코드와의 경계 (ai 쪽 변경 요청)
+
+요약: `backend/src/analysis/**`·`backend/src/cli/{analyze,feedback}.ts`는 **고치지 않고 import만** 한다. 필요한 공개 함수가 이미 다 있어 **ai 쪽 변경 요청은 없다**.
+
+| 쓰는 `!ai` 공개 함수 | 용도 |
+|------|------|
+| `analyzeMatch`, `AnalysisError`, `championTagsFromJson`, `ENGINE_VERSION` (`analysis/index.ts`) | 엔진, 오류 매핑, 태그 |
+| `createFeedbackFromResult`, `championNamesFromJson`, `FeedbackResult` (`analysis/feedback.ts`) | 문장 생성(엔진 결과를 받아 `keyMoments` 시각과 `player`를 함께 쓰려고 `createFeedback` 대신 이것을 씀) |
+| `createAnthropicClient`, `LlmClient` (`llm/client.ts`), `fileLedger`·`calibration`·`Ledger` (`llm/ledger.ts`), `worstCallCost`·`estimateTokens`·`priceOf` (`llm/pricing.ts`), `MAX_TOKENS` (`llm/generate.ts`), `PROMPT_VERSION`·`SYSTEM_PROMPT`·`buildUserMessage` (`llm/prompt.ts`), `buildFacts` (`llm/facts.ts`), `FakeLlmClient` (테스트) | 클라이언트, 장부, 예산 예약 계산, 가짜 클라이언트 |
+
+**참고로 `!ai`에 전할 것 (변경 요청 아님, 메인 에이전트 판단)**
+
+1. `generateTexts`에 취소 신호(AbortSignal)가 없어 504 뒤에도 LLM이 끝까지 돈다. 지금 설계(끝까지 돌려 캐시)로 충분하지만, 나중에 필요하면 `!ai` 변경으로.
+2. LLM 호출이 시간 초과·네트워크 오류로 끝나면 장부 `costUsd`가 0으로 남지만, 실제로는 Anthropic이 일부를 청구했을 수 있다. 콘솔 대조 때 참고(`ai_overview` 7번과 함께).
+3. `ai_overview`의 문장 품질 문제(2~6번: 역전 장면 표현, "5데스" 단위, 칸 안 방향어 등)는 그대로 API 응답에도 나온다. 화면 공개 전에 다음 `PROMPT_VERSION`으로 고치는 것을 권장한다(`!ai` 작업).
+
+#### 5-9-10. 파일 목록
+
+요약: 새 코드는 `src/api/feedback/` 폴더에 모으고, 기존 파일은 조립·라우팅·검증·로그 가리기만 조금 고친다.
+
+| 파일 | 신규/수정 | 내용 |
+|------|-----------|------|
+| `src/api/feedback/service.ts` | 신규 | `createFeedbackService(deps)` → `FeedbackFn(matchId, puuid)`: 5-9-4 흐름, 진행 중 공유, 시간 제한, 오류 매핑 |
+| `src/api/feedback/precheck.ts` | 신규 | 순수 함수 `precheckMatch(match, puuid)` → `ok | {status, code, reason}` (참가자 → 큐 → 길이 → 포지션 순서) |
+| `src/api/feedback/limits.ts` | 신규 | 하루 상한(KST 날짜·예약·반납·장부 복원), 예산 예약, 세마포어(2 + 대기 4), 차단기(10분) |
+| `src/api/feedback/championData.ts` | 신규 | 5-9-5 B안(버전 매칭, 지연 로딩, 진행 중 공유, 스냅숏 대비) |
+| `src/api/feedback/dto.ts` | 신규 | `toFeedbackDto` 순수 함수, 응답 타입 |
+| `src/api/routes/matches.ts` | 수정 | `POST /matches/:matchId/feedback` 추가 (라우트 전용 `express.json({ limit: '2kb' })`) |
+| `src/api/app.ts` | 수정 | 메서드 검사: GET·HEAD + **이 경로의 POST만** 통과. `ApiDeps.feedback` 주입 |
+| `src/api/errors.ts` | 수정 | 본문 파싱 오류(`entity.parse.failed`·`entity.too.large`·Content-Type) → 400, `Retry-After` 헤더 지원 |
+| `src/api/validate.ts` | 수정 | `parseMatchIdParam`(단일 ID) 추가 (기존 정규식 재사용) |
+| `src/config/feedback.ts` | 신규 | 7-6 상수 |
+| `src/config/env.ts` | 수정 | `loadFeedbackEnv()` (불리언·정수·숫자 검사, 키는 "있음/없음") |
+| `src/lib/logger.ts` | 수정 | `sk-ant-` 가리기 |
+| `src/riot/types.ts` | 수정(필요할 때만) | 엔진 입력에 필요한 선택 필드 |
+| `src/server.ts` | 수정 | 5-9-6 조립 |
+| `backend/data/ddragon/champion-tags.16.21.1.json` | 신규 | fixture 복사본 (스냅숏, 5-9-5 A) |
+| `test/unit/api/feedback*.test.ts` 등 | 신규 | 9-5 |
+| `.env.example` | 수정 | 7-6 새 변수 4개 |
+| `docs/contracts/api_contract.md` | 수정 | api_contract 2-7 |
+
+- 수정 금지(이번 변경): `backend/src/analysis/**`, `backend/src/cli/**`, `backend/test/unit/analysis/**`, `backend/test/eval/**`, `backend/src/collector/*`, `db/`, `docs/contracts/db_contract.*`, `frontend/`, 루트 `.env`, `CLAUDE.md`, `docs/ai/**`.
+
+#### 5-9-11. 프론트에 전할 사항
+
+요약: 오래 걸리는 버튼 하나다. 타임아웃을 늘리고, 누를 수 없는 판에는 버튼을 안 보이게 하고, 오류마다 쉬운 문구를 준다. (`!프론트` 6단계, 목업 먼저)
+
+| 항목 | 내용 |
+|------|------|
+| 호출 위치 | Next 서버(Route Handler 또는 Server Action)에서 `POST`. 브라우저 직접 호출 없음(CORS 없음). `puuid`는 2-5의 `summoner.puuid`를 본문으로 |
+| 타임아웃 | 이 요청만 **35초**. 기본 10초 그대로 |
+| 버튼 표시 | `queueId`가 420·440이고 `gameDurationSec ≥ 900`인 매치 행에만 보인다(2-5에 이미 있는 값). 422를 미리 줄인다 |
+| 버튼 상태 | 대기 → 누름 → **분석 중**(버튼 비활성, "AI가 분석 중입니다 · 보통 10~20초") → 결과 / 오류. 결과는 그 페이지에 기억(다시 펼쳐도 다시 부르지 않음). 서버 캐시가 있어 다시 눌러도 비용은 없음 |
+| `mode:"template"` | 문장은 그대로 보여 주고 작은 표시: `llm_off` "간단 분석"(개발 중), `llm_error` "AI 문장 생성에 실패해 기본 문장으로 보여 드려요" |
+| 오류 문구 | 400 → "요청이 잘못됐습니다" / 404 `match` "경기 정보를 찾을 수 없어요" / 404 `participant` "검색 결과가 오래됐어요. 다시 검색해 주세요" / 422 "솔로·자유랭크 15분 이상 경기만 분석할 수 있어요" / 429 `daily` "오늘 분석 한도를 모두 썼어요. 자정(한국 시간)에 다시 열려요" / 429 `budget` "지금은 분석을 쓸 수 없어요" / 502 "Riot 서버가 바빠요. 잠시 후 다시" / 503 `RIOT_KEY_EXPIRED` "지금은 분석할 수 없어요" / 503 `ANALYSIS_DISABLED` 버튼 숨김 또는 "준비 중" / 503 `ANALYSIS_BUSY`·504 "조금 뒤(`retryAfterSec`초) 다시 눌러 주세요" (504는 다시 누르면 보통 바로 결과) |
+| 자동 재시도 | 하지 않는다(사용자가 다시 누름). 504·busy만 "다시 시도" 버튼 |
+| 등급 | 응답에 없다. 화면에 등급·점수를 만들지 않는다 |
+
+#### 5-9-12. Build 구현 메모 (2026-11-03)
+
+- `FeedbackFn`에 `unavailable` 속성(ApiError)을 둬, 꺼짐(503 `ANALYSIS_DISABLED`)·Riot 키 없음(503)·미설정(500)이면 라우트가 **본문 파싱 전에** 바로 응답한다(5-9-4 ① 순서). 
+- 하루 상한 `FEEDBACK_DAILY_LIMIT=0`이면 LLM 클라이언트를 만들지 않고 템플릿 `llm_off`로 준다(429가 아님).
+- 환경 변수 값이 잘못되면(불리언·정수·숫자·effort) 경고 후 **분석 기능 전체를 끈다**(503 `ANALYSIS_DISABLED`, 서버는 켜짐). 가격표에 없는 모델은 LLM만 끈다.
+- 판당 최악 비용은 CLI 예상 비용과 같은 계산(1차 max_tokens 3,000 전부 + 재시도 입력 = 1차 입력 + 3,000 + 1,500, max_tokens 1,500)이고 세나 판 기준 약 **$0.216**이다. 기본 예산 $0.25에서는 장부 합이 약 $0.034를 넘으면 다음 LLM 분석부터 429 `budget`이 된다(공개 운영 전 상한을 올려야 함).
+- 로그: 분석 1건 = `[feedback] 분석 …` 1줄(`cache=hit|template_hit|shared|miss`, `outcome`, Data Dragon `championDataSource=ddragon|snapshot` 포함).
+
 ---
 
 ## 6. 오류 처리와 로깅
@@ -589,6 +907,19 @@ backend/
 | 비밀값 | `DATABASE_URL`(전체·비밀번호(디코딩 포함)·사용자·호스트)과 `RIOT_API_KEY`, 그리고 `postgresql://…`·`RGAPI-…` 모양을 모든 로그·오류 메시지에서 `***`로 가린다. 잘못된 `%` 인코딩에서도 원문을 가린다 (db_review L1) |
 | puuid | 로그·문서에 전체 puuid를 쓰지 않는다 (앞 8자만). Riot 오류 경로의 puuid도 앞 8자 |
 | `collection_logs` | 상태·개수·`error_message`만. 경고 개수는 stdout 요약에만 |
+
+### 6-4. 게임 피드백 분석 로그와 비밀값 (변경 05)
+
+요약: 분석 1건 = 로그 1줄. 토큰·비용·시간은 로그에만, puuid는 앞 8자만, 키는 어디에도 없다.
+
+| 로그 | 내용 |
+|------|------|
+| 요청 1줄 (기존 `app.ts`) | `POST /api/v1/matches/KR_…/feedback 200 13521.4ms`. puuid는 본문이라 URL에 없다 |
+| 분석 1줄 (`[feedback]`) | `matchId`, `puuid=앞8자`, `cache=hit|template_hit|shared|miss`, `riotCalls`, `mode`, `fallbackReason`, `attempts`, `firstPass/firstTotal`, `retried`, `templated`, 토큰 `in/cw/cr/out`, `costUsd`, `llmMs`, `totalMs`, `today=N/20`, `spent=$x/$y`, `championDataVersion` |
+| 경고·오류 | 차단기 열림(오류 1회/10분, 402면 "크레딧 소진"), 예산 429(경고), Data Dragon 실패(경고 10분 1번), 504(경고, 계속 진행 중임을 표시), 엔진 `warnings` 개수 |
+| 비밀값 | `lib/logger.ts`의 `redact`에 **`sk-ant-…` 모양과 `ANTHROPIC_API_KEY` 값 가리기를 추가**한다 (지금은 `RGAPI-`·DB URL만 가림). SDK 오류 메시지도 `redact`를 거친다 |
+| 응답 | 오류 응답에 SDK 원문 메시지·스택·puuid를 넣지 않는다 |
+| 장부 | `!ai` 장부 형식 그대로(키·puuid 없음, matchId·participantId 있음). git 제외 폴더 |
 
 ---
 
@@ -665,6 +996,45 @@ backend/
 
 - 수집 CLI의 `RateLimiter`(19/98)와는 **별개 인스턴스**다 (API 서버·수집 CLI가 다른 프로세스). 그래서 **같은 키로 둘을 동시에 돌리지 않는다**(18+19 > 20/초, 90+98 > 100/120초). 새 환경 변수는 없다.
 
+### 7-6. 게임 피드백 분석 (config/feedback.ts, 변경 05)
+
+요약: 켜고 끄는 스위치 2개와 상한 2개만 환경 변수로 둔다. **기본은 모두 꺼짐/보수적**이라 `.env`를 안 고치면 유료 호출이 일어나지 않는다.
+
+`.env.example`에 추가 (값은 비워 둠):
+
+| 변수 | 기본값 | 뜻 |
+|------|--------|-----|
+| `FEEDBACK_ENABLED` | `false` | 분석 API 자체를 켬. `false`면 503 `ANALYSIS_DISABLED` |
+| `FEEDBACK_LLM_ENABLED` | `false` | 실제 LLM 호출을 켬. `false`면 **0원 템플릿 문장**(`templateReason:"llm_off"`). 프론트 개발은 이 상태로 한다 (`.env`에 `ANTHROPIC_API_KEY`가 이미 있어도 실수로 비용이 나지 않게 스위치를 따로 둠) |
+| `FEEDBACK_DAILY_LIMIT` | `20` | 하루(KST) 분석 상한. 0이면 LLM 분석 없음(캐시·템플릿만) |
+| `FEEDBACK_API_BUDGET_USD` | `0.25` | API 장부 누적 비용 상한 |
+
+- 그대로 재사용: `ANTHROPIC_API_KEY`, `FEEDBACK_LLM_MODEL`(기본 `claude-opus-5-5`, `priceOf`로 검사 — 가격표에 없으면 시작 때 LLM 끔 + 오류 로그), `FEEDBACK_LLM_EFFORT`(기본 `low`). `FEEDBACK_BUDGET_USD`는 **CLI 평가 장부 전용**으로 그대로 둔다(설명 문구에 "CLI"를 덧붙임).
+- 잘못된 값(불리언이 `true/false` 아님, 음수 등)은 시작 때 경고 후 **분석 기능 전체를 끈다**(503 `ANALYSIS_DISABLED`, 서버는 켜짐, W9와 같은 생각). `FEEDBACK_DAILY_LIMIT=0`은 잘못된 값이 아니라 "LLM 없이 템플릿만"(`llm_off`).
+
+`src/config/feedback.ts` 상수:
+
+| 이름 | 값 |
+|------|-----|
+| `FEEDBACK_QUEUES` | `[420, 440]` |
+| `FEEDBACK_MIN_DURATION_SEC` | `900` |
+| `FEEDBACK_DEADLINE_MS` | `30_000` |
+| `FEEDBACK_LLM_TIMEOUT_MS` / `FEEDBACK_LLM_MAX_RETRIES` | `25_000` / `0` |
+| `FEEDBACK_CONCURRENCY` / `FEEDBACK_QUEUE_MAX` | `2` / `4` |
+| `FEEDBACK_RIOT_MAX_WAIT_MS` | `5_000` |
+| `FEEDBACK_CACHE_TTL_MS` / `FEEDBACK_CACHE_MAX` | 7일 / `500` |
+| `FEEDBACK_TEMPLATE_CACHE_TTL_MS` / `FEEDBACK_TEMPLATE_CACHE_MAX` | 10분 / `200` |
+| `FEEDBACK_BREAKER_MS` | 10분 |
+| `FEEDBACK_DEFAULT_INPUT_FACTOR` | `1.64` (2단계 실측) |
+| `FEEDBACK_LEDGER_PATH` | `backend/logs/feedback-api-ledger.jsonl` |
+| `DDRAGON_BASE_URL` / `DDRAGON_TIMEOUT_MS` / `DDRAGON_CACHE_VERSIONS` / `DDRAGON_VERSIONS_TTL_MS` | `https://ddragon.leagueoflegends.com` / `3_000` / `4` / 1시간 |
+| `DDRAGON_SNAPSHOT_PATH` | `backend/data/ddragon/champion-tags.16.21.1.json` |
+| `FEEDBACK_BODY_LIMIT` | `'2kb'` |
+| `FEEDBACK_RETRY_AFTER_SEC` / `FEEDBACK_BUSY_RETRY_MAX_SEC` | `15` / `60` (Build) |
+| `FEEDBACK_RETRY_MSG_TOKENS` | `1500` (CLI와 같은 재시도 메시지 어림, Build) |
+| `FEEDBACK_KNOWLEDGE_VERSION` | `null` (캐시 키에는 `"none"`) |
+| `DDRAGON_WARN_INTERVAL_MS` | 10분 (Build) |
+
 ---
 
 ## 8. 의존성
@@ -675,6 +1045,7 @@ backend/
 |--------|------|------|
 | `express` ^5 | 실행 | 프로젝트 스택. 5.x는 async 핸들러 오류를 오류 미들웨어로 넘김 |
 | `pg` ^8 | 실행 | Supabase Postgres 직접 접속 |
+| `@anthropic-ai/sdk` | 실행 | `!ai` 2단계가 도입(`analysis/llm/client.ts`만 import). 변경 05 API는 `createAnthropicClient`를 부를 뿐 새 의존성 없음 |
 | `typescript` ^5, `tsx` ^4 | 개발 | 타입 검사(`tsc --noEmit`), 빌드 없이 실행 (결정 D1) |
 | `@types/node`, `@types/express`, `@types/pg` | 개발 | 타입 정의 |
 | `eslint` ^9, `@eslint/js`, `typescript-eslint` ^8 | 개발 | 린트 |
@@ -751,6 +1122,41 @@ backend/
 | 8 | Ctrl+C, 잠금 충돌, 잠금 연결 끊김 | 130 / 3 / 1, `running`이 남지 않음 |
 
 - Review는 Riot 호출을 수십 회 안으로 쓴다. 남긴 실제 데이터는 지우지 않는다 (14일 창에 맞는 실제 데이터).
+
+### 9-5. 게임 피드백 분석 테스트와 비용 (변경 05)
+
+요약: 단위·라우트 테스트는 **가짜 Riot·가짜 LLM(`FakeLlmClient`)·가짜 fetch·가짜 시계**로 0원. 실제 LLM 호출은 **Review 때 1판 1회**만(약 $0.07, 최악 $0.22).
+
+**단위 (`npm test`, 네트워크 없음)**
+
+| 묶음 | 확인 |
+|------|------|
+| `precheck` | 참가자 아님 → 404 `participant`가 **포지션 없음보다 먼저**, 큐 450·400 → 422 `queue`, 899초 → `too_short`, 900초 통과, 포지션 빈 참가자 → `no_position`, 정상 |
+| 서비스 흐름 (세나 fixture `KR_8437852704`) | 정상 → 200 `mode:"llm"`, Riot 2회·LLM 1회 / 사전 검사 실패 시 timeline 0회 / getMatch 404 → 404 `match` / timeline 404 → 422 `no_timeline` / 401·403 → 503 / 429·5xx 소진 → 502 / `MATCH_MISMATCH` → 500 |
+| 캐시 | 두 번째 요청 Riot 0·LLM 0, 7일 뒤 다시 생성, 500개 초과 시 오래된 것 삭제, 템플릿 10분 뒤 다시 생성, LLM을 켠 뒤 `llm_off` 템플릿 캐시 무시 |
+| 진행 중 공유 | 같은 키 동시 3요청 → Riot 2회·LLM 1회·하루 셈 1 |
+| 하루 상한 | 20번째 통과·21번째 429(`resetAt` = 다음 KST 자정), 상한이어도 캐시 적중은 200, 비용 0 오류는 반납, KST 자정 지나면 초기화(가짜 시계, UTC 14:59→15:00 경계), 장부로 오늘 수 복원(어제 줄·`retry` 줄·비용 0 줄 제외) |
+| 예산 | 장부 + 예약 + 최악 > 상한 → 429 `budget`(LLM 0회), 동시 2요청이 같이 통과해 넘지 않음 |
+| LLM 처리 | `FEEDBACK_LLM_ENABLED=false`·키 없음 → template `llm_off`, LLM 0회, 셈 0 / auth·402 → template `llm_error` + 차단기 10분(그동안 LLM 0회) / 429·5xx·timeout·refusal·parse → template / 칸 일부 템플릿 → `mode:"llm"` |
+| 시간 제한·동시 실행 | 느린 가짜 LLM(40초, 가짜 시계) → 504, 뒤 요청은 진행 중 Promise에 붙어 결과 받음(추가 LLM 0) / 동시 2 + 대기 4 초과 → 503 `ANALYSIS_BUSY` / `limiterWaitMs` 6초 → 503 busy, Riot 0회 |
+| Data Dragon | `16.21.534.1234` → `16.21.1` 선택, 버전별 1번만 받기·동시 공유, 실패·3초 초과 → 스냅숏 + 경고, 4개 넘으면 오래된 것 삭제 |
+| DTO | 응답 키 전체에 `grade`·`score`·`total`·`weight`·`impact`·`verdict`·`factIds`·`source`·`usage`·`costUsd`·`model`·`puuid`가 **없음**(재귀 검사), `keyMoments` 시각 매핑, `note`, `meta.knowledgeVersion=null` |
+| 라우트 (`app.test.ts`) | POST 200, 같은 경로 GET 404, 다른 경로 POST 404, 깨진 JSON·3KB 본문·`text/plain`·배열 본문·`puuid` 누락 → 400, 오류에 `no-store`·`Retry-After`, `feedback` 미주입 → 500 |
+| 로그·비밀값 | 분석 로그에 puuid 앞 8자만, `sk-ant-` 모양이 `***`로 가려짐, 응답·로그에 키 값 없음 |
+| 환경 변수 | 기본값 전부 꺼짐/20/0.25, 잘못된 값 → 기능 끔 |
+
+- 통합 테스트(`test:integration`)는 DB를 안 쓰므로 추가 없음. 기존 17개 통과만 확인.
+- `!ai` 단위 테스트 159개 포함 기존 테스트는 그대로 통과해야 한다.
+
+**실제 호출 계획과 예상 비용**
+
+| 단계 | Riot | Anthropic | 예상 비용 |
+|------|------|-----------|-----------|
+| Build | 확인용 소량: `FEEDBACK_LLM_ENABLED=false`로 서버를 띄워 테스트 계정 검색 1회(≤24회) + 분석 POST 1~2회(2~4회) → 템플릿 응답·422·404 경로 확인 | **0회** | **$0** |
+| Review | 검색 1회(≤24) + 분석 POST(2회) | `FEEDBACK_LLM_ENABLED=true`로 **1판 1번**(1~2회 호출) + 같은 POST 반복(캐시 적중 0원) + 동시 2요청(공유, 추가 0원) | **약 $0.07** (재시도 있으면 약 $0.10, 장치 기준 최악 $0.22) |
+| 합계 | 수십 회 | 1~2회 | 5단계 배분 $0.25 안. 남은 크레딧 약 $4.55 → 약 $4.48 |
+
+- 실제 LLM 호출은 메인 에이전트를 통해 예상 비용을 보여 주고 승인받은 뒤에만 한다(CLAUDE.md 12장 비용 규칙). 테스트 계정·판은 Review가 고르되, 가능하면 기준선 5판에 없는 솔로/자유랭크 판 1개로 해 실제 경로를 본다.
 
 ---
 
@@ -839,6 +1245,28 @@ backend/
 
 - DB 계약 영향 없음, DB 쓰기 없음. 계약 버전은 v3의 "작은 추가".
 
+### 10-8. 변경 05 (게임 피드백 분석)
+
+| # | 기준 | 확인 |
+|---|------|------|
+| 1 | 9-5 단위·라우트 테스트 모두 통과, 기존 테스트(현재 323개) 그대로 통과 | `npm test` |
+| 2 | `typecheck`·`lint` 오류 0, `test:integration` 17개 통과 | Build 기록 |
+| 3 | `backend/src/analysis/**`·`cli/**`·`test/unit/analysis/**`·`test/eval/**` 변경 0줄 | `git diff --stat` |
+| 4 | `@anthropic-ai/sdk` import는 여전히 `analysis/llm/client.ts`만, `process.env`는 `config/env.ts`(와 기존 CLI)만 읽음 | `grep` |
+| 5 | 기본 설정(`.env`에 새 변수 없음)으로 서버를 켜면 503 `ANALYSIS_DISABLED`, LLM 클라이언트를 만들지 않음 | Build 실행 |
+| 6 | `FEEDBACK_ENABLED=true`, LLM 끔: 실제 Riot으로 템플릿 200(모양이 계약 2-7과 일치), 자유/일반 판 422, 남의 puuid 404, Anthropic 호출 0 | Build 실행 |
+| 7 | 응답에 등급·점수·총점·모델·토큰·비용·puuid가 없음 | DTO 테스트 + 실제 응답 확인 |
+| 8 | (Review, 승인 뒤) LLM 켜고 1판: 200 `mode:"llm"`, 최종 숫자·방향·금지어 0(`!ai` 검증기로 재확인), 30초 안, 반복 요청 Riot 0·LLM 0, 장부·하루 수 1 증가, 장부 합이 로그 비용과 일치 | Review 실호출 |
+| 9 | 키·`.env` 값이 로그·응답·장부·문서에 없음, 로그 puuid는 앞 8자 | `grep` + 로그 |
+| 10 | `api_contract.md` v4(1장 메서드, 2장 표, 2-7, 3장 오류 6개, 4장 캐시, 6장 기록)가 계획대로이고, `.env.example`에 변수 4개, `back_build.md`에 기능별 상태 | 문서 대조 |
+
+**Review 수준**
+
+요약: **전체 독립 Review** (CLAUDE.md 3장 표 3번째 줄). 계약 문서의 규칙(1장 GET만)과 오류 코드가 바뀌고, 사용자 요청이 유료 외부 서비스 호출로 이어지는 첫 경로라서다.
+
+- Review는 Build의 typecheck·lint·test 결과를 재실행 없이 믿고(3장), ① diff(예약·정산 경쟁 조건, 진행 중 Map 정리, 504 뒤 백그라운드 완료·캐시, 차단기, 오류 매핑, 비밀값 가림) ② 계약 2-7과 실제 응답 대조 ③ 실제 Riot + LLM 1판 (9-5, 승인 뒤) ④ 가짜 클라이언트로 429·504·busy 표본을 본다.
+- Review 뒤 `back_review.md`, `back_overview.md`(덮어쓰기, 5장 API·6장 설정·변경 이력 1줄·해결되지 않은 점), `docs/career_log.md`(추가만)를 쓴다. AI 로드맵 5단계 상태는 메인 에이전트가 `docs/ai/` 쪽에 알린다(`!백엔드`는 `docs/ai/**`를 고치지 않음).
+
 ---
 
 ## 11. 계약 변경 요청
@@ -852,6 +1280,7 @@ backend/
   3. `matches.game_start_at` 인덱스는 필요 없다 (창 상한·`purge` 미리보기는 최대 약 3만 7천 줄 순차 스캔).
   4. 표본 삭제 기능이 생기면 `matches(puuid)` 인덱스가 필요하다 (db_review L3).
 - API 계약(백엔드가 작성 영역) 문구 2건은 변경 02에서 고쳤다 (2-4 아이템 거르기 설명, 6장 변경 기록 날짜 순서).
+- 변경 05(게임 피드백 분석)도 DB 계약 변경 요청 없음(DB를 읽지도 쓰지도 않는다). API 계약(작성 영역)은 **v4**: 2-7 신규, 1장 메서드 규칙(GET + 분석 POST 1개), 3장 오류 코드 6개, 4장 캐시 줄, 6장 변경 기록. `!ai` 쪽 변경 요청도 없다(5-9-9).
 - 변경 04(킬관여·라인전)도 DB 계약 변경 요청 없음. 읽지도 쓰지도 않는다. API 계약(작성 영역)은 2-5에 `killParticipation` 1개, 2-6 신규, 6장 변경 기록 1줄을 더했다(오류 코드 추가 없음).
 - 변경 03(전적 검색)도 DB 계약 변경 요청 없음. `ranked_players`·`matches`·`match_players` 등 표본 수집 테이블을 읽지도 쓰지도 않는다 (W-6). `api_contract.md`에는 2-5를 새로 추가했다(승인된 범위, 작성 영역이라 요청이 아님).
 
@@ -913,9 +1342,30 @@ backend/
 | X4 | 검색의 `getMatch` 상세를 경기 캐시에 통째로 넣지 않는다 | 상세 1개 수십~백 KB로 메모리가 커지고 라인전과 별개의 최적화. 다음 변경 후보 | 2026-10-30 |
 | X5 | `pending`일 때 HTTP 200 + `retryAfterSec` (429 아님) | 프론트가 429 처리를 따로 짜지 않아도 된다 | 2026-10-30 |
 | X6 | 킬관여는 2-5에 합침(추가 호출 0), 라인전만 별도 엔드포인트(B안) | 킬관여는 match-v5 상세에 있고, 라인전(timeline)은 첫 화면을 약 2배 느리게 하고 한도를 즉시 소진한다 | 2026-10-30 |
+| F1 | 화면 위치는 매치 행을 펼친 안쪽 (프론트 몫) | 사용자 결정 5-9-0 #1 | 2026-11-03 |
+| F2 | 분석 대상은 검색한 소환사 본인만 (`puuid`가 참가자) | 사용자 결정 5-9-0 #2 | 2026-11-03 |
+| F3 | 솔로랭크(420)·자유랭크(440), 900초 이상만. 그 밖 422 | 사용자 결정 5-9-0 #3. 엔진 규칙이 랭크 5인 포지션 판 기준 | 2026-11-03 |
+| F4 | 하루 LLM 분석 상한 20회(비용이 든 분석만, 캐시 제외, KST 자정 초기화) | 사용자 결정 5-9-0 #4. 비용 보호 | 2026-11-03 |
+| F5 | 상한 초과는 템플릿이 아니라 429 `ANALYSIS_LIMIT_REACHED` | 사용자 결정 5-9-0 #5 | 2026-11-03 |
+| F6 | 결과는 서버 메모리 캐시(재시작 시 사라짐), DB 테이블 없음 | 사용자 결정 5-9-0 #6. DB 계약 변경 없이 시작 | 2026-11-03 |
+| F7 | 버튼을 눌렀을 때만 분석 (자동 분석 없음) | 사용자 결정 5-9-0 #7. 비용 | 2026-11-03 |
+| F8 | 분석은 POST(계약 1장 "GET만" 변경), `puuid`는 본문 | 부작용(비용·상한·캐시)이 있어 GET 의미에 맞지 않고, 프리페치·크롤러의 실수 호출을 막고, puuid가 URL·로그에 남지 않는다 | 2026-11-03 |
+| F9 | 스위치 2개(`FEEDBACK_ENABLED`, `FEEDBACK_LLM_ENABLED`) 기본 꺼짐 | 12장 F9~F18 Q1. `.env`에 Claude 키가 있어도 켜기 전에는 0원 | 2026-11-03 |
+| F10 | LLM 실패는 200 + 템플릿(상한·예산 초과만 429) | 12장 F9~F18 Q2. 사용자는 항상 결과를 받는다(`!ai` J절과 같음) | 2026-11-03 |
+| F11 | API 전용 장부(`backend/logs/feedback-api-ledger.jsonl`, git 제외), 누적 상한 $0.25 | 12장 F9~F18 Q3. 평가 장부와 섞지 않고 예산을 따로 정한다 | 2026-11-03 |
+| F12 | 응답 30초 상한, 넘으면 504이고 서버는 분석을 끝내 캐시 | 12장 F9~F18 Q4. 이미 낸 비용을 버리지 않고 다시 누르면 비용 0 | 2026-11-03 |
+| F13 | Data Dragon B안: 판 패치별로 처음 필요할 때 받고 실패 시 스냅숏(16.21.1) | 12장 F9~F18 Q5. 판의 패치와 맞고 새 챔피언 자동 반영. 무료·키 없음 | 2026-11-03 |
+| F14 | LLM 동시 실행 2, 대기 4, 넘치면 503 `ANALYSIS_BUSY` | 12장 F9~F18 Q6 | 2026-11-03 |
+| F15 | 재시작 시 장부로 오늘(KST) 사용 수 복원 | 12장 F9~F18 Q7. 재시작으로 상한이 풀리지 않게 | 2026-11-03 |
+| F16 | 응답에 판정어·근거 ID·출처를 넣지 않고 `mode`·`templateReason`만 | 12장 F9~F18 Q8. 등급처럼 보이는 값 배제. 나중에 필드 추가로 가능 | 2026-11-03 |
+| F17 | `npm audit fix`(lock만) 함께 | 12장 F9~F18 Q9. 결과: typescript-eslint 8.71.2→8.72.1 등 개발 의존성 패치, body-parser는 이미 2.4.0. 남은 moderate 11건(eslint 쪽 minimatch)은 `--force`(호환 깨짐)가 필요해 하지 않음 | 2026-11-03 |
+| F18 | 실제 LLM 1판 호출은 Review에서만(Build 0원), 문장 품질은 `!ai`가 별도로 | 12장 F9~F18 Q10·Q11 | 2026-11-03 |
+| F19 | 꺼짐·미설정 오류를 `FeedbackFn.unavailable`로 표시해 본문 파싱 전에 응답 | 5-9-4 ① "스위치가 입력 검사보다 먼저"를 지키려고 (Build가 보탠 결정) | 2026-11-03 |
+| F20 | 잘못된 환경 변수 값은 분석 기능 전체를 끈다, `FEEDBACK_DAILY_LIMIT=0`은 템플릿 `llm_off` | 보수적으로 끄고 서버는 켠다(W9). 0은 의도적인 설정이라 오류가 아니라 LLM 끔으로 본다 (Build) | 2026-11-03 |
+| F21 | `keyMoments`는 0~3개 | 설계(feedback_design 2-1 최대 3개)와 실제 엔진·LLM 결과(세나 판 3개)에 맞춤. 계획 초안의 "0~2개"를 고침 (메인 에이전트 확인) | 2026-11-03 |
 | X7 | 요청 로그의 `puuid` 쿼리 값을 앞 8자로 줄인다 | lane-gold는 puuid가 쿼리에 있어 기존 요청 로그가 전체 puuid를 남긴다. 로그 규칙(puuid 앞 8자)을 지킨다 (Build가 보탠 결정) | 2026-10-30 |
 
-- D 번호는 계획의 결정 항목, B는 Build가 정하고 Review가 받아들인 것, U는 변경 01의 사용자 결정, R은 Review 추천을 사용자가 고른 것, V는 변경 02에서 사용자가 승인한 결정(02-9)이다. W는 변경 03(전적 검색)에서 사용자가 승인한 추천안(결정 S1~S8, Build가 보탠 W9)이다. X는 변경 04(킬관여·라인전)에서 사용자가 승인한 추천값(X1~X6)과 Build가 보탠 X7이다.
+- D 번호는 계획의 결정 항목, B는 Build가 정하고 Review가 받아들인 것, U는 변경 01의 사용자 결정, R은 Review 추천을 사용자가 고른 것, V는 변경 02에서 사용자가 승인한 결정(02-9)이다. W는 변경 03(전적 검색)에서 사용자가 승인한 추천안(결정 S1~S8, Build가 보탠 W9)이다. X는 변경 04(킬관여·라인전)에서 사용자가 승인한 추천값(X1~X6)과 Build가 보탠 X7이다. F는 변경 05(게임 피드백 분석)의 사용자 결정(F1~F7: 5-9-0, F8~F18: 계획과 사용자 결정 질문 11개 승인)과 Build가 보탠 F19~F21이다.
 
 ---
 
@@ -935,6 +1385,18 @@ backend/
 
 - 수정 금지: `db/`, `docs/contracts/db_contract.*`, `frontend/`, 루트 `.env`, `CLAUDE.md`, `backend/src/collector/*`, `backend/src/cli/collect.ts`.
 - 변경 02(15명 400 조사, L1~L5, 프리셋 250, 계약 문구 2건)도 위 표와 같은 경로를 쓴다. 조사(02-1)는 읽기만(`SELECT`, 로그 읽기), 결정 1번이 "삭제"면 `ranked_players` DELETE는 사용자 승인 후에만.
+- 변경 05(게임 피드백 분석): 아래 표.
+
+| 단계 | 수정 가능 경로 |
+|------|----------------|
+| Plan | `backend/docs/back_spec.md` (이 절) |
+| Build | `backend/src/api/**`, `backend/src/config/{env,feedback}.ts`, `backend/src/lib/logger.ts`, `backend/src/riot/types.ts`(선택 필드만), `backend/src/server.ts`, `backend/data/ddragon/`(신규), `backend/test/unit/**`(단 `test/unit/analysis/**` 제외), `backend/docs/back_build.md`, `backend/docs/back_spec.md`(이 절 합치기), `docs/contracts/api_contract.md`(api_contract 2-7만), `.env.example`(7-6 4개 + `FEEDBACK_BUDGET_USD` 설명 문구) |
+| Review | `backend/docs/back_review.md`, `back_build.md`, `back_overview.md`, 문제 수정 시 Build 경로, `docs/career_log.md`(추가만) |
+| 금지 | 5-9-10 "수정 금지" 목록. `package.json`·`package-lock.json`은 고치지 않는다(새 의존성 없음) — 단 `npm audit fix` 결과(lock)만 (12장 F17, 승인됨) |
+
+- Riot: 확인용 소량(수십 회), 429가 나면 즉시 멈추고 보고. Anthropic: Build 0회, Review 승인된 1판만.
+- 비밀값: `.env` 값은 읽어 써도 되지만 출력하지 않는다. 스위치를 켠 실행은 프로세스 환경 변수로만 하고 `.env`를 고치지 않는다.
+
 - 변경 04(킬관여·라인전)도 위 표와 같은 경로를 쓴다. 범위는 `backend/src/riot/types.ts`, `backend/src/riot/client.ts`(제한기 대기시간 getter만), `backend/src/api/*`, `backend/src/config/summoner.ts`, `backend/src/server.ts`, `backend/test/*`이고, `docs/contracts/api_contract.md`는 2-5의 `killParticipation`·2-6·6장 변경 기록만 고친다. 금지 경로는 위 "수정 금지"와 같다.
 - 변경 03(전적 검색)도 위 표와 같은 경로를 쓴다. 범위는 `backend/src/riot/*`, `backend/src/api/*`, `backend/src/config/*`, `backend/src/server.ts`, `backend/test/*`이고, `docs/contracts/api_contract.md`는 승인된 2-5만 고친다. `collector/*`·`cli/collect.ts`는 수정하지 않는다.
 - DB 쓰기: 통합 테스트는 ROLLBACK만. 실제 저장은 Review 소량 수집과 `aggregate` 시험뿐. **`purge --yes`, 표본 삭제, 그 밖의 되돌릴 수 없는 SQL은 메인 에이전트를 통해 사용자 승인 후에만.**

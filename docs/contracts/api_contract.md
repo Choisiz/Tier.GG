@@ -2,9 +2,10 @@
 
 > 이 문서는 `!백엔드`가 작성하고 `!프론트`가 읽는 계약 문서다. 엔드포인트, 파라미터, 응답 형식, 오류 형식을 정한다. (CLAUDE.md 9장)
 
-- 상태: **v3 (구현 반영)** — `backend/docs/back_spec.md` "변경 03"과 함께 승인 (2026-10-27). 2-5 전적 검색 추가. 2026-10-30 "변경 04"로 2-5에 `killParticipation` 추가, 2-6 라인전 15분 골드 추가(작은 추가, additive). 나머지(1~4·6장, 2-0~2-4)는 v2(변경 02)와 같다.
+- 상태: **v4 (구현 반영, 2026-11-03)** — `backend/docs/back_spec.md` "변경 05"로 **2-7 게임 피드백 분석(POST)** 추가, 1장 메서드 규칙 변경(GET + POST 1개), 오류 코드 6개 추가. 2-0~2-6 응답은 v3와 같다.
+- 이전 상태: **v3 (구현 반영)** — `backend/docs/back_spec.md` "변경 03"과 함께 승인 (2026-10-27). 2-5 전적 검색 추가. 2026-10-30 "변경 04"로 2-5에 `killParticipation` 추가, 2-6 라인전 15분 골드 추가(작은 추가, additive). 나머지(1~4·6장, 2-0~2-4)는 v2(변경 02)와 같다.
 - 근거: `docs/contracts/db_contract.md` **v8**. 2-5(전적 검색)는 DB를 쓰지 않고 Riot API를 그대로 중계한다 (back_spec 변경 03 W-6, 계약 변경 요청 없음).
-- 범위: 챔피언 티어리스트(포지션별) + 챔피언 상세(포지션, 빌드) + **전적 검색**(프로필·랭크·최근 매치 20건, 2-5) + **라인전 15분 골드**(지연 로딩, 2-6). 통계(2-0~2-4)는 **최근 14일에 시작한 게임** 기준. SSE·과거 매치 더보기·스킬 순서(전적 검색)는 포함하지 않는다.
+- 범위: 챔피언 티어리스트(포지션별) + 챔피언 상세(포지션, 빌드) + **전적 검색**(프로필·랭크·최근 매치 20건, 2-5) + **라인전 15분 골드**(지연 로딩, 2-6) + **게임 피드백 분석**(버튼을 눌렀을 때만, 2-7). 통계(2-0~2-4)는 **최근 14일에 시작한 게임** 기준. SSE·과거 매치 더보기·스킬 순서(전적 검색)는 포함하지 않는다.
 
 ### v1 → v2 변경 (2026-10-15, 백엔드 변경 01)
 
@@ -27,15 +28,15 @@
 
 ## 1. 기본 규칙
 
-> 요약: 읽기 전용 GET만 있고, JSON으로 답한다. 숫자 ID만 주므로 이름·이미지는 프론트가 Data Dragon으로 붙인다. 통계는 최근 14일 창 하나이고, 한 응답 안의 숫자는 모두 같은 집계에서 나온다.
+> 요약: 조회는 GET, **분석 1개만 POST**(비용이 드는 요청, 2-7)이고, JSON으로 답한다. 숫자 ID만 주므로 이름·이미지는 프론트가 Data Dragon으로 붙인다. 통계는 최근 14일 창 하나이고, 한 응답 안의 숫자는 모두 같은 집계에서 나온다.
 
 | 항목 | 규칙 |
 |------|------|
 | 기본 URL | 개발: `http://localhost:4000/api/v1` (`API_PORT`, 기본 4000). 프론트는 서버 환경 변수로 기본 URL을 받는다 |
 | 버전 | 경로 앞 `/api/v1`. 필드 추가는 같은 버전에서 할 수 있으므로 프론트는 모르는 필드를 무시한다. 백엔드도 모르는 쿼리 파라미터를 무시한다 |
-| 메서드 | `GET`만 |
+| 메서드 | `GET`. 단 2-7 분석만 `POST` + JSON 본문(`Content-Type: application/json`, 2KB 이하). 그 밖의 경로의 POST·그 밖의 메서드는 404 `NOT_FOUND`, 2-7 경로의 GET도 404 |
 | 형식 | `Content-Type: application/json; charset=utf-8`. 필드 이름은 camelCase |
-| 인증 | 없음 (공개 통계). Riot 키·DB 정보는 백엔드에만 있다 |
+| 인증 | 없음 (공개 통계). Riot 키·DB 정보·Anthropic(Claude) 키는 백엔드에만 있다 |
 | 호출 위치 | Next.js 서버 컴포넌트에서 호출 (서버 간). CORS 헤더는 주지 않는다 |
 | 비율 | 퍼센트 숫자, 소수 2자리 (`52.31` = 52.31%) |
 | 통계 기간 | 최근 14일에 시작한 게임 (`window.start` 포함 ~ `window.end` 제외). DB 예약 작업이 **매일 05:00 KST(20:00 UTC)** 에 다시 집계한다 |
@@ -48,7 +49,7 @@
 
 ## 2. 엔드포인트
 
-> 요약: 4개다. 화면마다 한 번 호출로 필요한 데이터를 다 받는다.
+> 요약: 7개다(조회 GET 6개 + 분석 POST 1개). 화면마다 한 번 호출로 필요한 데이터를 다 받는다.
 
 | 메서드·경로 | 화면 |
 |-------------|------|
@@ -56,6 +57,9 @@
 | `GET /api/v1/meta` | 공통 (통계 기간·패치 구성 표시) |
 | `GET /api/v1/champions` | 챔피언 리스트 (포지션별 티어) |
 | `GET /api/v1/champions/:championId` | 챔피언 상세 (포지션 + 빌드) |
+| `GET /api/v1/summoners/:region/:riotId` | 전적 검색 (2-5) |
+| `GET /api/v1/matches/lane-gold` | 전적 검색 매치 행의 라인전 15분 골드 (2-6, 지연 로딩) |
+| `POST /api/v1/matches/:matchId/feedback` | 매치 행 펼침 안 "AI 분석" 버튼 (2-7) |
 
 ### 2-0. `window` 객체 (모든 통계 응답 공통)
 
@@ -578,6 +582,115 @@ GET /api/v1/matches/lane-gold?puuid=abcd1234…&matchIds=KR_8437852704,KR_843785
 | 502 | `RIOT_UNAVAILABLE` | Riot API 429·5xx 재시도 소진 (이미 채운 결과는 서버 캐시에 남으니 나중에 다시 요청하면 이어서 채워짐) |
 | 503 | `RIOT_KEY_EXPIRED` | Riot API 키 만료(401/403). **이 요청만** 실패하고 서버는 계속 응답한다. 프론트는 재시도하지 않고 `-`를 유지한다 |
 
+### 2-7. `POST /api/v1/matches/:matchId/feedback` — 게임 피드백 분석
+
+> 요약: 검색한 소환사 본인의 한 판을 분석해 한국어 피드백 문장을 준다. 사용자가 **버튼을 눌렀을 때만** 부른다(자동 분석 없음). 비용이 드는 요청이라 POST이고, `puuid`는 본문에 넣어 URL·로그에 남지 않게 한다. 백엔드가 Riot에서 match·timeline을 받아(2회) 판정 엔진 → LLM 문장 → 숫자 검증 → 템플릿 대체 순서로 만들고 서버 메모리에 캐시한다. DB를 쓰지 않는다. **`window` 객체 없음**, `Cache-Control: no-store`. (back_spec 변경 05)
+
+#### 요청
+
+```http
+POST /api/v1/matches/KR_8437852704/feedback
+Content-Type: application/json
+
+{ "puuid": "abcd1234…" }
+```
+
+| 이름 | 위치 | 필수 | 검사 | 실패 |
+|------|------|------|------|------|
+| `matchId` | 경로 | 예 | `^KR_[0-9]{1,15}$` (2-6과 같음) | 400 `details.param="matchId"` |
+| `puuid` | 본문 | 예 | 2-5의 `summoner.puuid`. 영숫자·`-`·`_`, 1~100자 | 400 `details.param="puuid"` (값은 넣지 않음) |
+| 본문 | - | 예 | `Content-Type: application/json`, **2KB 이하**, JSON **객체**. 모르는 필드는 무시 | 깨진 JSON·너무 큼·배열 등 객체 아님·Content-Type 다름 → 400 `details.param="body"` |
+
+#### 분석하는 판
+
+- **검색한 소환사 본인만** (`puuid`가 그 판 참가자여야 함, 아니면 404 `participant`).
+- **솔로랭크(420)·자유랭크(440)**, **15분(900초) 이상**, 10명 모두 포지션(`teamPosition`)이 있는 판. 그 밖은 422.
+- 프론트 권장: 2-5의 `queueId`가 420·440이고 `gameDurationSec ≥ 900`인 매치 행에만 버튼을 보여 422를 미리 줄인다.
+
+#### 응답 (200)
+
+```jsonc
+{
+  "matchId": "KR_8437852704",
+  "championId": 235,
+  "position": "UTILITY",              // TOP | JUNGLE | MIDDLE | BOTTOM | UTILITY
+  "role": "SUPPORT_DAMAGE",           // 엔진 유형 10개 중 하나 (프론트가 한글 이름표로)
+  "win": false,
+  "mode": "llm",                      // "llm" | "template"
+  "templateReason": null,             // mode="template"일 때만: "llm_off" | "llm_error"
+  "summary": { "text": "라인전에서 밀렸고, … 승부가 기울었습니다." },
+  "sections": {
+    "laning": { "good": [], "bad": [ { "subjectId": "laning.gold", "text": "15분 골드가 상대 애쉬보다 703 적었습니다." } ], "note": null },
+    "fight":  { "good": [], "bad": [ { "subjectId": "fight.damage", "text": "…" } ], "note": null },
+    "macro":  { "good": [ { "subjectId": "macro.side", "text": "…" } ], "bad": [], "note": null }
+  },
+  "keyMoments": [
+    { "startSec": 906, "endSec": 936, "direction": "widened", "text": "15.1분 킬 5개가 난 싸움 뒤 …" }
+  ],
+  "meta": {
+    "engineVersion": "2026-11-02.2",
+    "promptVersion": "2026-11-03.1",
+    "knowledgeVersion": null,          // RAG 뒤 문자열. 지금은 항상 null
+    "championDataVersion": "16.21.1",  // 유형 판정·이름에 쓴 Data Dragon 버전
+    "generatedAt": "2026-11-03T12:00:00.000Z"
+  }
+}
+```
+
+| 필드 | 타입 | null | 의미 |
+|------|------|------|------|
+| `matchId` | string | 아니오 | 요청한 경기 |
+| `championId` | int | 아니오 | 분석한 소환사의 챔피언 (Data Dragon `key`) |
+| `position` | string | 아니오 | 1장의 포지션 |
+| `role` | string | 아니오 | 엔진 유형: `TOP_TANK` `TOP_DAMAGE` `JUNGLE_TANK` `JUNGLE_DAMAGE` `MID_TANK` `MID_DAMAGE` `ADC` `SUPPORT_TANK` `SUPPORT_DAMAGE` `SUPPORT_UTILITY` |
+| `win` | boolean | 아니오 | 그 판 승리 |
+| `mode` | `"llm"` \| `"template"` | 아니오 | `llm`: LLM 문장을 썼다(검증에 걸린 일부 칸은 템플릿 문장일 수 있음). `template`: LLM 문장을 전혀 못 써서 전부 미리 정한 템플릿 문장 |
+| `templateReason` | `"llm_off"` \| `"llm_error"` | 예 | `mode="llm"`이면 `null`. `llm_off`: LLM을 끈 설정(개발 중, 0원). `llm_error`: LLM 오류·거절·시간 초과·크레딧 문제 등 |
+| `summary.text` | string | 아니오 | 총평 1~2문장 (최대 약 200자) |
+| `sections.laning`·`fight`·`macro` | object | 아니오 | 라인전·교전·운영 영역 |
+| `sections.<영역>.good[]`·`bad[]` | array | 아니오 | 잘한 점·아쉬운 점, 각 0~2개. `{subjectId, text}`. `text`는 1~2문장(최대 약 120자) |
+| `sections.<영역>.good[].subjectId` | string | 아니오 | 항목 ID (예 `laning.gold`, `macro.vision`). 아이콘·정렬 등에 쓸 수 있다. 목록은 늘어날 수 있으니 모르는 값은 무시 |
+| `sections.<영역>.note` | string | 예 | 라인전 상대를 비교할 수 없는 판이면 한 줄 안내, 그 밖은 `null` |
+| `keyMoments[]` | array | 아니오 | 결정적 장면 **0~3개**. `startSec`·`endSec`(number, 게임 시작부터 초), `direction`(`widened` 격차가 벌어짐 / `narrowed` 좁혀짐, 우리 팀 기준이 아니라 격차 크기 기준), `text` |
+| `meta.engineVersion`·`promptVersion` | string | 아니오 | 판정 규칙·문장 프롬프트 버전 |
+| `meta.knowledgeVersion` | string | 예 | 지식 자료(RAG) 버전. 지금은 항상 `null` |
+| `meta.championDataVersion` | string | 아니오 | 유형 판정·챔피언 이름에 쓴 Data Dragon 버전 |
+| `meta.generatedAt` | string | 아니오 | 결과를 처음 만든 시각. 캐시에서 준 응답도 처음 만든 시각 그대로 (캐시 적중 표시는 없음) |
+
+- **넣지 않는 것**: 등급·총점·점수·가중치·영역 판정어(잘함/보통/부족)·문장 근거 ID·문장 출처·모델 이름·토큰·비용·`puuid`. 화면에 등급·점수를 만들지 않는다. 필요해지면 **필드 추가**(같은 버전)로 넣는다.
+- RAG(지식 자료)를 붙인 뒤에도 응답 모양은 같다. 출처를 보여 주게 되면 항목에 필드를 더한다.
+
+#### 캐시·시간·한도
+
+| 항목 | 규칙 |
+|------|------|
+| HTTP 캐시 | `Cache-Control: no-store` (성공·오류 모두) |
+| 서버 캐시 | 서버 메모리. LLM 결과 7일, 템플릿 결과 10분. **서버를 다시 켜면 사라진다**. 같은 요청을 반복하면 Riot·LLM을 다시 부르지 않는다(비용 0). 같은 판을 동시에 눌러도 분석은 1번 |
+| 응답 시간 | 보통 10~20초(LLM 사용 시), 템플릿이면 1초 안팎. **최대 30초**, 넘으면 504. 504 뒤에도 서버는 분석을 끝내 캐시에 넣으므로 **다시 누르면 보통 바로 결과**가 나온다 |
+| 하루 상한 | LLM 비용이 든 분석만 하루 20회(서버 설정). 캐시 적중·템플릿은 세지 않는다. **한국 시간 자정**에 초기화. 넘으면 429 `daily` |
+| 예산 | 서버의 누적 비용 상한을 넘을 수 있으면 429 `budget` |
+| 프론트 권장 | Next 서버(Route Handler 또는 Server Action)에서 부른다(브라우저 직접 호출 없음, CORS 없음). **이 요청만 타임아웃 35초**. 자동 재시도하지 않는다(504·`ANALYSIS_BUSY`만 "다시 시도" 버튼). 결과는 그 페이지에 기억해 다시 펼쳐도 다시 부르지 않는다 |
+
+#### 오류 (3장 형식 그대로)
+
+| HTTP | `code` | 언제 | `details` |
+|------|--------|------|-----------|
+| 400 | `INVALID_PARAMETER` | `matchId`·`puuid`·본문 형식 | `{param, value?}` (`puuid`·본문은 `value` 없음) |
+| 404 | `MATCH_NOT_FOUND` | Riot에 그 판이 없음 / `puuid`가 그 판 참가자가 아님 | `{reason: "match" \| "participant"}` |
+| 422 | `ANALYSIS_UNSUPPORTED` | 분석하지 않는 판 | `{reason: "queue" \| "too_short" \| "no_position" \| "no_timeline"}` |
+| 429 | `ANALYSIS_LIMIT_REACHED` | 오늘 분석 상한 / 누적 예산 (캐시에 결과가 없을 때만) | `{reason: "daily", limit, resetAt}` 또는 `{reason: "budget"}` |
+| 502 | `RIOT_UNAVAILABLE` | Riot 429·5xx 재시도 소진 | - |
+| 503 | `RIOT_KEY_EXPIRED` | Riot 키 만료(401/403). 이 요청만 실패 | - |
+| 503 | `ANALYSIS_DISABLED` | 분석 기능이 꺼져 있음(서버 설정). 본문 검사보다 먼저 나온다 | - |
+| 503 | `ANALYSIS_BUSY` | 동시 분석이 꽉 참 / Riot 호출 한도 대기가 김 | `{retryAfterSec}` (1~60) |
+| 504 | `ANALYSIS_TIMEOUT` | 30초 안에 못 끝냄. 서버는 계속 분석해 캐시에 넣는다 | `{retryAfterSec: 15}` |
+| 500 | `INTERNAL_ERROR` | 그 밖 | - |
+
+- 422 `reason`: `queue` = 420·440이 아님(일반·칼바람·URF 등), `too_short` = 900초 미만(다시하기 포함), `no_position` = 포지션이 빈 참가자가 있음, `no_timeline` = timeline이 없거나 프레임이 없음.
+- 429·503(`ANALYSIS_BUSY`)·504에는 `Retry-After` 헤더(초)도 함께 준다. 프론트는 `details`만 봐도 된다.
+- **LLM 문제는 오류가 아니다**: LLM 끔·키 문제·크레딧 부족·시간 초과·거절 등은 200 + `mode:"template"`로 온다.
+- 404 `participant` 주의: Riot `puuid`는 API 키마다 다를 수 있어, 개발 키 재발급 뒤 예전 검색 결과의 `puuid`를 보내면 404 `participant`가 날 수 있다 → "다시 검색해 주세요"로 안내.
+
 ---
 
 ## 3. 오류 형식
@@ -602,7 +715,7 @@ GET /api/v1/matches/lane-gold?puuid=abcd1234…&matchIds=KR_8437852704,KR_843785
 
 | HTTP | `code` | 의미 |
 |------|--------|------|
-| 400 | `INVALID_PARAMETER` | 파라미터 형식 오류 (`details.param`, `details.value`). 대상은 `position`, `championId` |
+| 400 | `INVALID_PARAMETER` | 파라미터 형식 오류 (`details.param`, `details.value`). 대상은 `position`, `championId`, (2-5·2-6 파라미터), 2-7의 `matchId`·`puuid`·`body`(`puuid`·본문은 `value` 없음) |
 | 404 | `STATS_NOT_FOUND` | 그 챔피언(·포지션) 통계가 창 안에 없음 (`details.championId`, `details.position`) |
 | 404 | `NOT_FOUND` | 없는 경로 |
 | 503 | `STATS_NOT_READY` | 집계된 창이 없음 (첫 집계 전). `/meta`, `/champions`, 상세가 준다 |
@@ -610,7 +723,15 @@ GET /api/v1/matches/lane-gold?puuid=abcd1234…&matchIds=KR_8437852704,KR_843785
 | 500 | `INTERNAL_ERROR` | 그 밖의 서버 오류. 내부 내용은 응답에 넣지 않음 |
 | 404 | `SUMMONER_NOT_FOUND` | 전적 검색(2-5): 그 소환사가 없음 |
 | 502 | `RIOT_UNAVAILABLE` | 전적 검색(2-5)·라인전(2-6): Riot API 재시도 소진 |
-| 503 | `RIOT_KEY_EXPIRED` | 전적 검색(2-5)·라인전(2-6): Riot API 키 만료. 이 요청만 실패 |
+| 503 | `RIOT_KEY_EXPIRED` | 전적 검색(2-5)·라인전(2-6)·분석(2-7): Riot API 키 만료. 이 요청만 실패 |
+| 404 | `MATCH_NOT_FOUND` | 분석(2-7): 그 경기가 없음 / 그 소환사가 참가한 경기가 아님 (`details.reason`) |
+| 422 | `ANALYSIS_UNSUPPORTED` | 분석(2-7): 분석하지 않는 판 (`details.reason`) |
+| 429 | `ANALYSIS_LIMIT_REACHED` | 분석(2-7): 오늘 상한 / 누적 예산 (`details.reason`) |
+| 503 | `ANALYSIS_DISABLED` | 분석(2-7): 기능이 꺼져 있음 |
+| 503 | `ANALYSIS_BUSY` | 분석(2-7): 동시 분석이 꽉 참 (`details.retryAfterSec`) |
+| 504 | `ANALYSIS_TIMEOUT` | 분석(2-7): 30초 안에 못 끝냄, 다시 누르면 결과가 나올 수 있음 (`details.retryAfterSec`) |
+
+- 429·503(`ANALYSIS_BUSY`)·504는 `Retry-After` 헤더(초)도 준다 (2-7).
 
 집계 전 응답 예:
 
@@ -636,6 +757,8 @@ GET /api/v1/matches/lane-gold?puuid=abcd1234…&matchIds=KR_8437852704,KR_843785
 |------|------|
 | 성공 (`meta`, `champions`, 상세) | `Cache-Control: public, max-age=600` |
 | `health`, 모든 오류 | `Cache-Control: no-store` |
+| 2-5 전적 검색, 2-6 라인전 | `Cache-Control: no-store` (서버가 메모리 캐시) |
+| 2-7 분석 | `Cache-Control: no-store` (서버가 메모리 캐시) |
 
 - 프론트 권장: `fetch(url, { next: { revalidate: 3600 } })`. 05:00 집계 뒤 최대 약 1시간 안에 새 숫자가 보인다.
 - `window.aggregatedAt`이 바뀌면 스냅숏이 바뀐 것이다. 프론트가 더 빨리 반영하고 싶으면 이 값으로 재검증을 판단할 수 있다 (프론트 범위).
@@ -679,3 +802,4 @@ GET /api/v1/matches/lane-gold?puuid=abcd1234…&matchIds=KR_8437852704,KR_843785
 | 2026-10-27 | v3 (작은 추가) | 2-5 `matches[].participants.team`/`enemy[].damage`(챔피언 대상 딜량) 추가. 참가자 목록 딜량 막대그래프용, 추가 Riot 호출 없음. 사용자 요청("초상화·이름 하단에 얇은 딜량 그래프") |
 | 2026-10-27 | v3 (작은 추가) | 2-5 `matches[].queueId`(Riot 큐 ID) 추가. match-v5 응답에 이미 있던 `info.queueId`를 그대로 노출(추가 Riot 호출 없음), 이름표는 프론트가 한글화. 사용자 요청("승리 하단에 큐 종류(솔랭 등) 표시") |
 | 2026-10-30 | v3 (작은 추가) | 2-5 `matches[].killParticipation`(정수 %, null 가능) 추가: match-v5 `challenges.killParticipation`을 그대로 쓰고 없으면 (킬+어시)÷팀 킬 합으로 계산, 추가 Riot 호출 없음. 2-6 `GET /matches/lane-gold` 신규(라인전 15분 골드 격차, 지연 로딩, `ready`/`unavailable`/`pending` + `retryAfterSec`, HTTP 200). 오류 코드 추가 없음 (back_spec 변경 04). 사용자 요청("킬관여·라인전 점수 표시") |
+| 2026-11-03 | v4 | 2-7 `POST /matches/:matchId/feedback` 추가(게임 피드백 분석, 버튼을 눌렀을 때만, 본인·솔로/자유랭크·15분 이상, 서버 메모리 캐시, 30초 상한). 1장 메서드 규칙 "GET만" → "GET + 분석 POST 1개". 오류 코드 `MATCH_NOT_FOUND`·`ANALYSIS_UNSUPPORTED`·`ANALYSIS_LIMIT_REACHED`·`ANALYSIS_DISABLED`·`ANALYSIS_BUSY`·`ANALYSIS_TIMEOUT` 추가, `Retry-After` 헤더. 2장 표에 2-5·2-6 줄 보충(요약 4개→7개). 2-0~2-6 응답은 바뀌지 않음 (back_spec 변경 05) |

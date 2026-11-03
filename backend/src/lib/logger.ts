@@ -1,6 +1,6 @@
 // 한 줄 로그 + 비밀값 가리기
 // 형식: 시각 레벨 [영역] 메시지 key=value ...
-// DATABASE_URL(전체·비밀번호·사용자·호스트)과 RIOT_API_KEY는 모든 출력에서 *** 로 가린다.
+// DATABASE_URL(전체·비밀번호·사용자·호스트), RIOT_API_KEY, ANTHROPIC_API_KEY(와 sk-ant- 모양)는 모든 출력에서 *** 로 가린다.
 
 type Level = 'INFO' | 'WARN' | 'ERROR';
 type Fields = Record<string, unknown>;
@@ -34,6 +34,9 @@ function secretsToHide(): string[] {
   }
   const key = process.env.RIOT_API_KEY ?? '';
   if (key) out.push(key);
+  // 변경 05: Anthropic 키도 가린다
+  const anthropicKey = process.env.ANTHROPIC_API_KEY ?? '';
+  if (anthropicKey) out.push(anthropicKey);
   return out.filter((s) => s.length >= 3).sort((a, b) => b.length - a.length);
 }
 
@@ -43,6 +46,7 @@ export function redact(text: unknown): string {
   // 접속 문자열 모양이 남아 있으면 통째로 가린다
   s = s.replace(/postgres(?:ql)?:\/\/\S+/g, '***');
   s = s.replace(/RGAPI-[0-9a-fA-F-]+/g, '***');
+  s = s.replace(/sk-ant-[0-9A-Za-z_-]+/g, '***');
   return s;
 }
 

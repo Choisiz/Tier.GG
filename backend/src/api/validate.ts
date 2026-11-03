@@ -85,3 +85,13 @@ export function parseMatchIdsParam(v: unknown): Parsed<string[]> {
   }
   return { ok: true, value: ids };
 }
+
+// 게임 피드백 분석 (back_spec 변경 05, 05-1)
+
+/** 경로의 matchId 1개. ^KR_[0-9]{1,15}$ (2-6과 같은 규칙) */
+export function parseMatchIdParam(v: unknown): Parsed<string> {
+  if (typeof v !== 'string' || !MATCH_ID_RE.test(v)) {
+    return { ok: false, message: 'matchId는 KR_숫자 형식이어야 합니다.' };
+  }
+  return { ok: true, value: v };
+}
