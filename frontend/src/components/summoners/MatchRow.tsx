@@ -1,4 +1,5 @@
 import Image from "next/image";
+import MatchDetail from "@/components/summoners/MatchDetail";
 import MatchDisclosure from "@/components/summoners/MatchDisclosure";
 import Tooltip from "@/components/common/Tooltip";
 import LaneGoldCell from "@/components/summoners/LaneGoldCell";
@@ -126,7 +127,7 @@ function ParticipantIcons({
   );
 }
 
-/** 매치 1건. 승/패 색은 왼쪽 테두리 + 글자 (D35). 펼치면 AI 게임 분석 패널 (변경 10) */
+/** 매치 1건. 승/패 색은 왼쪽 테두리 + 글자 (D35). 펼치면 "상세 기록 | AI 분석" 탭 (변경 10·11) */
 export default function MatchRow({ match }: { match: MatchView }) {
   const resultClass = match.win ? "text-win" : "text-lose";
 
@@ -138,6 +139,7 @@ export default function MatchRow({ match }: { match: MatchView }) {
       win={match.win}
       championName={match.champion.name}
       feedbackEligible={match.feedbackEligible}
+      detail={<MatchDetail detail={match.detail} />}
     >
       {/* 결과·큐 종류·조회시간·플레이타임은 챔피언 초상화보다 왼쪽(2026-10-27). 큐 종류는 포지션 줄을 대신함 */}
       <div className="w-20 shrink-0 text-xs text-muted">

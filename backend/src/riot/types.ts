@@ -78,6 +78,12 @@ export interface ParticipantDto {
   gameEndedInEarlySurrender?: boolean;
   /** 변경 04: 킬관여(0~1 비율). 오래된 게임·특수 큐에서는 challenges 전체가 빠질 수 있다 */
   challenges?: { killParticipation?: number };
+  // 변경 06: 매치 상세 지표(10명 표). 오래된 게임 대비로 선택 필드, 없으면 0
+  totalDamageTaken?: number;
+  visionScore?: number;
+  wardsPlaced?: number;
+  wardsKilled?: number;
+  detectorWardsPlaced?: number;
 }
 
 export interface BanDto {
@@ -85,9 +91,18 @@ export interface BanDto {
   pickTurn: number;
 }
 
+export interface ObjectiveDto {
+  first?: boolean;
+  kills: number;
+}
+
 export interface TeamDto {
   teamId: number;
   bans: BanDto[];
+  /** 변경 06: 전적 검색 팀 요약에만 쓴다 (수집기는 쓰지 않음) */
+  win?: boolean;
+  /** 변경 06: 키가 빠질 수 있다(horde는 2024 이후 게임에만). 없으면 0 */
+  objectives?: Partial<Record<'baron' | 'champion' | 'dragon' | 'horde' | 'inhibitor' | 'riftHerald' | 'tower', ObjectiveDto>>;
 }
 
 export interface MatchDto {

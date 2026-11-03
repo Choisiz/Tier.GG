@@ -170,6 +170,45 @@ export type MatchParticipant = {
   tagLine: string | null;
   /** 챔피언 대상 딜량 (2026-10-27 추가) */
   damage: number;
+  /* ↓ 매치 상세 지표 (계약 v4 변경 06, 2026-11-03 추가) */
+  /** 검색한 소환사 본인이면 true (10명 중 1명) */
+  isMe: boolean;
+  /** TOP·JUNGLE·MIDDLE·BOTTOM·UTILITY. Riot이 빈 값을 주면 null */
+  teamPosition: string | null;
+  champLevel: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  /** 킬관여 % (팀 킬 합이 0이면 null) */
+  killParticipation: number | null;
+  damageTaken: number;
+  goldEarned: number;
+  cs: number;
+  visionScore: number;
+  wardsPlaced: number;
+  wardsKilled: number;
+  controlWardsPlaced: number;
+  /** item0~5, 빈 칸 0 */
+  items: number[];
+  trinket: number;
+  summonerSpells: number[];
+  keystone: number | null;
+  /** 보조 룬 트리 ID. 없으면 null */
+  subStyle: number | null;
+};
+
+/** 팀 요약 (계약 v4 변경 06). 킬·골드는 참가자 합, 오브젝트는 Riot objectives, 밴은 0~5개 */
+export type MatchTeamSummary = {
+  win: boolean;
+  kills: number;
+  gold: number;
+  towers: number;
+  inhibitors: number;
+  dragons: number;
+  barons: number;
+  heralds: number;
+  grubs: number;
+  bans: number[];
 };
 
 /** match-v5 매치 1건 */
@@ -203,6 +242,11 @@ export type MatchSummary = {
   participants: {
     team: MatchParticipant[];
     enemy: MatchParticipant[];
+  };
+  /** 내 팀/상대 팀 요약 (변경 06) */
+  teams: {
+    team: MatchTeamSummary;
+    enemy: MatchTeamSummary;
   };
 };
 

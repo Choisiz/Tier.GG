@@ -1,6 +1,6 @@
 // DB 줄 → 응답 DTO (api_contract 2-3, 2-4, 2-5). 숫자 변환과 반올림은 statsRepository SQL에서 끝난 상태다.
 import type { ItemRow, RuneRow, SkillRow, SpellRow, TierRow } from '../repositories/statsRepository.js';
-import type { AccountDto, LeagueEntryByPuuidDto, MatchDto, ParticipantDto, SummonerDto } from '../riot/types.js';
+import type { AccountDto, LeagueEntryByPuuidDto, MatchDto, ParticipantDto, SummonerDto, TeamDto } from '../riot/types.js';
 
 export function tierListItem(rank: number, r: TierRow, mainPositions: string[]) {
   return {
@@ -73,7 +73,7 @@ export const skillDto = (r: SkillRow) => ({ skillOrder: r.skillOrder, ...rates(r
  * 주는 필드라(추가 호출 없음), 같은 팀/상대팀 참가자의 닉네임을 그대로 노출한다. 둘 다 없으면
  * `gameName`을 null로 둬 프론트가 "알 수 없는 소환사"로 처리하게 한다 (아주 오래된 게임 등).
  */
-function sideDto(p: ParticipantDto) {
+function sideDto(p: ParticipantDto, myPuuid: string, participants: ParticipantDto[]) {
   return {
     puuid: p.puuid,
     championId: p.championId,
@@ -82,6 +82,46 @@ function sideDto(p: ParticipantDto) {
     tagLine: p.riotIdTagline || null,
     /** 챔피언 대상 딜량. 참가자 목록의 딜량 막대그래프용(2026-10-27 추가, 추가 호출 없음) */
     damage: p.totalDamageDealtToChampions,
+    // 변경 06 매치 상세 지표 (10명 표용, 추가 Riot 호출 없음)
+    /** 검색한 소환사 본인이면 true (10명 중 1명) */
+    isMe: p.puuid === myPuuid,
+    teamPosition: p.teamPosition || null,
+    champLevel: p.champLevel,
+    kills: p.kills,
+    deaths: p.deaths,
+    assists: p.assists,
+    killParticipation: killParticipationPercent(p, participants),
+    damageTaken: p.totalDamageTaken ?? 0,
+    goldEarned: p.goldEarned,
+    cs: p.totalMinionsKilled + p.neutralMinionsKilled,
+    visionScore: p.visionScore ?? 0,
+    wardsPlaced: p.wardsPlaced ?? 0,
+    wardsKilled: p.wardsKilled ?? 0,
+    controlWardsPlaced: p.detectorWardsPlaced ?? 0,
+    items: [p.item0, p.item1, p.item2, p.item3, p.item4, p.item5],
+    trinket: p.item6,
+    summonerSpells: [p.summoner1Id, p.summoner2Id],
+    keystone: p.perks.styles[0]?.selections[0]?.perk ?? null,
+    subStyle: p.perks.styles[1]?.style ?? null,
+  };
+}
+
+/** 팀 요약 (변경 06). objectives 값이 없으면 0, bans는 -1(밴 안 함) 제외 */
+export function teamSummary(teamId: number, match: MatchDto) {
+  const t: TeamDto | undefined = match.info.teams?.find((x) => x.teamId === teamId);
+  const members = match.info.participants.filter((p) => p.teamId === teamId);
+  const obj = (k: keyof NonNullable<TeamDto['objectives']>) => t?.objectives?.[k]?.kills ?? 0;
+  return {
+    win: t?.win ?? members[0]?.win ?? false,
+    kills: members.reduce((sum, p) => sum + p.kills, 0),
+    gold: members.reduce((sum, p) => sum + p.goldEarned, 0),
+    towers: obj('tower'),
+    inhibitors: obj('inhibitor'),
+    dragons: obj('dragon'),
+    barons: obj('baron'),
+    heralds: obj('riftHerald'),
+    grubs: obj('horde'),
+    bans: (t?.bans ?? []).map((b) => b.championId).filter((id) => id !== -1),
   };
 }
 
@@ -102,8 +142,10 @@ export function matchListItem(match: MatchDto, puuid: string) {
   const participants = match.info.participants;
   const me = participants.find((p) => p.puuid === puuid);
   if (!me) throw new Error('매치 참가자 중 검색한 puuid를 찾을 수 없습니다.');
-  const team = participants.filter((p) => p.teamId === me.teamId).map(sideDto);
-  const enemy = participants.filter((p) => p.teamId !== me.teamId).map(sideDto);
+  const side = (p: ParticipantDto) => sideDto(p, puuid, participants);
+  const team = participants.filter((p) => p.teamId === me.teamId).map(side);
+  const enemy = participants.filter((p) => p.teamId !== me.teamId).map(side);
+  const enemyTeamId = participants.find((p) => p.teamId !== me.teamId)?.teamId ?? (me.teamId === 100 ? 200 : 100);
   const keystone = me.perks.styles[0]?.selections[0]?.perk ?? null;
   return {
     matchId: match.metadata.matchId,
@@ -127,6 +169,8 @@ export function matchListItem(match: MatchDto, puuid: string) {
     summonerSpells: [me.summoner1Id, me.summoner2Id],
     keystone,
     participants: { team, enemy },
+    /** 팀 요약 (변경 06): 킬·골드 합, 오브젝트, 밴 */
+    teams: { team: teamSummary(me.teamId, match), enemy: teamSummary(enemyTeamId, match) },
   };
 }
 

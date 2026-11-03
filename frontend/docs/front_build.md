@@ -1,6 +1,6 @@
 # 프론트엔드 구현 상태 — Tier.GG 챔피언 화면
 
-> 기준: `front_spec.md` (현재 계획), `docs/contracts/api_contract.md` v4. 코드 상태: 변경 10 Build 반영 후 (2026-11-03).
+> 기준: `front_spec.md` (현재 계획), `docs/contracts/api_contract.md` v4. 코드 상태: 변경 11 Build 반영 후 (2026-11-03).
 > 이 문서는 **지금 구현 상태**만 적는다. 이전 시도와 과정 기록은 git 커밋 `87cfc78`에 있다.
 > 상태 표기: ✅ 완료 / ⚠️ 부분 완료 / ❌ 실패 / ⏸️ 보류
 
@@ -24,6 +24,7 @@
 - [16. 킬관여·라인전 15분 골드 (변경 08)](#16-킬관여라인전-15분-골드-변경-08)
 - [17. 전적 화면 상단 보강 (변경 09)](#17-전적-화면-상단-보강-변경-09)
 - [18. 매치 펼침 안 AI 게임 분석 (변경 10)](#18-매치-펼침-안-ai-게임-분석-변경-10)
+- [19. 매치 상세 탭 (변경 11)](#19-매치-상세-탭-변경-11)
 
 ---
 
@@ -665,3 +666,49 @@ npx next typegen && npx tsc --noEmit   # 타입 검사
 4. 결과 패널 높이가 목업 근사보다 크다(1280px 817px / 360px 1,212px). 모양은 목업과 같다.
 5. Next.js 보안 업그레이드 안내(기존 13장 항목).
 
+## 19. 매치 상세 탭 (변경 11)
+
+> 기준: `front_spec.md` 5-11·D79·D80, 계약 v4 2-5(변경 06 필드). 목업 생략(사용자 결정), 작은~중간 화면 변경이지만 사용자 지시로 **Review 없이 Build 자체 검증**. 백엔드·계약 수정 없음, 새 의존성·환경 변수 없음.
+
+### 19-1. 구현
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 타입 | `lib/api/types.ts`: `MatchParticipant`에 19개 필드(`isMe`·`teamPosition`·`champLevel`·K/D/A·`killParticipation`·`damageTaken`·`goldEarned`·`cs`·시야 4개·`items`·`trinket`·`summonerSpells`·`keystone`·`subStyle`), `MatchTeamSummary`, `MatchSummary.teams` | ✅ |
+| 매핑 | `lib/view/summoner.ts`: `MatchView.detail`(`toMatchDetailView`) — 포지션 정렬, 가한/받은 딜 10명 최댓값 대비 %, 닉네임 링크(`/summoners/kr/{encodeURIComponent(gameName-tagLine)}`), 오브젝트 6종·밴. `toRuneTreeMap`(보조 룬 트리). 기존 아이템·주문·키스톤 매핑 함수 재사용 | ✅ |
+| 페이지 | `app/summoners/[region]/[riotId]/page.tsx`: 10명 아이템·장신구 id를 모두 `getItems`에 넘김, `runeTrees` 컨텍스트 추가 | ✅ |
+| 상세 표 | `components/summoners/MatchDetail.tsx`(서버, 신규): 팀 머리줄(승패·킬·골드·오브젝트 SVG·밴), xl 열 이름 줄, 참가자 줄(초상화+레벨, 주문·키스톤·보조 트리 2×2, 닉네임 링크, KDA·킬관여, 딜 막대 2개, 골드, CS·분당, 시야·제어·설치/제거, 아이템 7칸). 본인 줄 금색 배경+왼쪽 선+`aria-current`. xl 미만은 줄 접기 | ✅ |
+| 탭 | `components/summoners/MatchDetailTabs.tsx`(client, 신규): tablist, ←/→/Home/End, 두 패널 모두 마운트(`hidden`) | ✅ |
+| 연결 | `MatchDisclosure.tsx`: `detail` prop 추가, 패널 안을 탭으로 감쌈, `aria-controls`를 `match-detail-{matchId}`로. `MatchRow.tsx`: `detail={<MatchDetail …/>}` 전달. 접힌 행 마크업 변경 없음 | ✅ |
+
+### 19-2. 계획과 다르게 구현한 점
+
+1. 받은 딜도 막대(회색)를 붙였다(계획은 가한 딜만 막대). 받은 딜 막대도 10명 중 최댓값 기준.
+2. 360px에서 아이템 7칸이 딜·골드와 한 줄에 다 안 들어가 참가자 1명이 3줄(위: 챔피언·닉네임·KDA / 가운데: 딜·골드·CS·시야 / 아래: 아이템)이 된다. 가로 스크롤은 0.
+3. 오브젝트 아이콘은 새 이미지 없이 단순한 인라인 SVG(승패 색)로 그렸다.
+
+### 19-3. 검증 결과 (2026-11-03)
+
+| 명령 | 결과 |
+|------|------|
+| `npx tsc --noEmit` | 통과 (오류 0) |
+| `npx eslint src` | 통과 (오류·경고 0) |
+| `npx next build` | 통과(정적 183페이지). 보안 업그레이드 안내로 1회 멈춘 뒤 재실행 |
+
+환경: 이미 떠 있던 백엔드(4000, 작업 트리 코드)·프론트 `next dev`(3000) 사용, 내장 브라우저, `너희는개다#KR1`. 페이지 로드 3회(검색 2회 + 닉네임 링크 1회), 유료 호출 0(AI 분석 버튼 누르지 않음).
+
+| 항목 | 결과 |
+|------|------|
+| 1280px | 펼침 → 상세 기록 기본 선택, 두 팀 표 한 줄(참가자 줄 48~49px), 펼친 칸 폭 796px, 문서 `scrollWidth` 1280 = `clientWidth`(가로 스크롤 0) |
+| 360px | 줄 접기(참가자 1명 약 132px), 패널 밖으로 나간 요소 0, `scrollWidth` 360 = `clientWidth` |
+| 본인 강조 | `aria-current` 줄 정확히 1개 = `너희는개다#KR1`, 금색 배경·선 |
+| 탭 | → 키로 AI 분석 선택·포커스 이동(`aria-selected`·`hidden` 바뀜), 한 번 더 → 상세 기록으로 순환. AI 탭에 기존 ① 분석 전 패널 표시 |
+| 닉네임 링크 | `화난토마토#KR1` 클릭 → `/summoners/kr/화난토마토-KR1` 이동, 프로필 정상 |
+| 콘솔 | 오류 0 |
+| 스크린샷 | scratchpad `change11_1280.jpg`, `change11_360.jpg` (저장소 밖) |
+
+### 19-4. 남은 문제
+
+1. 좁은 화면에서 딜 숫자 두 개(가한/받은)에 보이는 글자 라벨이 없다(막대 색·순서로만 구분, 스크린리더 라벨은 있음).
+2. 펼친 칸 상세 표 HTML은 접혀 있어도 RSC 데이터로 20판 모두 내려온다(응답 크기 증가). 체감 문제가 있으면 펼칠 때 그리는 방식으로 바꾼다.
+3. 탭 전환 후 AI 분석을 실제로 실행해 결과가 탭 전환에도 유지되는지는 유료 호출을 피하느라 화면으로 확인하지 않았다(두 패널을 모두 마운트하는 구조와 기존 Provider로 보장).

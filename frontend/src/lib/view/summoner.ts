@@ -3,13 +3,21 @@ import type {
   League,
   MatchParticipant,
   MatchSummary,
+  MatchTeamSummary,
   SummonerResponse,
 } from "@/lib/api/types";
 import { profileIconUrl } from "@/lib/ddragon/images";
 import type { ChampionSummary, IconInfo, ItemInfo, RuneTreeInfo } from "@/lib/ddragon/types";
 import { isFeedbackEligible } from "./feedback";
 import { formatKillParticipation } from "./laneGold";
-import { formatCsPerMinute, formatDuration, formatKda, formatPercent, formatRelativeKo } from "./format";
+import {
+  formatCount,
+  formatCsPerMinute,
+  formatDuration,
+  formatKda,
+  formatPercent,
+  formatRelativeKo,
+} from "./format";
 
 /* ───────── 랭크 (D33, D34) ───────── */
 
@@ -153,6 +161,13 @@ export function toKeystoneMap(trees: RuneTreeInfo[]): KeystoneMap {
   return map;
 }
 
+/** 룬 트리 id → 트리 이름·아이콘 (보조 룬 트리 표시용, 변경 11) */
+export type RuneTreeMap = Map<number, { name: string; iconUrl?: string }>;
+
+export function toRuneTreeMap(trees: RuneTreeInfo[]): RuneTreeMap {
+  return new Map(trees.map((tree) => [tree.id, { name: tree.name, iconUrl: tree.iconUrl }]));
+}
+
 function toKeystoneView(perkId: number, keystones: KeystoneMap): KeystoneView {
   return (
     keystones.get(perkId) ?? {
@@ -223,6 +238,8 @@ export type MatchView = {
   enemy: ParticipantView[];
   /** AI 게임 분석 버튼을 보여 줄 판 (솔로·자유랭크 15분 이상, 변경 10) */
   feedbackEligible: boolean;
+  /** 펼친 칸 "상세 기록" 탭 (변경 11) */
+  detail: MatchDetailView;
 };
 
 type MatchContext = {
@@ -230,7 +247,160 @@ type MatchContext = {
   items: Map<number, ItemInfo>;
   spells: Map<string, IconInfo>;
   keystones: KeystoneMap;
+  /** 보조 룬 트리 아이콘 (변경 11) */
+  runeTrees: RuneTreeMap;
 };
+
+/* ───────── 매치 상세 표 (변경 11) ───────── */
+
+/** 상세 표 1줄 = 참가자 1명 */
+export type DetailPlayerView = {
+  isMe: boolean;
+  champion: ChampionIconView;
+  champLevel: number;
+  summonerSpells: ReturnType<typeof toSpellView>[];
+  keystone: KeystoneView | null;
+  subStyle: { name: string; iconUrl?: string } | null;
+  /** 닉네임. Riot이 안 주면 "알 수 없는 소환사" */
+  name: string;
+  tagLine: string | null;
+  /** 닉네임 링크(`/summoners/kr/{gameName}-{tagLine}`). 닉네임이 없으면 null */
+  href: string | null;
+  kills: number;
+  deaths: number;
+  assists: number;
+  kda: string;
+  killParticipation: string;
+  damage: string;
+  /** 그 판 10명 중 최대 가한 딜 대비 0~100 */
+  damagePercent: number;
+  damageTaken: string;
+  /** 그 판 10명 중 최대 받은 딜 대비 0~100 */
+  damageTakenPercent: number;
+  gold: string;
+  cs: number;
+  csPerMinute: string;
+  visionScore: number;
+  controlWards: number;
+  wardsPlaced: number;
+  wardsKilled: number;
+  items: SlotView[];
+  trinket: SlotView;
+};
+
+export type ObjectiveKey = "towers" | "inhibitors" | "dragons" | "barons" | "heralds" | "grubs";
+
+export type DetailTeamView = {
+  side: "team" | "enemy";
+  win: boolean;
+  kills: number;
+  gold: string;
+  objectives: { key: ObjectiveKey; label: string; count: number }[];
+  bans: ChampionIconView[];
+  players: DetailPlayerView[];
+};
+
+/** 내 팀이 먼저 */
+export type MatchDetailView = { teams: [DetailTeamView, DetailTeamView] };
+
+const POSITION_ORDER: Record<string, number> = {
+  TOP: 0,
+  JUNGLE: 1,
+  MIDDLE: 2,
+  BOTTOM: 3,
+  UTILITY: 4,
+};
+
+const OBJECTIVE_LABELS: { key: ObjectiveKey; label: string }[] = [
+  { key: "towers", label: "포탑" },
+  { key: "inhibitors", label: "억제기" },
+  { key: "dragons", label: "드래곤" },
+  { key: "barons", label: "바론" },
+  { key: "heralds", label: "전령" },
+  { key: "grubs", label: "공허 유충" },
+];
+
+/** 같은 규칙: 검색창과 같은 `/summoners/kr/{gameName}-{tagLine}` (SummonerSearchForm) */
+function summonerHref(gameName: string | null, tagLine: string | null): string | null {
+  if (!gameName || !tagLine) return null;
+  return `/summoners/kr/${encodeURIComponent(`${gameName}-${tagLine}`)}`;
+}
+
+function percentOf(value: number, max: number): number {
+  return max > 0 ? Math.round((value / max) * 100) : 0;
+}
+
+function toDetailPlayerView(
+  p: MatchParticipant,
+  ctx: MatchContext,
+  gameDurationSec: number,
+  maxDamage: number,
+  maxTaken: number,
+): DetailPlayerView {
+  const subStyle = p.subStyle === null ? null : (ctx.runeTrees.get(p.subStyle) ?? null);
+  return {
+    isMe: p.isMe,
+    champion: toChampionIconView(p.championId, ctx.champions),
+    champLevel: p.champLevel,
+    summonerSpells: p.summonerSpells.map((id) => toSpellView(id, ctx.spells)),
+    keystone: p.keystone === null ? null : toKeystoneView(p.keystone, ctx.keystones),
+    subStyle,
+    name: p.gameName ?? "알 수 없는 소환사",
+    tagLine: p.gameName ? p.tagLine : null,
+    href: summonerHref(p.gameName, p.tagLine),
+    kills: p.kills,
+    deaths: p.deaths,
+    assists: p.assists,
+    kda: formatKda(p.kills, p.deaths, p.assists),
+    killParticipation: formatKillParticipation(p.killParticipation),
+    damage: formatCount(p.damage),
+    damagePercent: percentOf(p.damage, maxDamage),
+    damageTaken: formatCount(p.damageTaken),
+    damageTakenPercent: percentOf(p.damageTaken, maxTaken),
+    gold: formatCount(p.goldEarned),
+    cs: p.cs,
+    csPerMinute: formatCsPerMinute(p.cs, gameDurationSec),
+    visionScore: p.visionScore,
+    controlWards: p.controlWardsPlaced,
+    wardsPlaced: p.wardsPlaced,
+    wardsKilled: p.wardsKilled,
+    items: p.items.map((itemId) => toSlotView(itemId, ctx.items)),
+    trinket: toSlotView(p.trinket, ctx.items),
+  };
+}
+
+/** 포지션 순서(TOP→UTILITY), 포지션 없음은 뒤로. 정렬은 안정 정렬이라 같은 값은 원래 순서 유지 */
+function byPosition(a: MatchParticipant, b: MatchParticipant): number {
+  const rank = (p: MatchParticipant) => POSITION_ORDER[p.teamPosition ?? ""] ?? 99;
+  return rank(a) - rank(b);
+}
+
+function toMatchDetailView(match: MatchSummary, ctx: MatchContext): MatchDetailView {
+  const all = [...match.participants.team, ...match.participants.enemy];
+  const maxDamage = Math.max(0, ...all.map((p) => p.damage));
+  const maxTaken = Math.max(0, ...all.map((p) => p.damageTaken));
+  const toTeam = (
+    side: "team" | "enemy",
+    summary: MatchTeamSummary,
+    participants: MatchParticipant[],
+  ): DetailTeamView => ({
+    side,
+    win: summary.win,
+    kills: summary.kills,
+    gold: formatCount(summary.gold),
+    objectives: OBJECTIVE_LABELS.map(({ key, label }) => ({ key, label, count: summary[key] })),
+    bans: summary.bans.map((id) => toChampionIconView(id, ctx.champions)),
+    players: [...participants]
+      .sort(byPosition)
+      .map((p) => toDetailPlayerView(p, ctx, match.gameDurationSec, maxDamage, maxTaken)),
+  });
+  return {
+    teams: [
+      toTeam("team", match.teams.team, match.participants.team),
+      toTeam("enemy", match.teams.enemy, match.participants.enemy),
+    ],
+  };
+}
 
 /**
  * 매치 1건의 Riot 큐 ID → 짧은 한글 이름. "승리" 아래 자리라 짧게(2026-10-27 추가, 포지션 줄을 대신함).
@@ -280,6 +450,7 @@ function toMatchView(match: MatchSummary, ctx: MatchContext): MatchView {
     team: match.participants.team.map((p) => toParticipantView(p, ctx.champions, maxDamage)),
     enemy: match.participants.enemy.map((p) => toParticipantView(p, ctx.champions, maxDamage)),
     feedbackEligible: isFeedbackEligible(match.queueId, match.gameDurationSec),
+    detail: toMatchDetailView(match, ctx),
   };
 }
 

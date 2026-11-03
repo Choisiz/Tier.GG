@@ -17,6 +17,7 @@
   - [2-7. 테스트](#2-7-테스트)
   - [2-8. 킬관여·라인전 15분 골드 (변경 04)](#2-8-킬관여라인전-15분-골드-변경-04)
   - [2-9. 게임 피드백 분석 API (변경 05)](#2-9-게임-피드백-분석-api-변경-05)
+  - [2-10. 매치 상세 지표 (변경 06)](#2-10-매치-상세-지표-변경-06)
 - [3. 사용자가 실행하는 명령](#3-사용자가-실행하는-명령)
 - [4. 검증 결과](#4-검증-결과)
   - [4-1. 실제 소량 수집](#4-1-실제-소량-수집)
@@ -40,12 +41,14 @@
 > **변경 04(킬관여·라인전 15분 골드)**: 2-5 각 매치에 `killParticipation`(정수 %, 추가 호출 0)을 합치고, 새 `GET /api/v1/matches/lane-gold`(2-6)를 만들었다. timeline에서 15분 골드만 뽑아 경기 ID별로 6시간 캐시(원본 미저장)하고, 제한기 대기가 1.5초를 넘으면 남은 ID를 `pending`(HTTP 200 + `retryAfterSec`)으로 남긴다. API 전용 제한기를 18/90으로 올렸다. 
 >
 > **변경 05(게임 피드백 분석 API, 2026-11-03 Build — Review 전)**: `POST /api/v1/matches/:matchId/feedback`(계약 v4 2-7)을 만들었다. Riot match·timeline 2회 → `!ai` 엔진·문장 파이프라인(import만) → 서버 메모리 캐시(LLM 7일·템플릿 10분), 진행 중 Promise 공유, 하루 상한 20(KST)·예산 $0.25 예약·동시 2+대기 4·30초 504·차단기 10분. 스위치 2개는 기본 꺼짐. 이번 Build의 **Anthropic 호출 0회**. 아래 표의 수치는 변경 05 기준이다.
+>
+> **변경 06(매치 상세 지표, 2026-11-03 Build)**: 2-5 `participants.team`/`enemy[]`에 10명 상세 지표 19개, 매치에 `teams` 팀 요약을 더했다(기존 필드 그대로, Riot 추가 호출 0). typecheck·lint 0, 단위 379/379. 응답 `matches` 부분 약 29 KB → 102 KB(압축 전, 20판).
 
 | 항목 | 결과 |
 |------|------|
 | `npm run typecheck` (`tsc --noEmit`) | 오류 0 |
 | `npm run lint` (eslint 9 + typescript-eslint 8) | 오류 0 |
-| `npm test` (단위, DB·네트워크 없음) | **372개** 통과 / 실패 0 (변경 05 전 323 = 백엔드 164 + `!ai` 159, 변경 05 +49: `api/feedbackService` 26, `api/feedbackParts` 16, `api/feedbackRoute` 7) |
+| `npm test` (단위, DB·네트워크 없음) | **379개** 통과 / 실패 0 (변경 06 +6: `matchDetail` 6. 그 전 373, 변경 05 전 323 = 백엔드 164 + `!ai` 159, 변경 05 +49: `api/feedbackService` 26, `api/feedbackParts` 16, `api/feedbackRoute` 7) |
 | `npm run test:integration` (실제 Supabase, 모두 ROLLBACK) | **17개** 통과 / 실패 0 (약 10초, 변경 03·04·05는 DB를 쓰지 않아 추가 없음). 끝난 뒤 테스트 데이터 0줄 |
 | `npm audit` | 변경 05에서 `npm audit fix`(사용자 승인 F17) 실행: `package-lock.json`만 바뀜(typescript-eslint 8.71.2→8.72.1 등 개발 의존성 패치 범위). `body-parser`는 이미 2.4.0이라 high 경고 없음. **남은 것: moderate 11건**(eslint·typescript-eslint 쪽 `minimatch`, 개발 의존성만) — `--force`(호환 깨짐)가 필요해 하지 않음 |
 | 빌드 | 해당 없음. `tsx`로 바로 실행하고 `tsc --noEmit`으로 검사하는 구조다 (결정 D1, `package.json`에 `build` 스크립트 없음). typecheck가 그 역할 |
@@ -234,6 +237,19 @@
 | 문서·계약 | `api_contract.md` v4(1장 메서드, 2장 표 7개, 2-7, 3장 오류 6개+Retry-After, 4장 캐시, 6장 기록), `.env.example` 변수 4개 + `FEEDBACK_BUDGET_USD`에 "CLI 전용", `back_spec.md` 임시 절을 5-9·6-4·7-6·9-5·10-8·11·12(F1~F21)·13장에 합침 | ✅ |
 | 실제 LLM 1판 | ✅ 2026-11-03 메인 에이전트 확인: 포트 4100, `FEEDBACK_API_BUDGET_USD=0.50`(프로세스 환경만), `너희는개다#KR1` 솔랭 `KR_8444003131`(27.7분). 200 `mode:"llm"` 19.6초(1차 9/11 통과, 2칸 재시도 통과, 템플릿 0), 금지 필드 없음. 같은 요청 반복 2.8ms·Riot 0·LLM 0. 장부 2줄(1차+재시도) 합 $0.120055 = 로그 `costUsd`, `today=1/20`, 장부 git 제외 확인. Riot 3회(검색 1 + 분석 2). 실제 비용이 예상($0.07)보다 큰 것은 재시도 2칸 때문 | ✅ |
 | 장부 복원 실패 대비 (Review L1) | `server.ts` `buildFeedback`: API 장부를 못 읽으면(깨진 줄 등) 서버 전체를 멈추지 않고 오류 로그 1줄 + 분석만 503 `ANALYSIS_DISABLED`. Review가 고침, typecheck·lint 0·단위 372/372·실제 서버로 확인 | ✅ |
+
+### 2-10. 매치 상세 지표 (변경 06)
+
+> 요약: `src/api/dto.ts`·`src/riot/types.ts`만 고쳤다. Riot 호출 수·캐시·2-0~2-4·2-6·2-7 응답은 바뀌지 않는다. `src/analysis/**`·피드백 파일 변경 0줄.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 참가자 상세 | `sideDto(p, myPuuid, participants)`에 `isMe`·`teamPosition`(없으면 null)·`champLevel`·`kills`·`deaths`·`assists`·`killParticipation`(기존 함수 재사용)·`damageTaken`·`goldEarned`·`cs`·`visionScore`·`wardsPlaced`·`wardsKilled`·`controlWardsPlaced`·`items`·`trinket`·`summonerSpells`·`keystone`·`subStyle`(없으면 null). 선택 지표가 빠지면 0 | ✅ |
+| 팀 요약 | `teamSummary(teamId, match)` (export): `win`(teams[].win, 없으면 참가자 win), 킬·골드 합, objectives `tower`·`inhibitor`·`dragon`·`baron`·`riftHerald`·`horde`(없으면 0), `bans`(-1 제외). `matchListItem`에 `teams: { team, enemy }` | ✅ |
+| 타입 | `ParticipantDto`에 선택 필드 5개, `TeamDto`에 `win?`·`objectives?`(`ObjectiveDto`). 수집기 영향 없음 | ✅ |
+| 테스트 | `test/unit/matchDetail.test.ts` 6개: isMe 1명, 필드 매핑, subStyle null·누락 0, 팀 합계·objectives·방향, bans -1 제외, horde·objectives 없음 → 0 | ✅ |
+| 응답 크기 | fixture 2판(KR_8408851980·KR_8437852704)을 번갈아 20판, `matchListItem`만 JSON 직렬화: **29,349 B → 102,359 B** (판당 1,467 → 5,118 B, 압축 전) | ✅ |
+| 계약 | `api_contract.md` 2-5 예시·필드 표, 6장 기록 1줄(v4 작은 추가, 기존 관례) | ✅ |
 
 ---
 

@@ -2,7 +2,7 @@
 
 > 이 문서는 `!백엔드`가 작성하고 `!프론트`가 읽는 계약 문서다. 엔드포인트, 파라미터, 응답 형식, 오류 형식을 정한다. (CLAUDE.md 9장)
 
-- 상태: **v4 (구현 반영, 2026-11-03)** — `backend/docs/back_spec.md` "변경 05"로 **2-7 게임 피드백 분석(POST)** 추가, 1장 메서드 규칙 변경(GET + POST 1개), 오류 코드 6개 추가. 2-0~2-6 응답은 v3와 같다.
+- 상태: **v4 (구현 반영, 2026-11-03)** — `backend/docs/back_spec.md` "변경 05"로 **2-7 게임 피드백 분석(POST)** 추가, 1장 메서드 규칙 변경(GET + POST 1개), 오류 코드 6개 추가. 2-0~2-6 응답은 v3와 같다. 같은 날 "변경 06"으로 2-5에 매치 상세 지표(참가자 상세·`teams` 팀 요약)를 더했다(작은 추가, additive).
 - 이전 상태: **v3 (구현 반영)** — `backend/docs/back_spec.md` "변경 03"과 함께 승인 (2026-10-27). 2-5 전적 검색 추가. 2026-10-30 "변경 04"로 2-5에 `killParticipation` 추가, 2-6 라인전 15분 골드 추가(작은 추가, additive). 나머지(1~4·6장, 2-0~2-4)는 v2(변경 02)와 같다.
 - 근거: `docs/contracts/db_contract.md` **v8**. 2-5(전적 검색)는 DB를 쓰지 않고 Riot API를 그대로 중계한다 (back_spec 변경 03 W-6, 계약 변경 요청 없음).
 - 범위: 챔피언 티어리스트(포지션별) + 챔피언 상세(포지션, 빌드) + **전적 검색**(프로필·랭크·최근 매치 20건, 2-5) + **라인전 15분 골드**(지연 로딩, 2-6) + **게임 피드백 분석**(버튼을 눌렀을 때만, 2-7). 통계(2-0~2-4)는 **최근 14일에 시작한 게임** 기준. SSE·과거 매치 더보기·스킬 순서(전적 검색)는 포함하지 않는다.
@@ -490,8 +490,17 @@ GET /api/v1/summoners/kr/너희는개다-KR1
       "summonerSpells": [4, 12],
       "keystone": 8010,
       "participants": {
-        "team": [{ "puuid": "…", "championId": 23, "win": true, "gameName": "너희는개다", "tagLine": "KR1", "damage": 12601 }],
-        "enemy": [{ "puuid": "…", "championId": 54, "win": false, "gameName": "눈보라속커피한잔", "tagLine": "KR1", "damage": 19023 }]
+        "team": [{
+          "puuid": "…", "championId": 23, "win": true, "gameName": "너희는개다", "tagLine": "KR1", "damage": 12601,
+          "isMe": true, "teamPosition": "TOP", "champLevel": 18, "kills": 7, "deaths": 3, "assists": 5, "killParticipation": 52,
+          "damageTaken": 26554, "goldEarned": 13500, "cs": 182, "visionScore": 17, "wardsPlaced": 9, "wardsKilled": 2, "controlWardsPlaced": 1,
+          "items": [3006, 3046, 1036, 3031, 1018, 3074], "trinket": 3364, "summonerSpells": [4, 12], "keystone": 8010, "subStyle": 8400
+        }],
+        "enemy": [{ "puuid": "…", "championId": 54, "win": false, "gameName": "눈보라속커피한잔", "tagLine": "KR1", "damage": 19023, "isMe": false, "…": "team[]과 같은 필드" }]
+      },
+      "teams": {
+        "team":  { "win": true,  "kills": 39, "gold": 68000, "towers": 10, "inhibitors": 2, "dragons": 3, "barons": 0, "heralds": 1, "grubs": 2, "bans": [64, 7, 902, 101, 17] },
+        "enemy": { "win": false, "kills": 12, "gold": 52000, "towers": 1,  "inhibitors": 0, "dragons": 0, "barons": 0, "heralds": 0, "grubs": 1, "bans": [56, 234, 89, 134] }
       }
     }
   ]
@@ -515,6 +524,21 @@ GET /api/v1/summoners/kr/너희는개다-KR1
 | `matches[].participants.team`/`enemy` | array[5] | 아니오 | 같은 팀/상대팀. 챔피언 아이콘은 프론트가 Data Dragon |
 | `…team[]`/`enemy[].gameName`/`tagLine` | string | **예** | Riot 닉네임#태그 (match-v5 응답에 포함된 `riotIdGameName`/`riotIdTagline`을 그대로 줌, 추가 호출 없음, 2026-10-27 추가). 아주 오래된 매치 등 Riot이 안 주면 둘 다 `null` — 프론트는 "알 수 없는 소환사"로 처리 |
 | `…team[]`/`enemy[].damage` | int | 아니오 | 챔피언 대상 딜량(`totalDamageDealtToChampions`). 참가자 목록의 딜량 막대그래프용(2026-10-27 추가, 추가 호출 없음) |
+| `…team[]`/`enemy[].isMe` | bool | 아니오 | 검색한 소환사 본인이면 `true`(10명 중 1명). 2026-11-03 추가(변경 06) — 아래 줄들도 모두 변경 06, 추가 Riot 호출 없음 |
+| `…team[]`/`enemy[].teamPosition` | string | **예** | `TOP`·`JUNGLE`·`MIDDLE`·`BOTTOM`·`UTILITY`. Riot이 빈 값을 주면 `null` |
+| `…team[]`/`enemy[].champLevel`·`kills`·`deaths`·`assists` | int | 아니오 | 그 참가자의 챔피언 레벨·K/D/A |
+| `…team[]`/`enemy[].killParticipation` | int(0~) | **예** | 그 참가자의 킬관여 %. `matches[].killParticipation`과 같은 계산 |
+| `…team[]`/`enemy[].damageTaken` | int | 아니오 | 받은 피해(`totalDamageTaken`) |
+| `…team[]`/`enemy[].goldEarned` | int | 아니오 | 획득 골드 |
+| `…team[]`/`enemy[].cs` | int | 아니오 | `totalMinionsKilled + neutralMinionsKilled` |
+| `…team[]`/`enemy[].visionScore`·`wardsPlaced`·`wardsKilled`·`controlWardsPlaced` | int | 아니오 | 시야 점수·와드 설치·와드 제거·제어 와드 설치(`detectorWardsPlaced`). Riot이 안 주면 0 |
+| `…team[]`/`enemy[].items`·`trinket`·`summonerSpells`·`keystone` | - | 아니오(`keystone`은 예) | `matches[]`의 같은 이름 필드와 같은 규칙(`items` int[6] 빈 칸 0, `summonerSpells` int[2]) |
+| `…team[]`/`enemy[].subStyle` | int | **예** | 보조 룬 트리 ID(`perks.styles[1].style`). 없으면 `null` |
+| `matches[].teams.team`/`enemy` | object | 아니오 | 내 팀/상대 팀 요약(변경 06). 아래 필드 |
+| `…teams.*.win` | bool | 아니오 | 그 팀 승리 여부 |
+| `…teams.*.kills`·`gold` | int | 아니오 | 그 팀 참가자 `kills` 합·`goldEarned` 합(백엔드가 더함) |
+| `…teams.*.towers`·`inhibitors`·`dragons`·`barons`·`heralds`·`grubs` | int | 아니오 | `info.teams[].objectives`의 `tower`·`inhibitor`·`dragon`·`baron`·`riftHerald`·`horde` `kills`. 값이 없으면 0(유충은 오래된 게임에서 0) |
+| `…teams.*.bans` | int[] | 아니오 | 밴한 championId(밴 순서). 밴 안 함(`-1`)은 빼서 0~5개 |
 
 - 캐시: `Cache-Control: no-store` (검색 결과는 거의 실시간이어야 하므로. 2·4장의 `public, max-age=600`은 챔피언 통계 3개에만 해당).
 - 타임라인은 부르지 않는다. 스킬 순서는 이 엔드포인트에 없다 (이번 범위 밖). 라인전 15분 골드는 timeline이 필요해 2-6으로 분리했다.
@@ -803,3 +827,4 @@ Content-Type: application/json
 | 2026-10-27 | v3 (작은 추가) | 2-5 `matches[].queueId`(Riot 큐 ID) 추가. match-v5 응답에 이미 있던 `info.queueId`를 그대로 노출(추가 Riot 호출 없음), 이름표는 프론트가 한글화. 사용자 요청("승리 하단에 큐 종류(솔랭 등) 표시") |
 | 2026-10-30 | v3 (작은 추가) | 2-5 `matches[].killParticipation`(정수 %, null 가능) 추가: match-v5 `challenges.killParticipation`을 그대로 쓰고 없으면 (킬+어시)÷팀 킬 합으로 계산, 추가 Riot 호출 없음. 2-6 `GET /matches/lane-gold` 신규(라인전 15분 골드 격차, 지연 로딩, `ready`/`unavailable`/`pending` + `retryAfterSec`, HTTP 200). 오류 코드 추가 없음 (back_spec 변경 04). 사용자 요청("킬관여·라인전 점수 표시") |
 | 2026-11-03 | v4 | 2-7 `POST /matches/:matchId/feedback` 추가(게임 피드백 분석, 버튼을 눌렀을 때만, 본인·솔로/자유랭크·15분 이상, 서버 메모리 캐시, 30초 상한). 1장 메서드 규칙 "GET만" → "GET + 분석 POST 1개". 오류 코드 `MATCH_NOT_FOUND`·`ANALYSIS_UNSUPPORTED`·`ANALYSIS_LIMIT_REACHED`·`ANALYSIS_DISABLED`·`ANALYSIS_BUSY`·`ANALYSIS_TIMEOUT` 추가, `Retry-After` 헤더. 2장 표에 2-5·2-6 줄 보충(요약 4개→7개). 2-0~2-6 응답은 바뀌지 않음 (back_spec 변경 05) |
+| 2026-11-03 | v4 (작은 추가) | 2-5 `participants.team`/`enemy[]`에 10명 상세 지표 19개(`isMe`·`teamPosition`·`champLevel`·K/D/A·`killParticipation`·`damageTaken`·`goldEarned`·`cs`·시야/와드 4개·`items`·`trinket`·`summonerSpells`·`keystone`·`subStyle`)와 `matches[].teams`(팀 킬·골드 합, 오브젝트 6종, 밴) 추가. 이미 받는 match-v5 값만 사용, 추가 Riot 호출·캐시 변경 없음. 기존 필드·다른 응답은 그대로. 응답 크기 약 3.5배(20판 `matches` 29→102 KB, 압축 전) (back_spec 변경 06). 사용자 요청("매치 펼침에 10명 상세 표·팀 요약") |

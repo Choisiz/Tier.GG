@@ -35,6 +35,7 @@
   - [5-7. 전적 검색 (변경 03)](#5-7-전적-검색-변경-03)
   - [5-8. 킬관여·라인전 15분 골드 (변경 04)](#5-8-킬관여라인전-15분-골드-변경-04)
   - [5-9. 게임 피드백 분석 (변경 05)](#5-9-게임-피드백-분석-변경-05)
+  - [5-10. 매치 상세 지표 (변경 06)](#5-10-매치-상세-지표-변경-06)
 - [6. 오류 처리와 로깅](#6-오류-처리와-로깅)
   - [6-4. 게임 피드백 분석 로그와 비밀값 (변경 05)](#6-4-게임-피드백-분석-로그와-비밀값-변경-05)
 - [7. 설정값](#7-설정값)
@@ -859,6 +860,15 @@ createApp(db, undefined, { summonerSearch, laneGold, feedback })
 - 판당 최악 비용은 CLI 예상 비용과 같은 계산(1차 max_tokens 3,000 전부 + 재시도 입력 = 1차 입력 + 3,000 + 1,500, max_tokens 1,500)이고 세나 판 기준 약 **$0.216**이다. 기본 예산 $0.25에서는 장부 합이 약 $0.034를 넘으면 다음 LLM 분석부터 429 `budget`이 된다(공개 운영 전 상한을 올려야 함).
 - 로그: 분석 1건 = `[feedback] 분석 …` 1줄(`cache=hit|template_hit|shared|miss`, `outcome`, Data Dragon `championDataSource=ddragon|snapshot` 포함).
 
+### 5-10. 매치 상세 지표 (변경 06)
+
+> 요약: 매치를 펼쳤을 때 10명 상세 표와 팀 요약을 보여 주려고, 이미 받는 match-v5 상세에서 값을 더 꺼내 2-5 응답에 **더하기만** 한다. Riot 추가 호출·캐시·다른 응답은 그대로 (사용자 승인 2026-11-03).
+
+- `participants.team[]`/`enemy[]`에 추가: `isMe`(검색한 소환사만 true), `teamPosition`, `champLevel`, `kills`, `deaths`, `assists`, `killParticipation`(`killParticipationPercent` 재사용), `damageTaken`(`totalDamageTaken`), `goldEarned`, `cs`(라인+정글), `visionScore`, `wardsPlaced`, `wardsKilled`, `controlWardsPlaced`(`detectorWardsPlaced`), `items`(6칸), `trinket`, `summonerSpells`(2), `keystone`, `subStyle`(`perks.styles[1].style`, 없으면 null). 기존 필드는 그대로.
+- 매치에 `teams: { team, enemy }` 추가. `TeamSummary` = `win`, `kills`(참가자 킬 합), `gold`(`goldEarned` 합), `towers`, `inhibitors`, `dragons`, `barons`, `heralds`(`riftHerald`), `grubs`(`horde`), `bans`(championId, -1 제외). `info.teams[].objectives`에서 읽고 값이 없으면 0.
+- 구현: `src/api/dto.ts` `sideDto`·`teamSummary`, `src/riot/types.ts` 선택 필드. 테스트 `test/unit/matchDetail.test.ts`.
+- 응답 크기(fixture 2판을 번갈아 20판, `matches` 부분, 압축 전): 약 29 KB → 약 102 KB (판당 1.5 KB → 5.1 KB). `no-store` 그대로.
+
 ---
 
 ## 6. 오류 처리와 로깅
@@ -1364,8 +1374,9 @@ createApp(db, undefined, { summonerSearch, laneGold, feedback })
 | F20 | 잘못된 환경 변수 값은 분석 기능 전체를 끈다, `FEEDBACK_DAILY_LIMIT=0`은 템플릿 `llm_off` | 보수적으로 끄고 서버는 켠다(W9). 0은 의도적인 설정이라 오류가 아니라 LLM 끔으로 본다 (Build) | 2026-11-03 |
 | F21 | `keyMoments`는 0~3개 | 설계(feedback_design 2-1 최대 3개)와 실제 엔진·LLM 결과(세나 판 3개)에 맞춤. 계획 초안의 "0~2개"를 고침 (메인 에이전트 확인) | 2026-11-03 |
 | X7 | 요청 로그의 `puuid` 쿼리 값을 앞 8자로 줄인다 | lane-gold는 puuid가 쿼리에 있어 기존 요청 로그가 전체 puuid를 남긴다. 로그 규칙(puuid 앞 8자)을 지킨다 (Build가 보탠 결정) | 2026-10-30 |
+| G1 | 매치 상세 지표는 2-5에 필드를 더하는 방식(새 엔드포인트·Riot 추가 호출 없음), 다른 참가자는 `isMe`로만 구분 | 이미 받는 match-v5 상세에 값이 다 있다. 펼침 때 다시 부르지 않아 화면이 바로 열린다. 대가로 응답이 약 3.5배(29→102 KB, 압축 전) (변경 06, 사용자 승인) | 2026-11-03 |
 
-- D 번호는 계획의 결정 항목, B는 Build가 정하고 Review가 받아들인 것, U는 변경 01의 사용자 결정, R은 Review 추천을 사용자가 고른 것, V는 변경 02에서 사용자가 승인한 결정(02-9)이다. W는 변경 03(전적 검색)에서 사용자가 승인한 추천안(결정 S1~S8, Build가 보탠 W9)이다. X는 변경 04(킬관여·라인전)에서 사용자가 승인한 추천값(X1~X6)과 Build가 보탠 X7이다. F는 변경 05(게임 피드백 분석)의 사용자 결정(F1~F7: 5-9-0, F8~F18: 계획과 사용자 결정 질문 11개 승인)과 Build가 보탠 F19~F21이다.
+- D 번호는 계획의 결정 항목, B는 Build가 정하고 Review가 받아들인 것, U는 변경 01의 사용자 결정, R은 Review 추천을 사용자가 고른 것, V는 변경 02에서 사용자가 승인한 결정(02-9)이다. W는 변경 03(전적 검색)에서 사용자가 승인한 추천안(결정 S1~S8, Build가 보탠 W9)이다. X는 변경 04(킬관여·라인전)에서 사용자가 승인한 추천값(X1~X6)과 Build가 보탠 X7이다. F는 변경 05(게임 피드백 분석)의 사용자 결정(F1~F7: 5-9-0, F8~F18: 계획과 사용자 결정 질문 11개 승인)과 Build가 보탠 F19~F21이다. G는 변경 06(매치 상세 지표)이다.
 
 ---
 

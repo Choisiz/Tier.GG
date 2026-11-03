@@ -13,7 +13,7 @@ import {
   getRuneTrees,
   getSummonerSpells,
 } from "@/lib/ddragon/api";
-import { toKeystoneMap, toSummonerPageView } from "@/lib/view/summoner";
+import { toKeystoneMap, toRuneTreeMap, toSummonerPageView } from "@/lib/view/summoner";
 
 // 전적 검색은 통계 화면과 달리 요청마다 그 자리에서 Riot 값을 받아온다 (window 없음, D36)
 export const dynamic = "force-dynamic";
@@ -86,6 +86,12 @@ export default async function SummonerPage({ params }: Props) {
       if (itemId !== 0) itemIds.add(itemId);
     }
     if (match.trinket !== 0) itemIds.add(match.trinket);
+    // 상세 기록 탭(변경 11)은 10명 아이템을 모두 그린다
+    for (const p of [...match.participants.team, ...match.participants.enemy]) {
+      for (const itemId of [...p.items, p.trinket]) {
+        if (itemId !== 0) itemIds.add(itemId);
+      }
+    }
   }
 
   const [version, champions, items, spells, runeTrees] = await Promise.all([
@@ -101,6 +107,7 @@ export default async function SummonerPage({ params }: Props) {
     items,
     spells,
     keystones: toKeystoneMap(runeTrees),
+    runeTrees: toRuneTreeMap(runeTrees),
   });
 
   return (
