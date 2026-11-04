@@ -16,7 +16,7 @@
 | 프론트엔드 | Next.js, TypeScript, Tailwind CSS |
 | 백엔드     | Node.js, Express                  |
 | DB         | Supabase                          |
-| AI         | 미정                              |
+| AI         | Claude(Anthropic API), Voyage AI 임베딩, Supabase pgvector |
 
 - 새로운 기술이나 의존성을 도입할 때는 목적과 이유를 설명한다.
 

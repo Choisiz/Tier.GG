@@ -1,11 +1,20 @@
 // 프롬프트 (ai_spec 2-5): 고정 시스템 프롬프트(캐시) + 판마다 바뀌는 사용자 메시지 + 재시도 메시지.
 // 시스템 프롬프트에는 날짜·ID처럼 바뀌는 값을 넣지 않는다 (캐시가 깨진다).
 // 시스템 프롬프트·스키마·facts 표기 규칙을 바꾸면 PROMPT_VERSION을 올린다.
+// 버전은 RAG 여부로 둘이다 (B4): 조각이 없는 요청(RAG 꺼짐·검색 0개)은 Q1과 바이트까지 같은 요청이라 PROMPT_VERSION_NO_RAG를 쓰고,
+// 조각이 있는 요청만 PROMPT_VERSION을 쓴다. 녹화본 파일 이름·장부 보정·API 캐시 키는 promptVersionFor()로 고른 값을 쓴다.
 import { isReversed, type FactSheet } from './facts.js';
 import { allowedUnitWords, AREA_LABEL, SUBJECT_LABEL } from './labels.js';
 import type { VerifyFailure } from './verify.js';
 
-export const PROMPT_VERSION = '2026-11-04.1';
+/** RAG 조각이 붙는 요청의 버전 (B4) */
+export const PROMPT_VERSION = '2026-11-04.2';
+/** 조각 없는 요청의 버전. Q1(2026-11-04.1)과 같은 시스템 프롬프트·스키마·사용자 메시지라 기존 녹화본이 그대로 재생된다 */
+export const PROMPT_VERSION_NO_RAG = '2026-11-04.1';
+
+export function promptVersionFor(withKnowledge: boolean): string {
+  return withKnowledge ? PROMPT_VERSION : PROMPT_VERSION_NO_RAG;
+}
 
 export const SYSTEM_PROMPT = `너는 리그 오브 레전드 한 판의 분석 결과를 한국어 피드백 문장으로 옮기는 작성자다.
 판정(좋은 점과 부족한 점, 영역별 판정, 결정적 장면)은 분석 코드가 이미 정했다. 너는 판정을 바꾸지 않고, 주어진 숫자만으로 플레이어가 읽기 쉬운 문장을 쓴다.
@@ -62,6 +71,34 @@ facts 일부:
 - "1킬 5데스로 밀렸습니다." (5 = 상대 팀 킬) → 팀 킬을 데스로 썼다. "우리 팀 1킬, 상대 팀 5킬"로 쓴다
 - "교전 점수 25점으로 D 등급입니다." → 점수·등급을 썼다
 `;
+
+/** 시스템 프롬프트 뒤에 붙는 RAG 규칙 (조각이 있을 때만). 앞부분(SYSTEM_PROMPT)은 바꾸지 않는다 */
+export const KNOWLEDGE_RULES = `
+## 참고 지식 (knowledge)
+사용자 메시지의 JSON 뒤에 <knowledge> 블록이 붙는다. 블록의 <chunk id="...">는 이 유형·과목의 결과를 해석하는 관점 조각이다.
+13. 조각은 해석과 다음 판 조언의 근거로만 쓴다. 숫자·시각·횟수는 여전히 facts에서만 쓴다(조각에는 숫자가 없다). 조각 문장을 그대로 옮기지 말고, 이 판의 칸에 맞는 내용만 골라 짧게 녹인다.
+14. 조각의 해석도 데이터가 직접 말하지 않으면 추정이다. 단정하지 말고 규칙 5를 따른다. 칸의 방향(good/bad)이나 그 판의 facts와 맞지 않는 조각은 쓰지 않는다.
+15. 출력 맨 위 chunkUse에 조각을 반영한 칸마다 {"slot":"칸 이름","chunkIds":["조각 id"]}를 하나씩 적는다. <knowledge>에 있는 id만 쓰고, 조각을 반영하지 않은 칸은 적지 않는다(아무 칸에도 안 썼으면 빈 배열).
+16. 조언을 넣어도 칸 길이(1~2문장, 120자 안)와 요약 길이 규칙은 같다. 조언은 "다음 판에는 ~해 볼 수 있습니다"처럼 부드럽게 쓴다.
+`;
+
+export const SYSTEM_PROMPT_RAG = SYSTEM_PROMPT + KNOWLEDGE_RULES;
+
+export function systemPromptFor(withKnowledge: boolean): string {
+  return withKnowledge ? SYSTEM_PROMPT_RAG : SYSTEM_PROMPT;
+}
+
+/** 프롬프트에 넣는 조각 (id + 소제목·본문) */
+export interface KnowledgeChunkInput {
+  id: string;
+  content: string;
+}
+
+/** <knowledge> 블록. 조각이 없으면 빈 문자열 */
+export function buildKnowledgeBlock(chunks: readonly KnowledgeChunkInput[]): string {
+  if (chunks.length === 0) return '';
+  return `<knowledge>\n${chunks.map((c) => `<chunk id="${c.id}">\n${c.content}\n</chunk>`).join('\n')}\n</knowledge>`;
+}
 
 export interface UserPayload {
   player: Record<string, unknown>;
@@ -121,12 +158,14 @@ export function buildUserPayload(sheet: FactSheet): UserPayload {
   };
 }
 
-export function buildUserMessage(sheet: FactSheet): string {
-  return JSON.stringify(buildUserPayload(sheet));
+/** 사용자 메시지. 조각이 없으면 Q1과 같은 JSON 한 덩어리, 있으면 JSON 뒤에 빈 줄 + <knowledge> 블록 */
+export function buildUserMessage(sheet: FactSheet, knowledge: readonly KnowledgeChunkInput[] | null = null): string {
+  const json = JSON.stringify(buildUserPayload(sheet));
+  return knowledge && knowledge.length > 0 ? `${json}\n\n${buildKnowledgeBlock(knowledge)}` : json;
 }
 
 /** 재시도 메시지: 실패한 칸, 이유, 그 칸에서 쓸 수 있는 값 */
-export function buildRetryMessage(sheet: FactSheet, failures: readonly VerifyFailure[]): string {
+export function buildRetryMessage(sheet: FactSheet, failures: readonly VerifyFailure[], withKnowledge = false): string {
   const bySlot = new Map<string, string[]>();
   for (const f of failures) bySlot.set(f.slot, [...(bySlot.get(f.slot) ?? []), `[${f.rule}] ${f.detail}`]);
   const lines = [...bySlot].map(([slot, reasons]) => {
@@ -139,5 +178,5 @@ export function buildRetryMessage(sheet: FactSheet, failures: readonly VerifyFai
   });
   return `아래 칸의 문장이 검사를 통과하지 못했다. 이 칸들만 이유에 맞게 고쳐 다시 써라. 다른 칸은 쓰지 않는다. 규칙은 처음과 같다.
 ${lines.join('\n')}
-출력: {"fixes":[{"slot":"칸 이름","text":"고친 문장","factIds":["..."]}]}`;
+출력: {"fixes":[{"slot":"칸 이름","text":"고친 문장","factIds":["..."]${withKnowledge ? ',"chunkIds":["..."]' : ''}}]}`;
 }

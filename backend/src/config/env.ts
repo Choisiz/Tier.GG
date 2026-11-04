@@ -74,6 +74,10 @@ export interface FeedbackEnv {
   effort: 'low' | 'medium' | 'high';
   dailyLimit: number;
   budgetUsd: number;
+  /** FEEDBACK_RAG_ENABLED (B4). 기본 false */
+  ragEnabled: boolean;
+  /** VOYAGE_API_KEY (RAG 질의 임베딩). 없으면 null. 로그에는 "있음/없음"만 */
+  voyageKey: string | null;
   /** 잘못된 값 설명 (변수 이름만, 값 없음). 1개 이상이면 enabled=false */
   problems: string[];
 }
@@ -121,5 +125,7 @@ export function loadFeedbackEnv(env: Record<string, string | undefined> = proces
   if (effortRaw === 'low' || effortRaw === 'medium' || effortRaw === 'high') effort = effortRaw;
   else problems.push('FEEDBACK_LLM_EFFORT는 low, medium, high 중 하나여야 합니다.');
   const apiKey = get('ANTHROPIC_API_KEY') ?? null;
-  return { enabled: enabled && problems.length === 0, llmEnabled, apiKey, model, effort, dailyLimit, budgetUsd, problems };
+  const ragEnabled = bool('FEEDBACK_RAG_ENABLED', defaults.ragEnabled);
+  const voyageKey = get('VOYAGE_API_KEY') ?? null;
+  return { enabled: enabled && problems.length === 0, llmEnabled, apiKey, model, effort, dailyLimit, budgetUsd, ragEnabled, voyageKey, problems };
 }

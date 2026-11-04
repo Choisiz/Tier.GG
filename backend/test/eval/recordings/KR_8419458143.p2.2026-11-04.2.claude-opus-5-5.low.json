@@ -1,0 +1,72 @@
+{
+  "matchId": "KR_8419458143",
+  "participantId": 2,
+  "engineVersion": "2026-11-02.2",
+  "promptVersion": "2026-11-04.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-04T14:21:50.470Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "6c13dc66713414771f4e14912bbf19660e580f277740055830cd22256bcf0701",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"라인전은 렉사이에게 밀렸고, 오브젝트 싸움과 그 밖의 운영도 부족했습니다. 8.2분 싸움에서 우리 팀 2킬, 상대 팀 3킬로 골드 격차가 795 벌어졌습니다.\",\"factIds\":[\"laning.opponent\",\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\"]},\"sections\":{\"laning\":{\"good\":[],\"bad\":[{\"subjectId\":\"laning.gold\",\"text\":\"15분 골드가 4,244로 상대 렉사이보다 1,512 적었고, 그 전에 3번 데스가 있었습니다. 다음 판에는 데스를 줄여 골드 손해를 막아 볼 수 있습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.gold.me\",\"laning.opponent\",\"laning.gold.diffAbs\",\"laning.deathsBefore.count\"]},{\"subjectId\":\"laning.level\",\"text\":\"15분 레벨이 8레벨로 상대 렉사이의 10레벨보다 2레벨 낮았습니다. 데스 뒤 경험치를 받지 못한 시간이 영향을 준 것으로 보입니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.level.me\",\"laning.opponent\",\"laning.level.enemy\",\"laning.level.diffAbs\"]}]},\"fight\":{\"good\":[],\"bad\":[{\"subjectId\":\"fight.objective\",\"text\":\"오브젝트 막타가 0번이었습니다. 다음 판에는 오브젝트가 나오는 시간을 기준으로 캠프 순서를 거꾸로 짜 볼 수 있습니다.\",\"factIds\":[\"fight.objective.lastHits\"]},{\"subjectId\":\"fight.advantage\",\"text\":\"낀 오브젝트 싸움 2번에서 득실 중 우리 팀 몫이 15.4%로 낮았습니다. 다음 판에는 오브젝트 전에 아군과 함께 움직여 볼 수 있습니다.\",\"factIds\":[\"fight.advantage.fights\",\"fight.advantage.sharePct\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.vision\",\"text\":\"오브젝트 싸움 밖에서 시야 점수 11, 분당 0.72를 쌓았습니다. 다음 판에도 와드를 오브젝트 길목에 이어 가 볼 수 있습니다.\",\"factIds\":[\"macro.vision.points\",\"macro.vision.perMinute\"]}],\"bad\":[{\"subjectId\":\"macro.advantage\",\"text\":\"낀 오브젝트 밖 싸움 1번에서 우리 팀 몫이 0%였습니다. 다음 판에는 상대 정글 위치를 확인하고 아군 가까이 움직여 볼 수 있습니다.\",\"factIds\":[\"macro.advantage.fights\",\"macro.advantage.sharePct\"]},{\"subjectId\":\"macro.side\",\"text\":\"포탑 피해량이 0이었습니다. 다음 판에는 싸움에서 이긴 뒤 가까운 포탑부터 쳐 볼 수 있습니다.\",\"factIds\":[\"macro.side.turretDamage\"]}]}},\"keyMoments\":[{\"index\":0,\"text\":\"8.2분 싸움에서 우리 팀 2킬, 상대 팀 3킬로 골드 격차가 1,421에서 2,216으로 795 벌어졌고, 상대 팀이 공허 유충을 잡았습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.goldGapBeforeAbs\",\"keyMoment.0.goldGapAfterAbs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]}],\"chunkUse\":[{\"slot\":\"laning.bad.0\",\"chunkIds\":[\"laning.gold.ALL.bad.01\"]},{\"slot\":\"laning.bad.1\",\"chunkIds\":[\"laning.level.ALL.bad.01\"]},{\"slot\":\"fight.bad.0\",\"chunkIds\":[\"fight.objective.JUNGLE_DAMAGE.bad.01\"]},{\"slot\":\"fight.bad.1\",\"chunkIds\":[\"fight.advantage.ALL.bad.01\"]},{\"slot\":\"macro.good.0\",\"chunkIds\":[\"macro.vision.ALL.good.01\"]},{\"slot\":\"macro.bad.0\",\"chunkIds\":[\"macro.advantage.ALL.bad.01\"]},{\"slot\":\"macro.bad.1\",\"chunkIds\":[\"macro.side.ALL.bad.01\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 5590,
+          "cacheWrite": 0,
+          "cacheRead": 5898,
+          "output": 1640
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 13710
+    }
+  ],
+  "knowledge": {
+    "version": "d8a341175b64",
+    "chunks": [
+      {
+        "id": "fight.objective.JUNGLE_DAMAGE.bad.01",
+        "content": "딜정글의 오브젝트 막타가 적을 때\n딜정글의 오브젝트 막타가 적으면 오브젝트 시간에 갱킹이나 파밍으로 다른 곳에 있었을 수 있다. 상대 정글이 오브젝트를 가져갔다면 그 시간대의 동선이 겹치지 않았을 가능성이 있다. 다음 판에는 오브젝트가 나오는 시간을 기준으로 거꾸로 캠프 순서를 짜 볼 수 있다."
+      },
+      {
+        "id": "fight.advantage.ALL.bad.01",
+        "content": "오브젝트 싸움 득실이 낮을 때\n내가 낀 오브젝트 싸움에서 우리 팀 몫이 낮으면, 싸움이 열리기 전부터 숫자나 위치에서 밀렸을 가능성이 있다. 오브젝트가 나오기 전에 라인을 정리하고 먼저 자리를 잡는 팀이 싸움을 유리하게 시작하는 경우가 많다. 다음 판에는 오브젝트가 나오기 조금 전에 아군과 함께 움직이는 것을 먼저 해 볼 수 있다."
+      },
+      {
+        "id": "macro.advantage.ALL.bad.01",
+        "content": "오브젝트 밖 싸움에서 팀이 밀렸을 때\n오브젝트 밖 싸움에서 내가 낀 싸움의 우리 팀 몫이 낮으면, 시야가 없는 곳에서 숫자가 맞지 않는 싸움에 휘말렸을 수 있다. 오브젝트가 없는 시간의 손해는 다음 오브젝트 싸움을 불리하게 시작하게 만든다. 다음 판에는 움직이기 전에 상대 정글의 마지막 위치를 확인하고, 아군과 가까운 쪽으로 움직여 볼 수 있다."
+      },
+      {
+        "id": "macro.side.ALL.bad.01",
+        "content": "사이드 압박이 낮을 때\n포탑 피해가 포지션 기대보다 낮으면 라인을 밀어 포탑을 칠 시간이 적었을 수 있다. 싸움이 끝난 뒤 바로 귀환하거나 정글에 머물면 포탑을 칠 기회를 놓치기 쉽다. 다음 판에는 싸움에서 이긴 뒤 가까운 포탑부터 먼저 쳐 볼 수 있다."
+      },
+      {
+        "id": "macro.vision.ALL.good.01",
+        "content": "평소 시야가 좋았을 때\n오브젝트 시간 밖의 시야 점수가 포지션 기대보다 높았다면, 지도에 정보를 꾸준히 깔아 팀이 안전하게 움직이도록 도운 것일 수 있다. 시야는 눈에 덜 띄지만 판 내내 쌓이는 기여다. 다음 판에도 와드를 둔 자리가 다음 오브젝트로 가는 길목이 되도록 이어 가 볼 수 있다."
+      },
+      {
+        "id": "laning.gold.ALL.bad.01",
+        "content": "라인전 골드가 뒤졌을 때\n라인전 골드가 상대 라이너보다 적으면 CS를 놓쳤거나 데스로 골드를 내준 경우가 많을 수 있다. 데스가 함께 있었다면 골드 차이의 큰 몫은 데스에서 왔을 가능성이 있다. 다음 판에는 상대 정글이 보이지 않을 때 라인을 깊게 밀지 않고, 미니언 막타를 우선으로 챙겨 볼 수 있다."
+      },
+      {
+        "id": "laning.level.ALL.bad.01",
+        "content": "라인전 레벨이 뒤졌을 때\n레벨이 상대 라이너보다 낮으면 경험치를 받지 못한 시간이 길었다는 뜻일 수 있다. 데스 뒤 다시 라인에 오는 동안이나, 라인을 비우고 돌아다닌 동안 경험치가 빠졌을 가능성이 있다. 다음 판에는 라인을 비울 때 미니언 웨이브가 상대 포탑에 닿은 뒤 움직여 경험치 손해를 줄여 볼 수 있다."
+      },
+      {
+        "id": "fight.objective.ALL.bad.01",
+        "content": "오브젝트 막타가 적을 때\n오브젝트 막타가 적으면 오브젝트가 나올 때 다른 곳에 있었거나, 상대에게 오브젝트를 내줬을 수 있다. 오브젝트를 시작하기 전에 근처 라인이 밀려 있지 않으면 아군이 도와주러 오기 어렵다. 다음 판에는 오브젝트가 나오는 시간을 미리 확인하고 그 전에 근처 라인을 정리해 볼 수 있다."
+      }
+    ]
+  }
+}

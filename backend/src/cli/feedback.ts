@@ -1,11 +1,13 @@
 // 개발용 명령 (ai_spec 2-8): 로컬 파일로 LLM 문장 피드백을 만든다.
 // 기본은 미리보기(예상 비용만 출력, 네트워크·키·클라이언트 없음). --yes일 때만 유료 호출. --replay는 녹화본으로 0원 실행.
+// --rag(B4): DB·Voyage로 판마다 RAG 조각을 찾아 함께 준다(미리보기도 검색은 함, Voyage 무료 범위). 녹화본에 조각을 저장해 --replay --rag는 검색 없이 0원 재현.
+// --rag 없이는 RAG 전(Q1)과 같은 요청이다.
 // 키 값은 출력하지 않는다("있음/없음"만). process.env는 이 파일에서만 읽는다.
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { allChampionNames, championNamesFromJson, createFeedbackFromResult, type FeedbackResult } from '../analysis/feedback.js';
+import { allChampionNames, championNamesFromJson, createFeedbackFromResult, type FeedbackResult, type KnowledgeInput } from '../analysis/feedback.js';
 import { AnalysisError, analyzeMatch, championTagsFromJson } from '../analysis/index.js';
 import { createAnthropicClient, type LlmClient, type LlmEffort } from '../analysis/llm/client.js';
 import { ReplayLlmClient, type RecordedCall, type Recording } from '../analysis/llm/fakeClient.js';
@@ -13,7 +15,12 @@ import { buildFacts, type FactSheet } from '../analysis/llm/facts.js';
 import { MAX_TOKENS } from '../analysis/llm/generate.js';
 import { calibration, fileLedger, memoryLedger, type Ledger } from '../analysis/llm/ledger.js';
 import { estimateTokens, priceOf, worstCallCost } from '../analysis/llm/pricing.js';
-import { buildUserMessage, PROMPT_VERSION, SYSTEM_PROMPT } from '../analysis/llm/prompt.js';
+import { buildUserMessage, promptVersionFor, PROMPT_VERSION_NO_RAG, SYSTEM_PROMPT, systemPromptFor, type KnowledgeChunkInput } from '../analysis/llm/prompt.js';
+import { knowledgeVersion, loadKnowledgeDir } from '../analysis/rag/chunks.js';
+import { pgSearch, retrieveKnowledge, type RetrieveOutcome } from '../analysis/rag/retrieve.js';
+import { createVoyageEmbed } from '../analysis/rag/voyage.js';
+import pg from 'pg';
+import { RAG_DEFAULTS } from './rag.js';
 import { verifySlot } from '../analysis/llm/verify.js';
 import type { AnalysisMatch, AnalysisResult, AnalysisTimeline } from '../analysis/types.js';
 
@@ -39,18 +46,28 @@ const USAGE = `사용법:
   npm run feedback -- --set test/eval/set5         # 세트 미리보기
   npm run feedback -- --set test/eval/set5 --yes   # 세트 실행 (판마다 예산 검사)
   npm run feedback -- ... --replay <녹화본 파일|폴더>   # 녹화본으로 0원 재검증
+  npm run feedback -- --set test/eval/set5 --rag [--yes | --replay <폴더>]   # RAG 조각을 함께 (검색: DB + Voyage)
 옵션: --effort low|medium|high, --show-prompt, --compact, --tags <파일>, --ledger <파일>, --out <폴더>, --recordings <폴더>
-환경 변수: ANTHROPIC_API_KEY(--yes만), FEEDBACK_LLM_MODEL, FEEDBACK_LLM_EFFORT, FEEDBACK_BUDGET_USD`;
+환경 변수: ANTHROPIC_API_KEY(--yes만), FEEDBACK_LLM_MODEL, FEEDBACK_LLM_EFFORT, FEEDBACK_BUDGET_USD, DATABASE_URL·VOYAGE_API_KEY(--rag, --replay 제외)`;
 
 export interface CliIo {
   log: (s: string) => void;
   error: (s: string) => void;
 }
 
+/** --rag 검색기 (DB 연결 + Voyage). 다 쓰면 close */
+export interface CliRag {
+  retrieve: (result: AnalysisResult) => Promise<RetrieveOutcome>;
+  knowledgeVersion: string;
+  close: () => Promise<void>;
+}
+
 export interface CliDeps {
   /** --yes일 때만 부른다. 테스트에서 바꿔 끼워 "미리보기는 클라이언트를 만들지 않음"을 확인한다 */
   clientFactory: (apiKey: string) => LlmClient;
   now: () => number;
+  /** --rag일 때만 부른다 (--replay --rag는 녹화본의 조각을 쓰고 부르지 않는다). 키·접속 문자열 검사도 여기서 */
+  ragFactory?: (env: NodeJS.ProcessEnv) => Promise<CliRag>;
 }
 
 interface Job {
@@ -87,8 +104,9 @@ function loadSet(dir: string): Job[] {
   }));
 }
 
-function recordingBase(matchId: string, pid: number, model: string, effort: string): string {
-  return `${matchId}.p${pid}.${PROMPT_VERSION}.${model}.${effort}`;
+/** 녹화본 이름. 버전은 그 판 요청의 프롬프트 버전(조각이 있으면 .2, 없으면 .1) */
+function recordingBase(matchId: string, pid: number, model: string, effort: string, promptVersion: string): string {
+  return `${matchId}.p${pid}.${promptVersion}.${model}.${effort}`;
 }
 
 function findRecording(replay: string, base: string): string | null {
@@ -117,11 +135,16 @@ export interface Estimate {
   calibrationSamples: number;
 }
 
-/** 첫 호출 예상 비용(재시도 없음 가정)과 판당 최악 비용(1차 max_tokens 전부 + 재시도 최악) */
-export function estimateCost(sheet: FactSheet, model: string, ledger: Ledger): Estimate {
-  const cal = calibration(ledger.entries(), model, PROMPT_VERSION);
-  const user = buildUserMessage(sheet);
-  const systemTokens = estimateTokens(SYSTEM_PROMPT, cal.inputFactor);
+/**
+ * 첫 호출 예상 비용(재시도 없음 가정)과 판당 최악 비용(1차 max_tokens 전부 + 재시도 최악).
+ * 조각이 있으면 RAG 프롬프트로 어림한다. RAG 버전 실측이 아직 없으면 RAG 전 버전의 보정 계수·평균 출력을 빌려 쓴다.
+ */
+export function estimateCost(sheet: FactSheet, model: string, ledger: Ledger, knowledge: readonly KnowledgeChunkInput[] | null = null): Estimate {
+  const withKnowledge = knowledge !== null && knowledge.length > 0;
+  let cal = calibration(ledger.entries(), model, promptVersionFor(withKnowledge));
+  if (withKnowledge && cal.samples === 0) cal = calibration(ledger.entries(), model, PROMPT_VERSION_NO_RAG);
+  const user = buildUserMessage(sheet, knowledge);
+  const systemTokens = estimateTokens(systemPromptFor(withKnowledge), cal.inputFactor);
   const userTokens = estimateTokens(JSON.stringify([{ role: 'user', content: user }]), cal.inputFactor);
   const inputTokens = systemTokens + userTokens;
   const p = priceOf(model);
@@ -212,6 +235,7 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv, io: CliIo, 
         set: { type: 'string' },
         yes: { type: 'boolean', default: false },
         replay: { type: 'string' },
+        rag: { type: 'boolean', default: false },
         effort: { type: 'string' },
         'show-prompt': { type: 'boolean', default: false },
         compact: { type: 'boolean', default: false },
@@ -305,13 +329,44 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv, io: CliIo, 
     }
   }
 
+  // ---------- RAG 조각 (--rag, 녹화본 재생이 아닐 때만 검색) ----------
+  const knowledgeOf = new Map<AnalysisResult, KnowledgeInput | null>();
+  if (values.rag && !values.replay) {
+    if (!deps.ragFactory) {
+      io.error('--rag 검색기를 만들 수 없음');
+      return 1;
+    }
+    let rag: CliRag;
+    try {
+      rag = await deps.ragFactory(env);
+    } catch (e) {
+      io.error(`--rag 준비 실패: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
+      return 1;
+    }
+    try {
+      io.log(`RAG knowledgeVersion ${rag.knowledgeVersion}`);
+      for (const { result } of prepared) {
+        const out = await rag.retrieve(result);
+        knowledgeOf.set(result, out.chunks.length > 0 ? { version: rag.knowledgeVersion, chunks: out.chunks.map((c) => ({ id: c.id, content: c.content })) } : null);
+        io.log(
+          `- RAG ${result.matchId} p${result.player.participantId}: 과목 ${out.queries}개 → 조각 ${out.chunks.length}개 (ALL로 넓힘 ${out.picks.filter((p) => p.widened).length}과목)${out.notes.length ? ` · ${out.notes.join(' / ')}` : ''}`,
+        );
+      }
+    } finally {
+      await rag.close();
+    }
+  }
+  const chunksOf = (r: AnalysisResult) => knowledgeOf.get(r)?.chunks ?? null;
+
   // ---------- 미리보기 (항상 출력) ----------
   const spent = ledger.totalUsd();
-  io.log(`모델 ${model} · effort ${effort} · PROMPT_VERSION ${PROMPT_VERSION} · max_tokens 1차 ${MAX_TOKENS.first} / 재시도 ${MAX_TOKENS.retry}`);
+  io.log(
+    `모델 ${model} · effort ${effort} · PROMPT_VERSION ${values.rag ? `${promptVersionFor(true)} (조각 없는 판은 ${PROMPT_VERSION_NO_RAG})` : PROMPT_VERSION_NO_RAG} · max_tokens 1차 ${MAX_TOKENS.first} / 재시도 ${MAX_TOKENS.retry}`,
+  );
   let sumExp = 0;
   let sumWorst = 0;
   for (const { result, sheet } of prepared) {
-    const est = estimateCost(sheet, model, ledger);
+    const est = estimateCost(sheet, model, ledger, chunksOf(result));
     sumExp += est.expectedUsd;
     sumWorst += est.worstUsd;
     io.log(
@@ -321,11 +376,11 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv, io: CliIo, 
   io.log(`합계 ${prepared.length}판: 예상 ${usd(sumExp)}, 최악 ${usd(sumWorst)}`);
   io.log(`장부 ${basename(ledgerPath)}: 누적 ${usd(spent)} / 상한 $${budgetUsd.toFixed(2)} → 남은 예산 ${usd(Math.max(0, budgetUsd - spent))}`);
   if (values['show-prompt']) {
-    io.log('\n===== 시스템 프롬프트 =====\n' + SYSTEM_PROMPT);
-    for (const { sheet } of prepared) io.log(`\n===== 사용자 메시지 ${sheet.matchId} p${sheet.participantId} =====\n${buildUserMessage(sheet)}`);
+    io.log('\n===== 시스템 프롬프트 =====\n' + (values.rag ? systemPromptFor(true) : SYSTEM_PROMPT));
+    for (const { sheet, result } of prepared) io.log(`\n===== 사용자 메시지 ${sheet.matchId} p${sheet.participantId} =====\n${buildUserMessage(sheet, chunksOf(result))}`);
   }
   if (!values.yes && !values.replay) {
-    io.log('\n미리보기만 했습니다 (네트워크 호출 없음). 실제 호출은 --yes, 녹화본 재검증은 --replay.');
+    io.log(`\n미리보기만 했습니다 (${values.rag ? 'LLM 호출 없음, RAG 검색만' : '네트워크 호출 없음'}). 실제 호출은 --yes, 녹화본 재검증은 --replay.`);
     return 0;
   }
 
@@ -338,7 +393,7 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv, io: CliIo, 
       io.error('키가 없어 실제 호출을 하지 않습니다.');
       return 1;
     }
-    if (spent + (prepared.length > 0 ? estimateCost(prepared[0]!.sheet, model, ledger).worstUsd : 0) > budgetUsd) {
+    if (spent + (prepared.length > 0 ? estimateCost(prepared[0]!.sheet, model, ledger, chunksOf(prepared[0]!.result)).worstUsd : 0) > budgetUsd) {
       io.error(`예산 초과: 누적 ${usd(spent)} + 첫 판 최악 > $${budgetUsd.toFixed(2)}. 호출하지 않습니다.`);
       return 3;
     }
@@ -349,7 +404,8 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv, io: CliIo, 
   let exit = 0;
   for (const { job, result, sheet } of prepared) {
     const pid = result.player.participantId;
-    const base = recordingBase(result.matchId, pid, model, effort);
+    let knowledge = knowledgeOf.get(result) ?? null;
+    let base = recordingBase(result.matchId, pid, model, effort, promptVersionFor(knowledge !== null));
     const calls: RecordedCall[] = [];
     let client: LlmClient;
     let runLedger: Ledger = ledger;
@@ -357,13 +413,20 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv, io: CliIo, 
     let recPath: string | null = null;
     let replay: ReplayLlmClient | null = null;
     if (values.replay) {
-      const file = findRecording(resolve(values.replay), base);
+      // --rag 재생: RAG 버전 녹화본을 먼저 찾고(조각은 녹화본에서), 없으면 조각 없이 만든 판(.1)
+      const ragBase = recordingBase(result.matchId, pid, model, effort, promptVersionFor(true));
+      const file = (values.rag ? findRecording(resolve(values.replay), ragBase) : null) ?? findRecording(resolve(values.replay), base);
       if (!file) {
-        io.error(`녹화본 없음: ${base}`);
+        io.error(`녹화본 없음: ${values.rag ? `${ragBase} 또는 ` : ''}${base}`);
         exit = 1;
         continue;
       }
-      replay = new ReplayLlmClient(readJson(file) as Recording);
+      const rec = readJson(file) as Recording;
+      if (values.rag && rec.knowledge) {
+        knowledge = rec.knowledge;
+        base = ragBase;
+      }
+      replay = new ReplayLlmClient(rec);
       client = replay;
       runLedger = memoryLedger();
       runBudget = Number.POSITIVE_INFINITY;
@@ -381,21 +444,22 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv, io: CliIo, 
       ledger: runLedger,
       championNames,
       now: deps.now,
-      inputFactor: calibration(ledger.entries(), model, PROMPT_VERSION).inputFactor,
+      inputFactor: estimateCost(sheet, model, ledger, knowledge?.chunks ?? null).inputFactor,
       onCall: (c) => calls.push(c),
       recordingName: recPath ? basename(recPath) : null,
     });
-    const { feedback } = await run(result);
+    const { feedback } = await run(result, knowledge);
     if (values.yes && calls.length > 0) {
       const rec: Recording = {
         matchId: result.matchId,
         participantId: pid,
         engineVersion: result.engineVersion,
-        promptVersion: PROMPT_VERSION,
+        promptVersion: feedback.meta.promptVersion,
         model,
         effort,
         recordedAt: new Date(deps.now()).toISOString(),
         calls,
+        ...(knowledge ? { knowledge: { version: knowledge.version, chunks: knowledge.chunks.map((c) => ({ id: c.id, content: c.content })) } } : {}),
       };
       writeFileSync(recPath!, `${JSON.stringify(rec, null, 2)}\n`);
     }
@@ -434,7 +498,7 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv, io: CliIo, 
   if (results.length > 0) {
     mkdirSync(outDir, { recursive: true });
     const stamp = new Date(deps.now()).toISOString().replace(/[:.]/g, '-');
-    const label = `${values.replay ? 'replay' : 'live'}.${values.set ? basename(resolve(values.set)) : results[0]!.matchId}.${model}.${effort}`;
+    const label = `${values.replay ? 'replay' : 'live'}.${values.set ? basename(resolve(values.set)) : results[0]!.matchId}.${model}.${effort}${values.rag ? '.rag' : ''}`;
     const outPath = join(outDir, `${stamp}.${label}.json`);
     const totals = results.reduce(
       (a, r) => {
@@ -453,7 +517,7 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv, io: CliIo, 
       },
       { slots: 0, firstPass: 0, numberFirstPass: 0, retried: 0, templated: 0, templateMode: 0, costUsd: 0, finalNumber: 0, finalDirection: 0, finalForbidden: 0 },
     );
-    writeFileSync(outPath, `${JSON.stringify({ label, promptVersion: PROMPT_VERSION, model, effort, totals, results }, null, 2)}\n`);
+    writeFileSync(outPath, `${JSON.stringify({ label, promptVersion: values.rag ? promptVersionFor(true) : PROMPT_VERSION_NO_RAG, model, effort, totals, results }, null, 2)}\n`);
     io.log(`\n결과: ${outPath}`);
     io.log(
       `합계: 칸 ${totals.slots} · 1차 통과 ${totals.firstPass} · 숫자 1차 통과 ${totals.numberFirstPass} · 재시도 ${totals.retried} · 템플릿 ${totals.templated} · 전체 템플릿 판 ${totals.templateMode} · 최종 숫자 ${totals.finalNumber}·방향 ${totals.finalDirection}·금지어 ${totals.finalForbidden} · 비용 ${usd(totals.costUsd)}`,
@@ -468,11 +532,26 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv, io: CliIo, 
   return exit;
 }
 
+/** --rag 기본 검색기: 지식 문서로 knowledgeVersion, DB 연결 1개 + Voyage 질의 임베딩. 키·접속 문자열은 출력하지 않는다 */
+async function createCliRag(env: NodeJS.ProcessEnv): Promise<CliRag> {
+  const url = env.DATABASE_URL?.trim();
+  const key = env.VOYAGE_API_KEY?.trim();
+  console.log(`VOYAGE_API_KEY: ${key ? '있음' : '없음'} · DATABASE_URL: ${url ? '있음' : '없음'}`);
+  if (!url || !key) throw new Error('DATABASE_URL과 VOYAGE_API_KEY가 필요합니다');
+  const parsed = loadKnowledgeDir(RAG_DEFAULTS.dir);
+  if (parsed.errors.length > 0) throw new Error(`지식 문서 오류 ${parsed.errors.length}건 (npm run rag -- ingest --offline)`);
+  // 과목별 검색을 동시에 보내므로 연결 1개(Client)가 아니라 작은 풀
+  const pool = new pg.Pool({ connectionString: url, max: 2, application_name: 'tiergg-feedback-cli', connectionTimeoutMillis: 10_000 });
+  const deps = { embed: createVoyageEmbed({ apiKey: key, rateRetries: 4 }), search: pgSearch({ query: (text, values) => pool.query(text, values) }) };
+  return { retrieve: (r) => retrieveKnowledge(r, deps), knowledgeVersion: knowledgeVersion(parsed.chunks), close: () => pool.end() };
+}
+
 const isMain = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   runCli(process.argv.slice(2), process.env, { log: (s) => console.log(s), error: (s) => console.error(s) }, {
     clientFactory: (apiKey) => createAnthropicClient({ apiKey }),
     now: () => Date.now(),
+    ragFactory: createCliRag,
   }).then(
     (code) => {
       process.exitCode = code;

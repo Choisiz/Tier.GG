@@ -24,6 +24,8 @@ export interface Recording {
   effort: string;
   recordedAt: string;
   calls: RecordedCall[];
+  /** RAG 조각을 준 판만 (B4): 그때 준 조각. --replay --rag가 검색 없이 같은 요청을 다시 만든다 */
+  knowledge?: { version: string; chunks: { id: string; content: string }[] };
 }
 
 export function requestHash(req: LlmRequest): string {

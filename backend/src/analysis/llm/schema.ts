@@ -65,14 +65,68 @@ export const RETRY_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+// ---------- RAG 스키마 (B4) ----------
+// 조각이 없는 요청은 위 FIRST_SCHEMA·RETRY_SCHEMA를 그대로 써서 Q1과 같은 요청이 된다.
+// 첫 답은 칸마다 chunkIds를 넣지 않고 맨 위 chunkUse 하나([{slot, chunkIds}])로 받는다:
+// 칸 객체 8곳에 칸을 더했더니 API가 "compiled grammar is too large"(400)로 거절했다 (Build B 실측 2026-11-04).
+
+const chunkIdsField = factIds;
+
+const chunkUse = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: { slot: { type: 'string' }, chunkIds: chunkIdsField },
+    required: ['slot', 'chunkIds'],
+    additionalProperties: false,
+  },
+} as const;
+
+export const FIRST_SCHEMA_RAG = {
+  ...FIRST_SCHEMA,
+  properties: { ...FIRST_SCHEMA.properties, chunkUse },
+  required: [...FIRST_SCHEMA.required, 'chunkUse'],
+};
+
+/** 재시도 fix는 한 곳뿐이라 chunkIds를 바로 둔다 */
+export const RETRY_SCHEMA_RAG = {
+  ...RETRY_SCHEMA,
+  properties: {
+    fixes: {
+      type: 'array',
+      items: {
+        ...RETRY_SCHEMA.properties.fixes.items,
+        properties: { ...RETRY_SCHEMA.properties.fixes.items.properties, chunkIds: chunkIdsField },
+        required: [...RETRY_SCHEMA.properties.fixes.items.required, 'chunkIds'],
+      },
+    },
+  },
+};
+
+export function firstSchemaFor(withKnowledge: boolean): Record<string, unknown> {
+  return (withKnowledge ? FIRST_SCHEMA_RAG : FIRST_SCHEMA) as unknown as Record<string, unknown>;
+}
+
+export function retrySchemaFor(withKnowledge: boolean): Record<string, unknown> {
+  return (withKnowledge ? RETRY_SCHEMA_RAG : RETRY_SCHEMA) as unknown as Record<string, unknown>;
+}
+
 // ---------- 모양 검사 (스키마를 코드로 한 번 더) ----------
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isStrArr = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
 
+/** chunkIds: 없으면 undefined(RAG 꺼짐), 있으면 문자열 배열이어야 한다. 잘못된 모양이면 false */
+function chunkIdsOf(v: Record<string, unknown>): { chunkIds?: string[] } | false {
+  if (!('chunkIds' in v)) return {};
+  return isStrArr(v.chunkIds) ? { chunkIds: v.chunkIds } : false;
+}
+
 function asItem(v: unknown): LlmItem | null {
   if (!isObj(v) || typeof v.subjectId !== 'string' || typeof v.text !== 'string' || !isStrArr(v.factIds)) return null;
-  return { subjectId: v.subjectId, text: v.text, factIds: v.factIds };
+  const c = chunkIdsOf(v);
+  if (c === false) return null;
+  return { subjectId: v.subjectId, text: v.text, factIds: v.factIds, ...c };
 }
 
 function asItems(v: unknown): LlmItem[] | null {
@@ -92,6 +146,8 @@ export function parseFirstAnswer(text: string): FirstAnswer | null {
   if (!isObj(v) || !isObj(v.summary) || !isObj(v.sections) || !Array.isArray(v.keyMoments)) return null;
   const s = v.summary;
   if (typeof s.text !== 'string' || !isStrArr(s.factIds)) return null;
+  const sc = chunkIdsOf(s);
+  if (sc === false) return null;
   const sections = {} as FirstAnswer['sections'];
   for (const area of ['laning', 'fight', 'macro'] as const) {
     const a = v.sections[area];
@@ -106,9 +162,20 @@ export function parseFirstAnswer(text: string): FirstAnswer | null {
     if (!isObj(k) || typeof k.index !== 'number' || !Number.isInteger(k.index) || typeof k.text !== 'string' || !isStrArr(k.factIds)) {
       return null;
     }
-    keyMoments.push({ index: k.index, text: k.text, factIds: k.factIds });
+    const kc = chunkIdsOf(k);
+    if (kc === false) return null;
+    keyMoments.push({ index: k.index, text: k.text, factIds: k.factIds, ...kc });
   }
-  return { summary: { text: s.text, factIds: s.factIds }, sections, keyMoments };
+  let use: FirstAnswer['chunkUse'];
+  if ('chunkUse' in v) {
+    if (!Array.isArray(v.chunkUse)) return null;
+    use = [];
+    for (const u of v.chunkUse) {
+      if (!isObj(u) || typeof u.slot !== 'string' || !isStrArr(u.chunkIds)) return null;
+      use.push({ slot: u.slot, chunkIds: u.chunkIds });
+    }
+  }
+  return { summary: { text: s.text, factIds: s.factIds, ...sc }, sections, keyMoments, ...(use ? { chunkUse: use } : {}) };
 }
 
 /** JSON 문자열 → 재시도 답. 모양이 틀리면 null */
@@ -123,7 +190,9 @@ export function parseRetryAnswer(text: string): RetryAnswer | null {
   const fixes: RetryAnswer['fixes'] = [];
   for (const f of v.fixes) {
     if (!isObj(f) || typeof f.slot !== 'string' || typeof f.text !== 'string' || !isStrArr(f.factIds)) return null;
-    fixes.push({ slot: f.slot, text: f.text, factIds: f.factIds });
+    const fc = chunkIdsOf(f);
+    if (fc === false) return null;
+    fixes.push({ slot: f.slot, text: f.text, factIds: f.factIds, ...fc });
   }
   return { fixes };
 }

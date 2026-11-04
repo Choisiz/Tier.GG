@@ -77,9 +77,10 @@ describe('엔진 import 검사', () => {
   it('analysis/는 riot·db·repositories·api·collector와 네트워크·파일·환경 변수를 쓰지 않음', () => {
     const dir = fileURLToPath(new URL('../../../src/analysis/', import.meta.url));
     // 2단계(2026-11-03): LLM 문장 단계(llm/**, feedback.ts)는 엔진 밖이라 이 검사에서 뺀다. 그쪽 경계는 llm/misc.test.ts "import 경계"
+    // 4단계(B4): RAG(rag/**)도 엔진 밖이다. 그쪽 경계는 rag/rag.test.ts "import 경계"
     const files = readdirSync(dir, { recursive: true })
       .map(String)
-      .filter((f) => f.endsWith('.ts') && !f.startsWith('llm/') && f !== 'feedback.ts');
+      .filter((f) => f.endsWith('.ts') && !f.startsWith('llm/') && !f.startsWith('rag/') && f !== 'feedback.ts');
     assert.ok(files.length >= 10);
     for (const f of files) {
       const src = readFileSync(`${dir}${f}`, 'utf8');

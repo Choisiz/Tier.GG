@@ -1,0 +1,72 @@
+{
+  "matchId": "KR_8437852704",
+  "participantId": 5,
+  "engineVersion": "2026-11-02.2",
+  "promptVersion": "2026-11-04.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-04T14:21:10.137Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "db5e1650eace62aaaeabff06b0f8562f43aca63b484c59dacd42abf46226c562",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"라인전은 애쉬에게 밀렸고, 오브젝트 싸움과 그 밖의 운영도 부족했습니다. 15.1분 싸움에서 우리 팀 1킬, 상대 팀 4킬로 골드 격차가 약 3,900 벌어졌습니다.\",\"factIds\":[\"laning.opponent\",\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\"]},\"sections\":{\"laning\":{\"good\":[],\"bad\":[{\"subjectId\":\"laning.gold\",\"text\":\"15분 골드가 3,958로 상대 애쉬보다 703 적었습니다. 2.5분, 8.5분 데스가 골드 손해로 이어진 것으로 보입니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.gold.me\",\"laning.opponent\",\"laning.gold.diffAbs\",\"laning.deathsBefore.0.min\",\"laning.deathsBefore.1.min\"]},{\"subjectId\":\"laning.kda\",\"text\":\"15분까지 0킬 2데스 3어시스트로, 상대 애쉬보다 킬과 어시스트를 더하고 데스를 뺀 값이 4 낮았습니다. 다음 판에는 아군 포탑 쪽에 서 볼 수 있습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.kda.me.kills\",\"laning.kda.me.deaths\",\"laning.kda.me.assists\",\"laning.opponent\",\"laning.kda.diffAbs\"]}]},\"fight\":{\"good\":[],\"bad\":[{\"subjectId\":\"fight.vision\",\"text\":\"오브젝트 4개 전 시야 점수 합이 2로, 오브젝트당 0.5에 그쳤습니다. 다음 판에는 앞라인과 함께 제어 와드를 두어 볼 수 있습니다.\",\"factIds\":[\"fight.vision.objectives\",\"fight.vision.points\",\"fight.vision.perObjective\"]},{\"subjectId\":\"fight.advantage\",\"text\":\"낀 오브젝트 싸움 2번에서 우리 팀 몫이 4.5%로 낮았습니다. 다음 판에는 오브젝트 전에 아군과 먼저 움직여 볼 수 있습니다.\",\"factIds\":[\"fight.advantage.fights\",\"fight.advantage.sharePct\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.side\",\"text\":\"포탑 피해량 2,017, 분당 87.4로 상대 포탑을 꾸준히 압박한 것으로 보입니다.\",\"factIds\":[\"macro.side.turretDamage\",\"macro.side.perMinute\"]}],\"bad\":[{\"subjectId\":\"macro.vision\",\"text\":\"오브젝트 싸움 밖 시야 점수 합이 21, 분당 0.91로 낮았습니다. 다음 판에는 귀환마다 제어 와드를 사 볼 수 있습니다.\",\"factIds\":[\"macro.vision.points\",\"macro.vision.perMinute\"]},{\"subjectId\":\"macro.advantage\",\"text\":\"낀 오브젝트 밖 싸움 5번에서 우리 팀 몫이 25.4%로 낮았습니다. 다음 판에는 상대 정글 위치를 먼저 확인해 볼 수 있습니다.\",\"factIds\":[\"macro.advantage.fights\",\"macro.advantage.sharePct\"]}]}},\"keyMoments\":[{\"index\":0,\"text\":\"15.1분 싸움에서 우리 팀 1킬, 상대 팀 4킬로 골드 격차가 약 3,900 벌어졌고, 우리 바텀 1차 포탑을 잃었습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},{\"index\":1,\"text\":\"16.7분 싸움에서 우리 팀 0킬, 상대 팀 3킬로 격차가 약 3,900 벌어졌고, 상대 팀이 전령을 잡았습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.gapChangeAbs\",\"keyMoment.1.followUp.1\"]},{\"index\":2,\"text\":\"22.2분 싸움에서 우리 팀 4킬, 상대 팀 4킬로 격차가 465 좁혀졌지만, 우리 미드 억제기를 잃었습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.killsTheirs\",\"keyMoment.2.gapChangeAbs\",\"keyMoment.2.followUp.1\"]}],\"chunkUse\":[{\"slot\":\"laning.bad.0\",\"chunkIds\":[\"laning.gold.ALL.bad.01\"]},{\"slot\":\"laning.bad.1\",\"chunkIds\":[\"laning.kda.ALL.bad.01\"]},{\"slot\":\"fight.bad.0\",\"chunkIds\":[\"fight.vision.SUPPORT_DAMAGE.bad.01\"]},{\"slot\":\"fight.bad.1\",\"chunkIds\":[\"fight.advantage.ALL.bad.01\"]},{\"slot\":\"macro.good.0\",\"chunkIds\":[\"macro.side.ALL.good.01\"]},{\"slot\":\"macro.bad.0\",\"chunkIds\":[\"macro.vision.SUPPORT_DAMAGE.bad.01\"]},{\"slot\":\"macro.bad.1\",\"chunkIds\":[\"macro.advantage.ALL.bad.01\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 8684,
+          "cacheWrite": 5898,
+          "cacheRead": 0,
+          "output": 1971
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 19436
+    }
+  ],
+  "knowledge": {
+    "version": "d8a341175b64",
+    "chunks": [
+      {
+        "id": "fight.vision.SUPPORT_DAMAGE.bad.01",
+        "content": "딜서폿의 오브젝트 전 시야가 낮을 때\n딜서폿의 오브젝트 직전 시야 행동이 적으면 싸움이 열릴 자리의 정보가 부족했을 수 있다. 딜서폿은 몸이 약해 시야 없이 앞으로 나가면 먼저 잡히기 쉽다. 다음 판에는 오브젝트가 나오기 조금 전에 아군 앞라인과 함께 들어가 제어 와드를 두어 볼 수 있다."
+      },
+      {
+        "id": "fight.advantage.ALL.bad.01",
+        "content": "오브젝트 싸움 득실이 낮을 때\n내가 낀 오브젝트 싸움에서 우리 팀 몫이 낮으면, 싸움이 열리기 전부터 숫자나 위치에서 밀렸을 가능성이 있다. 오브젝트가 나오기 전에 라인을 정리하고 먼저 자리를 잡는 팀이 싸움을 유리하게 시작하는 경우가 많다. 다음 판에는 오브젝트가 나오기 조금 전에 아군과 함께 움직이는 것을 먼저 해 볼 수 있다."
+      },
+      {
+        "id": "macro.vision.SUPPORT_DAMAGE.bad.01",
+        "content": "딜서폿의 평소 시야가 낮을 때\n딜서폿의 평소 시야가 낮으면 딜에 집중하느라 와드 관리가 뒤로 밀렸을 수 있다. 딜서폿도 서폿이라 팀 시야의 큰 몫을 맡는다. 다음 판에는 귀환할 때마다 제어 와드를 사고, 와드 충전이 차면 바로 쓰는 습관을 들여 볼 수 있다."
+      },
+      {
+        "id": "macro.advantage.ALL.bad.01",
+        "content": "오브젝트 밖 싸움에서 팀이 밀렸을 때\n오브젝트 밖 싸움에서 내가 낀 싸움의 우리 팀 몫이 낮으면, 시야가 없는 곳에서 숫자가 맞지 않는 싸움에 휘말렸을 수 있다. 오브젝트가 없는 시간의 손해는 다음 오브젝트 싸움을 불리하게 시작하게 만든다. 다음 판에는 움직이기 전에 상대 정글의 마지막 위치를 확인하고, 아군과 가까운 쪽으로 움직여 볼 수 있다."
+      },
+      {
+        "id": "macro.side.ALL.good.01",
+        "content": "사이드 압박이 좋았을 때\n포탑 피해가 포지션 기대보다 높았다면 라인을 밀며 상대 포탑을 꾸준히 압박한 것일 수 있다. 포탑 압박은 상대를 막으러 오게 만들어 다른 곳에서 우리 팀이 편해지게 한다. 다음 판에도 압박하는 동안 상대가 지도에서 사라지면 한 걸음 물러서는 습관을 함께 가져가 볼 수 있다."
+      },
+      {
+        "id": "laning.gold.ALL.bad.01",
+        "content": "라인전 골드가 뒤졌을 때\n라인전 골드가 상대 라이너보다 적으면 CS를 놓쳤거나 데스로 골드를 내준 경우가 많을 수 있다. 데스가 함께 있었다면 골드 차이의 큰 몫은 데스에서 왔을 가능성이 있다. 다음 판에는 상대 정글이 보이지 않을 때 라인을 깊게 밀지 않고, 미니언 막타를 우선으로 챙겨 볼 수 있다."
+      },
+      {
+        "id": "laning.kda.ALL.bad.01",
+        "content": "라인전에서 데스가 많았을 때\n라인전 킬보다 데스가 많으면 라인전의 다른 손해도 대부분 여기서 시작됐을 수 있다. 데스는 골드와 경험치를 함께 잃게 하고 상대 라이너를 키운다. 다음 판에는 상대 정글 위치를 모를 때 라인 가운데보다 아군 포탑 쪽에 서서 싸움을 받는 쪽을 먼저 연습해 볼 수 있다."
+      },
+      {
+        "id": "fight.vision.ALL.bad.01",
+        "content": "오브젝트 전 시야가 낮을 때\n오브젝트 직전 시야 행동이 적으면 팀이 싸움이 열릴 자리를 모른 채 들어갔을 수 있다. 오브젝트 주변 정보가 없으면 상대가 숨어 있는 곳으로 먼저 걸어 들어가기 쉽다. 다음 판에는 오브젝트가 나오기 조금 전에 제어 와드를 하나 들고 근처 길목에 두어 볼 수 있다."
+      }
+    ]
+  }
+}

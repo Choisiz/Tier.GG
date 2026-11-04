@@ -31,8 +31,12 @@ export const FEEDBACK_BREAKER_MS = 10 * 60 * 1000;
 export const FEEDBACK_DEFAULT_INPUT_FACTOR = 1.64;
 /** 재시도 메시지 어림 토큰 (CLI 예상 비용 계산과 같은 값) */
 export const FEEDBACK_RETRY_MSG_TOKENS = 1500;
-/** 응답 meta.knowledgeVersion 자리 (RAG 전). 캐시 키에는 "none"으로 들어간다 */
+/** RAG 꺼짐(FEEDBACK_RAG_ENABLED=false)일 때 meta.knowledgeVersion. 캐시 키에는 "none"으로 들어간다 */
 export const FEEDBACK_KNOWLEDGE_VERSION: string | null = null;
+/** RAG 조각 검색(Voyage 질의 임베딩 + DB) 상한. 넘거나 실패하면 RAG 없이 진행하고 로그만 남긴다 (ai_spec B4-4) */
+export const FEEDBACK_RAG_TIMEOUT_MS = 3_000;
+/** RAG 지식 문서 폴더 (git 관리). 서버 시작 때 읽어 knowledgeVersion을 만든다. DB 적재는 npm run rag -- ingest --yes */
+export const FEEDBACK_KNOWLEDGE_DIR = fileURLToPath(new URL('../../../docs/ai/knowledge/', import.meta.url));
 /** POST 본문 크기 상한 */
 export const FEEDBACK_BODY_LIMIT = '2kb';
 
@@ -47,6 +51,8 @@ export const FEEDBACK_ENV_DEFAULTS = {
   budgetUsd: 0.25,
   model: 'claude-opus-5-5',
   effort: 'low' as const,
+  /** RAG 조각을 LLM에 함께 줌 (B4). 꺼지면 RAG 전과 같은 요청·응답 */
+  ragEnabled: false,
 };
 
 // ───────── Data Dragon (05-5 B안) ─────────

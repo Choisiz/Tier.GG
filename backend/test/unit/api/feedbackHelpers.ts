@@ -6,7 +6,7 @@ import { LlmError, type LlmErrorKind } from '../../../src/analysis/llm/client.js
 import { memoryLedger, type Ledger } from '../../../src/analysis/llm/ledger.js';
 import { loadSnapshot, type ChampionDataProvider } from '../../../src/api/feedback/championData.js';
 import { createBreaker, createBudgetGuard, createDailyLimit, createSemaphore, type Semaphore } from '../../../src/api/feedback/limits.js';
-import { createFeedbackService, type FeedbackFn, type FeedbackRiot } from '../../../src/api/feedback/service.js';
+import { createFeedbackService, type FeedbackFn, type FeedbackRagConfig, type FeedbackRiot } from '../../../src/api/feedback/service.js';
 import { DDRAGON_SNAPSHOT_PATH } from '../../../src/config/feedback.js';
 import { silentLogger, type Logger } from '../../../src/lib/logger.js';
 import { RiotNotFoundError } from '../../../src/riot/errors.js';
@@ -71,6 +71,8 @@ export const notFound = () => new RiotNotFoundError('없음 (HTTP 404)', 404, '/
 /** 매번 같은 답(또는 오류)을 주는 가짜 LLM. gate가 있으면 풀릴 때까지 기다린다 */
 export class ScriptClient implements LlmClient {
   calls = 0;
+  /** 받은 요청 (RAG 테스트에서 시스템 프롬프트·메시지 확인용) */
+  readonly requests: LlmRequest[] = [];
   private gate: Promise<void> | null = null;
   private open: (() => void) | null = null;
   constructor(
@@ -85,6 +87,7 @@ export class ScriptClient implements LlmClient {
   }
   async create(req: LlmRequest): Promise<LlmResponse> {
     this.calls++;
+    this.requests.push(req);
     const n = this.calls;
     if (this.gate) await this.gate;
     const s = this.step(n);
@@ -135,6 +138,7 @@ export function harness(o: {
   semaphore?: Semaphore;
   deadlineMs?: number;
   startMs?: number;
+  rag?: FeedbackRagConfig | null;
 } = {}): Harness {
   const clock = { t: o.startMs ?? NOON_KST };
   const riot = o.riot ?? fakeRiot();
@@ -149,6 +153,7 @@ export function harness(o: {
   const feedback = createFeedbackService({
     riot,
     llm: { client, model: 'claude-opus-5-5', effort: 'low' },
+    rag: o.rag ?? null,
     ledger,
     champData: snapshotData(),
     daily: createDailyLimit(o.dailyLimit ?? 20, o.restored ?? 0, clock.t),

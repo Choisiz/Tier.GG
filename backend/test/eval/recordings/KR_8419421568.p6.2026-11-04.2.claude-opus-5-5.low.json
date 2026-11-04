@@ -1,0 +1,96 @@
+{
+  "matchId": "KR_8419421568",
+  "participantId": 6,
+  "engineVersion": "2026-11-02.2",
+  "promptVersion": "2026-11-04.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-04T14:21:36.749Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "7f5d4e314127ce16df57c6ef10d8b04e8621b7f34c2e320d2f88c2da095bb77b",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"크산테로 티모 상대 라인전은 우세했고, 오브젝트 싸움은 잘했으며, 그 밖의 운영은 보통이었습니다. 23.1분 싸움에서 우리 팀 5킬, 상대 팀 2킬로 골드 격차가 약 2,700 벌어졌습니다.\",\"factIds\":[\"player.champion\",\"laning.opponent\",\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.gapChangeAbs\"]},\"sections\":{\"laning\":{\"good\":[{\"subjectId\":\"laning.gold\",\"text\":\"15분 골드가 6,299로 상대 티모보다 1,823 많았습니다. 다음 판에도 이 차이를 주변 라인 지원으로 이어 가 볼 수 있습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.gold.me\",\"laning.opponent\",\"laning.gold.diffAbs\"]},{\"subjectId\":\"laning.level\",\"text\":\"15분 레벨이 12레벨로 상대 티모의 10레벨보다 2레벨 높았습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.level.me\",\"laning.opponent\",\"laning.level.enemy\",\"laning.level.diffAbs\"]}],\"bad\":[]},\"fight\":{\"good\":[{\"subjectId\":\"fight.advantage\",\"text\":\"낀 오브젝트 싸움 4번에서 득실 중 우리 팀 몫이 69.5%였습니다. 앞에서 버티며 아군이 싸울 시간을 만든 것으로 보입니다.\",\"factIds\":[\"fight.advantage.fights\",\"fight.advantage.sharePct\"]},{\"subjectId\":\"fight.damage\",\"text\":\"0~15분 챔피언 딜 비중이 26.1%로 기대 비중 18%보다 8.1%p 높았습니다.\",\"factIds\":[\"fight.damage.phase0StartMin\",\"fight.damage.phase0EndMin\",\"fight.damage.share0\",\"fight.damage.expected0\",\"fight.damage.diff0Abs\"]}],\"bad\":[]},\"macro\":{\"good\":[{\"subjectId\":\"macro.advantage\",\"text\":\"낀 오브젝트 밖 싸움 8번에서 득실 중 우리 팀 몫이 87.1%였습니다.\",\"factIds\":[\"macro.advantage.fights\",\"macro.advantage.sharePct\"]},{\"subjectId\":\"macro.solo\",\"text\":\"단독 킬은 2번, 단독 데스는 0번이었습니다. 다음 판에도 상대를 잡은 뒤 포탑으로 바로 이어 가 볼 수 있습니다.\",\"factIds\":[\"macro.solo.kills\",\"macro.solo.deaths\"]}],\"bad\":[{\"subjectId\":\"macro.side\",\"text\":\"분당 포탑 피해량이 125.8로 낮았습니다. 다음 판에는 오브젝트가 없는 시간에 사이드 라인을 먼저 밀어 볼 수 있습니다.\",\"factIds\":[\"macro.side.perMinute\"]},{\"subjectId\":\"macro.farm\",\"text\":\"15분 이후 분당 CS가 5.9개로 낮았습니다. 다음 판에는 싸움 뒤 가까운 사이드 라인부터 정리해 볼 수 있습니다.\",\"factIds\":[\"macro.farm.perMinute\"]}]}},\"keyMoments\":[{\"index\":0,\"text\":\"17.2분 싸움에서 우리 팀 6킬, 상대 팀 3킬로 골드 격차가 약 2,000 벌어졌고, 우리 팀이 용을 잡았습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.3\"]},{\"index\":1,\"text\":\"23.1분 싸움에서 우리 팀 5킬, 상대 팀 2킬로 골드 격차가 약 2,700 벌어졌고, 상대 탑 2차 포탑을 깼습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.gapChangeAbs\",\"keyMoment.1.followUp.0\"]},{\"index\":2,\"text\":\"26분 싸움에서 우리 팀 4킬, 상대 팀 1킬로 골드 격차가 2,990 벌어졌고, 상대 미드 억제기를 깼습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.killsTheirs\",\"keyMoment.2.gapChangeAbs\",\"keyMoment.2.followUp.0\"]}],\"chunkUse\":[{\"slot\":\"laning.good.0\",\"chunkIds\":[\"laning.gold.ALL.good.01\"]},{\"slot\":\"fight.good.0\",\"chunkIds\":[\"fight.advantage.TOP_TANK.good.01\"]},{\"slot\":\"macro.good.1\",\"chunkIds\":[\"macro.solo.ALL.good.01\"]},{\"slot\":\"macro.bad.0\",\"chunkIds\":[\"macro.side.TOP_TANK.bad.01\"]},{\"slot\":\"macro.bad.1\",\"chunkIds\":[\"macro.farm.TOP_TANK.bad.01\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 8850,
+          "cacheWrite": 0,
+          "cacheRead": 5898,
+          "output": 1868
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 21070
+    },
+    {
+      "attempt": 2,
+      "kind": "retry",
+      "requestHash": "478cdfbb52bb7810e22eea32e1a1ebcd15330b2fa33e425c58c5ac474e29fa4c",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"fixes\":[{\"slot\":\"summary\",\"text\":\"크산테로 티모 상대 라인전은 우세했고, 오브젝트 싸움은 잘했으며, 그 밖의 운영은 보통이었습니다. 17.2분 싸움에서 우리 팀 6킬, 상대 팀 3킬로 골드 격차가 약 2,000 벌어졌습니다.\",\"factIds\":[\"player.champion\",\"laning.opponent\",\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\"],\"chunkIds\":[]},{\"slot\":\"macro.bad.1\",\"text\":\"게임 끝 CS가 165개였고, 마지막 12.8분 동안 분당 CS가 5.9개로 낮았습니다. 다음 판에는 싸움 뒤 가까운 사이드 라인부터 정리해 볼 수 있습니다.\",\"factIds\":[\"macro.farm.csEnd\",\"macro.farm.minutes\",\"macro.farm.perMinute\"],\"chunkIds\":[\"macro.farm.TOP_TANK.bad.01\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 11434,
+          "cacheWrite": 4379,
+          "cacheRead": 0,
+          "output": 400
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 5523
+    }
+  ],
+  "knowledge": {
+    "version": "d8a341175b64",
+    "chunks": [
+      {
+        "id": "fight.advantage.TOP_TANK.good.01",
+        "content": "탱탑이 낀 싸움에서 팀이 많이 얻었을 때\n탱탑이 낀 오브젝트 싸움에서 우리 팀 몫이 높았다면, 앞에서 상대 스킬을 받아 주며 아군 딜러가 싸울 시간을 만든 것일 수 있다. 탱탑은 딜이 높지 않아도 싸움 결과로 기여하는 유형이다. 다음 판에도 오브젝트 전에 사이드를 정리하고 합류하는 흐름을 유지해 볼 수 있다."
+      },
+      {
+        "id": "fight.damage.ALL.good.01",
+        "content": "교전 딜 비중이 기대보다 높을 때\n교전 딜 비중이 유형의 기대보다 높았다면 싸움에 오래 머물며 꾸준히 피해를 넣은 것일 수 있다. 살아남은 시간이 길수록 딜은 자연스럽게 쌓인다. 다음 판에도 싸움이 열릴 때 아군 가까이에서 닿는 상대부터 공격하는 위치를 유지해 볼 수 있다."
+      },
+      {
+        "id": "macro.side.TOP_TANK.bad.01",
+        "content": "탱탑의 사이드 압박이 낮을 때\n탱탑의 포탑 피해가 낮으면 사이드 라인을 밀어 둘 시간이 적었거나, 팀과 함께 몰려다닌 시간이 길었을 수 있다. 탱탑은 버티는 힘이 좋아 혼자 사이드를 밀어도 쉽게 잡히지 않는 편이다. 다음 판에는 오브젝트가 없는 시간에 사이드 라인을 먼저 밀어 상대를 끌어당겨 볼 수 있다."
+      },
+      {
+        "id": "macro.farm.TOP_TANK.bad.01",
+        "content": "탱탑의 중후반 파밍이 낮을 때\n중후반 분당 CS가 낮으면 사이드 라인을 비워 둔 채 팀 싸움 주변을 오래 맴돌았을 수 있다. 탱탑은 방어 아이템이 갖춰질수록 앞에서 버티는 힘이 커지므로 꾸준한 CS가 중요하다. 다음 판에는 싸움이 끝난 뒤 가까운 사이드 라인부터 정리하는 습관을 들여 볼 수 있다."
+      },
+      {
+        "id": "macro.advantage.ALL.good.01",
+        "content": "오브젝트 밖 싸움에서 팀이 앞섰을 때\n오브젝트 밖 싸움에서 내가 낀 싸움의 우리 팀 몫이 높았다면, 숫자가 맞는 싸움을 골라 들어간 것일 수 있다. 이런 작은 이득이 쌓이면 다음 오브젝트를 편하게 가져갈 수 있다. 다음 판에도 이득을 본 뒤에는 가까운 포탑이나 오브젝트로 바로 이어 가 볼 수 있다."
+      },
+      {
+        "id": "macro.solo.ALL.good.01",
+        "content": "혼자 싸운 결과가 좋았을 때\n오브젝트 싸움 밖에서 혼자 이긴 싸움이 잡힌 횟수보다 많았다면, 상대를 잡을 수 있는 순간을 잘 고른 것일 수 있다. 상대 한 명이 빠진 시간은 팀이 숫자 우위로 움직일 수 있는 시간이다. 다음 판에도 상대를 잡은 뒤에는 그 시간을 포탑이나 오브젝트로 바로 이어 가 볼 수 있다."
+      },
+      {
+        "id": "laning.gold.ALL.good.01",
+        "content": "라인전 골드가 앞섰을 때\n라인전 골드가 앞섰다면 라인에서 손해 없이 자원을 챙겼다는 뜻일 수 있다. 이 차이는 첫 귀환 아이템을 먼저 맞추는 데서 힘이 된다. 다음 판에도 앞선 골드를 오브젝트 싸움이나 주변 라인 지원으로 이어 가 격차를 팀 전체 이득으로 넓혀 볼 수 있다."
+      },
+      {
+        "id": "laning.level.ALL.good.01",
+        "content": "라인전 레벨이 앞섰을 때\n레벨이 앞섰다면 라인을 오래 지키며 경험치를 꾸준히 받았다는 뜻일 수 있다. 레벨이 앞서는 순간은 스킬 하나가 더 강해지는 때라 싸움을 걸기 좋은 타이밍이 될 수 있다. 다음 판에도 레벨이 먼저 오르는 순간을 기억해 두고 그때 상대에게 압박을 넣어 볼 수 있다."
+      }
+    ]
+  }
+}

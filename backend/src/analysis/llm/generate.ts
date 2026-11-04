@@ -1,12 +1,13 @@
 // 1차 호출 → 검증 → 재시도 1회(고칠 칸만) → 그래도 틀린 칸은 템플릿 (ai_spec 2-0, 2-3, 2-6).
+// RAG 조각(deps.knowledge)이 있으면 시스템 프롬프트 뒤 규칙·<knowledge> 블록·chunkIds 스키마를 쓰고, 없으면 Q1과 같은 요청이다 (B4).
 import { LlmError, type LlmClient, type LlmEffort, type LlmMessage, type LlmRequest, type LlmResponse } from './client.js';
 import type { RecordedCall } from './fakeClient.js';
 import { requestHash } from './fakeClient.js';
 import type { FactSheet } from './facts.js';
 import { assertBudget, BudgetExceededError, type Ledger, type LedgerEntry } from './ledger.js';
 import { addUsage, costUsd, estimateTokens, worstCallCost, ZERO_USAGE, type TokenUsage } from './pricing.js';
-import { buildRetryMessage, buildUserMessage, PROMPT_VERSION, SYSTEM_PROMPT } from './prompt.js';
-import { FIRST_SCHEMA, parseFirstAnswer, parseRetryAnswer, RETRY_SCHEMA } from './schema.js';
+import { buildRetryMessage, buildUserMessage, promptVersionFor, systemPromptFor, type KnowledgeChunkInput } from './prompt.js';
+import { firstSchemaFor, parseFirstAnswer, parseRetryAnswer, retrySchemaFor } from './schema.js';
 import { templateFor } from './template.js';
 import { checkFirstAnswer, checkRetryAnswer, type SlotText, type VerifyContext, type VerifyFailure } from './verify.js';
 
@@ -51,6 +52,8 @@ export interface GenerateDeps {
   onCall?: (call: RecordedCall) => void;
   /** 장부 항목의 recording 칸 */
   recordingName?: string | null;
+  /** RAG 조각 (B4). null·빈 배열이면 RAG 없이 (Q1과 같은 요청) */
+  knowledge?: readonly KnowledgeChunkInput[] | null;
 }
 
 export interface GenerateOutcome {
@@ -73,6 +76,10 @@ export interface GenerateOutcome {
   costUsd: number;
   durationMs: number;
   stopDetails: unknown;
+  /** 이 생성에 쓴 프롬프트 버전 (조각 유무로 다름) */
+  promptVersion: string;
+  /** 프롬프트에 준 조각 ID (RAG 없으면 빈 배열) */
+  knowledgeIds: string[];
 }
 
 type CallResult = { ok: true; res: LlmResponse } | { ok: false; reason: FallbackReason; error?: LlmError };
@@ -80,7 +87,11 @@ type CallResult = { ok: true; res: LlmResponse } | { ok: false; reason: Fallback
 export async function generateTexts(sheet: FactSheet, deps: GenerateDeps): Promise<GenerateOutcome> {
   const t0 = deps.now();
   const maxTokens = deps.maxTokens ?? MAX_TOKENS;
-  const vctx: VerifyContext = { sheet, allChampionNames: deps.allChampionNames };
+  const knowledge = deps.knowledge && deps.knowledge.length > 0 ? deps.knowledge : null;
+  const rag = knowledge !== null;
+  const promptVersion = promptVersionFor(rag);
+  const knowledgeIds = knowledge ? knowledge.map((c) => c.id) : [];
+  const vctx: VerifyContext = { sheet, allChampionNames: deps.allChampionNames, ...(rag ? { knowledgeIds: new Set(knowledgeIds) } : {}) };
   let usage = ZERO_USAGE;
   let cost = 0;
   let attempts = 0;
@@ -99,6 +110,8 @@ export async function generateTexts(sheet: FactSheet, deps: GenerateDeps): Promi
       costUsd: cost,
       durationMs: deps.now() - t0,
       stopDetails,
+      promptVersion,
+      knowledgeIds,
     };
   };
 
@@ -121,7 +134,7 @@ export async function generateTexts(sheet: FactSheet, deps: GenerateDeps): Promi
       participantId: sheet.participantId,
       model: req.model,
       effort: req.effort,
-      promptVersion: PROMPT_VERSION,
+      promptVersion,
       attempt,
       kind,
       estInputTokens: est,
@@ -152,13 +165,13 @@ export async function generateTexts(sheet: FactSheet, deps: GenerateDeps): Promi
     }
   };
 
-  const firstMessages: LlmMessage[] = [{ role: 'user', content: buildUserMessage(sheet) }];
+  const firstMessages: LlmMessage[] = [{ role: 'user', content: buildUserMessage(sheet, knowledge) }];
   const firstReq: LlmRequest = {
     model: deps.model,
     effort: deps.effort,
-    system: SYSTEM_PROMPT,
+    system: systemPromptFor(rag),
     messages: firstMessages,
-    schema: FIRST_SCHEMA as unknown as Record<string, unknown>,
+    schema: firstSchemaFor(rag),
     maxTokens: maxTokens.first,
   };
 
@@ -211,9 +224,9 @@ export async function generateTexts(sheet: FactSheet, deps: GenerateDeps): Promi
       messages: [
         ...firstMessages,
         { role: 'assistant', content: firstRes.content },
-        { role: 'user', content: buildRetryMessage(sheet, check.failures.filter((f) => failedSlots.includes(f.slot))) },
+        { role: 'user', content: buildRetryMessage(sheet, check.failures.filter((f) => failedSlots.includes(f.slot)), rag) },
       ],
-      schema: RETRY_SCHEMA as unknown as Record<string, unknown>,
+      schema: retrySchemaFor(rag),
       maxTokens: maxTokens.retry,
     };
     const retry = await call('retry', 2, retryReq);
@@ -241,5 +254,17 @@ export async function generateTexts(sheet: FactSheet, deps: GenerateDeps): Promi
   }
 
   const anyLlm = [...texts.values()].some((t) => t.source !== 'template');
-  return { mode: anyLlm ? 'llm' : 'template', fallbackReason: anyLlm ? null : 'verify', texts, attempts, verification, usage, costUsd: cost, durationMs: deps.now() - t0, stopDetails };
+  return {
+    mode: anyLlm ? 'llm' : 'template',
+    fallbackReason: anyLlm ? null : 'verify',
+    texts,
+    attempts,
+    verification,
+    usage,
+    costUsd: cost,
+    durationMs: deps.now() - t0,
+    stopDetails,
+    promptVersion,
+    knowledgeIds,
+  };
 }

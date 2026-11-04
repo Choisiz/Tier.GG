@@ -1,0 +1,72 @@
+{
+  "matchId": "KR_8419451137",
+  "participantId": 3,
+  "engineVersion": "2026-11-02.2",
+  "promptVersion": "2026-11-04.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-04T14:22:03.375Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "e00ebbd0d2c85e48c204462e0b0103ea033ebbf956b59634581cca0a8181b492",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"나서스로 라인전은 다이애나에게 우세했고, 오브젝트 싸움은 부족했으며, 그 밖의 운영은 잘했습니다. 16.2분 싸움에서 우리 팀 4킬, 상대 팀 0킬로 골드 격차가 약 4,000 벌어졌습니다.\",\"factIds\":[\"player.champion\",\"laning.opponent\",\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\"]},\"sections\":{\"laning\":{\"good\":[{\"subjectId\":\"laning.gold\",\"text\":\"15분 골드가 6,006으로 상대 다이애나보다 48 많았습니다. 다음 판에도 앞선 골드를 주변 라인 지원으로 이어 가 볼 수 있습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.gold.me\",\"laning.opponent\",\"laning.gold.diffAbs\"]},{\"subjectId\":\"laning.level\",\"text\":\"15분 레벨이 11레벨로 상대 다이애나의 9레벨보다 2레벨 높았습니다. 레벨이 먼저 오르는 순간에 압박을 넣어 볼 수 있습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.level.me\",\"laning.opponent\",\"laning.level.enemy\",\"laning.level.diffAbs\"]}],\"bad\":[]},\"fight\":{\"good\":[{\"subjectId\":\"fight.advantage\",\"text\":\"낀 오브젝트 싸움 4번에서 득실 중 우리 팀 몫이 78.1%로 높았습니다.\",\"factIds\":[\"fight.advantage.fights\",\"fight.advantage.sharePct\"]}],\"bad\":[{\"subjectId\":\"fight.damage\",\"text\":\"15분 이후 챔피언 딜 비중이 6.9%로 기대 비중 22%보다 15.1%p 낮았습니다. 다음 판에는 앞라인 뒤에서 가까운 상대에게 먼저 딜을 넣어 볼 수 있습니다.\",\"factIds\":[\"fight.damage.phase1StartMin\",\"fight.damage.share1\",\"fight.damage.expected1\",\"fight.damage.diff1Abs\"]},{\"subjectId\":\"fight.vision\",\"text\":\"오브젝트 3개 전 시야 점수 합이 1로 낮았습니다. 다음 판에는 오브젝트 전에 근처 길목에 제어 와드를 두어 볼 수 있습니다.\",\"factIds\":[\"fight.vision.objectives\",\"fight.vision.points\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.advantage\",\"text\":\"낀 오브젝트 밖 싸움 2번에서 득실 중 우리 팀 몫이 83.3%였습니다.\",\"factIds\":[\"macro.advantage.fights\",\"macro.advantage.sharePct\"]},{\"subjectId\":\"macro.side\",\"text\":\"포탑 피해량이 13,705, 분당 709.5로 상대 포탑을 꾸준히 압박했습니다.\",\"factIds\":[\"macro.side.turretDamage\",\"macro.side.perMinute\"]}],\"bad\":[]}},\"keyMoments\":[{\"index\":0,\"text\":\"16.2분 싸움에서 우리 팀 4킬, 상대 팀 0킬로 골드 격차가 약 4,000 벌어졌고, 이어 상대 미드 1차 포탑을 깼습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},{\"index\":1,\"text\":\"11.1분 싸움에서 우리 팀 6킬, 상대 팀 2킬로 골드 격차가 약 3,500 벌어졌습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.gapChangeAbs\"]},{\"index\":2,\"text\":\"14.2분 싸움에서 우리 팀 3킬, 상대 팀 3킬로 골드 격차가 약 1,700 좁혀졌고, 우리 탑 1차 포탑을 잃었습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.killsTheirs\",\"keyMoment.2.gapChangeAbs\",\"keyMoment.2.followUp.0\"]}],\"chunkUse\":[{\"slot\":\"laning.good.0\",\"chunkIds\":[\"laning.gold.ALL.good.01\"]},{\"slot\":\"laning.good.1\",\"chunkIds\":[\"laning.level.ALL.good.01\"]},{\"slot\":\"fight.bad.0\",\"chunkIds\":[\"fight.damage.MID_DAMAGE.bad.01\"]},{\"slot\":\"fight.bad.1\",\"chunkIds\":[\"fight.vision.ALL.bad.01\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 8161,
+          "cacheWrite": 0,
+          "cacheRead": 5898,
+          "output": 1735
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 12897
+    }
+  ],
+  "knowledge": {
+    "version": "d8a341175b64",
+    "chunks": [
+      {
+        "id": "fight.damage.MID_DAMAGE.bad.01",
+        "content": "딜미드의 교전 딜이 낮을 때\n딜미드의 딜 비중이 기대보다 낮으면 싸움이 시작될 때 먼저 잡혔거나, 사거리 밖에서 기회를 기다리다 싸움이 끝났을 수 있다. 데스가 먼저 나왔다면 딜이 낮은 이유는 위치 잡기에 있을 가능성이 크다. 다음 판에는 아군 앞라인 뒤에 서서 가장 가까운 상대에게 먼저 스킬을 넣어 볼 수 있다."
+      },
+      {
+        "id": "fight.vision.ALL.bad.01",
+        "content": "오브젝트 전 시야가 낮을 때\n오브젝트 직전 시야 행동이 적으면 팀이 싸움이 열릴 자리를 모른 채 들어갔을 수 있다. 오브젝트 주변 정보가 없으면 상대가 숨어 있는 곳으로 먼저 걸어 들어가기 쉽다. 다음 판에는 오브젝트가 나오기 조금 전에 제어 와드를 하나 들고 근처 길목에 두어 볼 수 있다."
+      },
+      {
+        "id": "fight.advantage.ALL.good.01",
+        "content": "오브젝트 싸움 득실이 높을 때\n내가 낀 오브젝트 싸움에서 우리 팀 몫이 높았다면, 싸움 전에 아군과 함께 먼저 자리를 잡은 것일 수 있다. 오브젝트 싸움의 이득은 다음 오브젝트와 포탑으로 이어지기 쉽다. 다음 판에도 오브젝트가 나오기 전에 라인을 정리하고 아군과 함께 움직이는 흐름을 이어 가 볼 수 있다."
+      },
+      {
+        "id": "macro.advantage.ALL.good.01",
+        "content": "오브젝트 밖 싸움에서 팀이 앞섰을 때\n오브젝트 밖 싸움에서 내가 낀 싸움의 우리 팀 몫이 높았다면, 숫자가 맞는 싸움을 골라 들어간 것일 수 있다. 이런 작은 이득이 쌓이면 다음 오브젝트를 편하게 가져갈 수 있다. 다음 판에도 이득을 본 뒤에는 가까운 포탑이나 오브젝트로 바로 이어 가 볼 수 있다."
+      },
+      {
+        "id": "macro.side.ALL.good.01",
+        "content": "사이드 압박이 좋았을 때\n포탑 피해가 포지션 기대보다 높았다면 라인을 밀며 상대 포탑을 꾸준히 압박한 것일 수 있다. 포탑 압박은 상대를 막으러 오게 만들어 다른 곳에서 우리 팀이 편해지게 한다. 다음 판에도 압박하는 동안 상대가 지도에서 사라지면 한 걸음 물러서는 습관을 함께 가져가 볼 수 있다."
+      },
+      {
+        "id": "laning.gold.ALL.good.01",
+        "content": "라인전 골드가 앞섰을 때\n라인전 골드가 앞섰다면 라인에서 손해 없이 자원을 챙겼다는 뜻일 수 있다. 이 차이는 첫 귀환 아이템을 먼저 맞추는 데서 힘이 된다. 다음 판에도 앞선 골드를 오브젝트 싸움이나 주변 라인 지원으로 이어 가 격차를 팀 전체 이득으로 넓혀 볼 수 있다."
+      },
+      {
+        "id": "laning.level.ALL.good.01",
+        "content": "라인전 레벨이 앞섰을 때\n레벨이 앞섰다면 라인을 오래 지키며 경험치를 꾸준히 받았다는 뜻일 수 있다. 레벨이 앞서는 순간은 스킬 하나가 더 강해지는 때라 싸움을 걸기 좋은 타이밍이 될 수 있다. 다음 판에도 레벨이 먼저 오르는 순간을 기억해 두고 그때 상대에게 압박을 넣어 볼 수 있다."
+      },
+      {
+        "id": "fight.damage.ALL.bad.01",
+        "content": "교전 딜 비중이 기대보다 낮을 때\n교전 딜 비중이 유형의 기대보다 낮으면 싸움에 늦게 들어갔거나, 싸움 초반에 먼저 쓰러졌을 수 있다. 데스가 먼저 나왔다면 딜보다 위치 잡기를 먼저 돌아보는 편이 맞다. 다음 판에는 오브젝트가 나오기 전에 미리 합류해 싸움 시작부터 함께 있어 볼 수 있다."
+      }
+    ]
+  }
+}

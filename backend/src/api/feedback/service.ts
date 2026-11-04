@@ -1,14 +1,16 @@
 // 게임 피드백 분석 서비스 (back_spec 변경 05, 05-4·05-7·05-8).
 // 싼 검사부터 하고 비싼 일(timeline, LLM)은 마지막에. 결과는 서버 메모리에 캐시하고, 같은 키의 동시 요청은 Promise를 공유한다.
 // !ai 코드(analysis/**)는 import만 한다. LLM 문제는 오류가 아니라 200 + 템플릿 문장이다(하루 상한·예산만 429).
-import { createFeedbackFromResult, type FeedbackResult } from '../../analysis/feedback.js';
+// RAG(ai_spec B4-4): rag 설정이 있으면 LLM을 부르기 전에 조각을 찾아 함께 준다. 검색 실패·시간 초과(3초)면 RAG 없이 진행하고 로그만.
+import { createFeedbackFromResult, type FeedbackResult, type KnowledgeInput } from '../../analysis/feedback.js';
 import { AnalysisError, analyzeMatch, ENGINE_VERSION } from '../../analysis/index.js';
 import type { LlmClient, LlmEffort } from '../../analysis/llm/client.js';
 import { buildFacts } from '../../analysis/llm/facts.js';
 import { MAX_TOKENS } from '../../analysis/llm/generate.js';
 import { calibration, type Ledger } from '../../analysis/llm/ledger.js';
 import { estimateTokens, worstCallCost } from '../../analysis/llm/pricing.js';
-import { buildUserMessage, PROMPT_VERSION, SYSTEM_PROMPT } from '../../analysis/llm/prompt.js';
+import { buildUserMessage, promptVersionFor, systemPromptFor, type KnowledgeChunkInput } from '../../analysis/llm/prompt.js';
+import type { RetrieveOutcome } from '../../analysis/rag/retrieve.js';
 import type { AnalysisMatch, AnalysisResult, AnalysisTimeline } from '../../analysis/types.js';
 import {
   FEEDBACK_BUSY_RETRY_MAX_SEC,
@@ -17,6 +19,7 @@ import {
   FEEDBACK_DEADLINE_MS,
   FEEDBACK_DEFAULT_INPUT_FACTOR,
   FEEDBACK_KNOWLEDGE_VERSION,
+  FEEDBACK_RAG_TIMEOUT_MS,
   FEEDBACK_RETRY_AFTER_SEC,
   FEEDBACK_RETRY_MSG_TOKENS,
   FEEDBACK_RIOT_MAX_WAIT_MS,
@@ -58,9 +61,19 @@ export interface FeedbackLlmConfig {
   effort: LlmEffort;
 }
 
+/** RAG 설정 (B4-4). null·없음 = 꺼짐 (RAG 전과 같은 요청·응답·캐시 키) */
+export interface FeedbackRagConfig {
+  /** 엔진 결과 → 조각 (Voyage·DB는 조립 때 넣는다). 단위 테스트는 가짜 */
+  retrieve: (result: AnalysisResult) => Promise<RetrieveOutcome>;
+  /** 지식 문서 전체의 knowledgeVersion (캐시 키·응답 meta) */
+  knowledgeVersion: string;
+  timeoutMs?: number;
+}
+
 export interface FeedbackServiceDeps {
   riot: FeedbackRiot;
   llm: FeedbackLlmConfig;
+  rag?: FeedbackRagConfig | null;
   ledger: Ledger;
   champData: ChampionDataProvider;
   daily: DailyLimit;
@@ -72,6 +85,21 @@ export interface FeedbackServiceDeps {
   deadlineMs?: number;
   resultCache?: SummonerCache<FeedbackDto>;
   templateCache?: SummonerCache<FeedbackDto>;
+}
+
+/** p가 ms 안에 끝나지 않으면 오류 */
+async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      p,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`RAG 검색 시간 초과 (${ms}ms)`)), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** 분석 1건 로그용 */
@@ -101,6 +129,8 @@ const notParticipant = () =>
 
 export function createFeedbackService(deps: FeedbackServiceDeps): FeedbackFn {
   const { riot, llm, ledger, champData, daily, budget, semaphore, breaker, logger } = deps;
+  const rag = deps.rag ?? null;
+  const ragTimeoutMs = rag?.timeoutMs ?? FEEDBACK_RAG_TIMEOUT_MS;
   const now = deps.now ?? Date.now;
   const deadlineMs = deps.deadlineMs ?? FEEDBACK_DEADLINE_MS;
   const results = deps.resultCache ?? createSummonerCache<FeedbackDto>(FEEDBACK_CACHE_TTL_MS, FEEDBACK_CACHE_MAX);
@@ -110,20 +140,22 @@ export function createFeedbackService(deps: FeedbackServiceDeps): FeedbackFn {
   /** 지금 LLM을 부를 수 있나 (켜짐 + 하루 상한 > 0 + 차단기 닫힘) */
   const llmActive = (t: number) => llm.client !== null && daily.limit > 0 && !breaker.isOpen(t);
 
+  // RAG 꺼짐이면 RAG 전과 같은 키 (PROMPT_VERSION_NO_RAG, "none")
   const keyOf = (matchId: string, puuid: string) =>
-    [matchId, puuid, ENGINE_VERSION, PROMPT_VERSION, FEEDBACK_KNOWLEDGE_VERSION ?? 'none', llm.model, llm.effort].join('|');
+    [matchId, puuid, ENGINE_VERSION, promptVersionFor(rag !== null), rag?.knowledgeVersion ?? FEEDBACK_KNOWLEDGE_VERSION ?? 'none', llm.model, llm.effort].join('|');
 
-  const inputFactor = (): number => {
-    const cal = calibration(ledger.entries(), llm.model, PROMPT_VERSION);
+  const inputFactor = (withKnowledge: boolean): number => {
+    const cal = calibration(ledger.entries(), llm.model, promptVersionFor(withKnowledge));
     return cal.samples > 0 ? cal.inputFactor : FEEDBACK_DEFAULT_INPUT_FACTOR;
   };
 
-  /** 판당 최악 비용: 1차 max_tokens 전부 + 재시도 최악 (CLI 예상 비용과 같은 계산) */
-  const worstUsd = (result: AnalysisResult, names: ReadonlyMap<number, string>, factor: number): number => {
+  /** 판당 최악 비용: 1차 max_tokens 전부 + 재시도 최악 (CLI 예상 비용과 같은 계산). 조각이 있으면 그만큼 입력이 는다 */
+  const worstUsd = (result: AnalysisResult, names: ReadonlyMap<number, string>, factor: number, chunks: readonly KnowledgeChunkInput[] | null): number => {
     const sheet = buildFacts(result, names);
+    const withKnowledge = chunks !== null && chunks.length > 0;
     const input =
-      estimateTokens(SYSTEM_PROMPT, factor) +
-      estimateTokens(JSON.stringify([{ role: 'user', content: buildUserMessage(sheet) }]), factor);
+      estimateTokens(systemPromptFor(withKnowledge), factor) +
+      estimateTokens(JSON.stringify([{ role: 'user', content: buildUserMessage(sheet, chunks) }]), factor);
     return (
       worstCallCost(input, MAX_TOKENS.first, llm.model) +
       worstCallCost(input + MAX_TOKENS.first + FEEDBACK_RETRY_MSG_TOKENS, MAX_TOKENS.retry, llm.model)
@@ -171,7 +203,29 @@ export function createFeedbackService(deps: FeedbackServiceDeps): FeedbackFn {
     throw err;
   }
 
-  /** 리더 요청만 실행: Riot → 사전 검사 → 엔진 → (예약) → 문장 → 정산 → 캐시 */
+  /** RAG 조각 검색. 꺼짐이면 null, 실패·시간 초과면 failed=true (RAG 없이 진행) */
+  async function findKnowledge(result: AnalysisResult, matchId: string): Promise<{ knowledge: KnowledgeInput | null; failed: boolean }> {
+    if (!rag) return { knowledge: null, failed: false };
+    const t0 = now();
+    try {
+      const out = await withTimeout(rag.retrieve(result), ragTimeoutMs);
+      logger.info('RAG 검색', {
+        matchId,
+        chunks: out.chunks.length,
+        queries: out.queries,
+        widened: out.picks.filter((p) => p.widened).length,
+        ms: now() - t0,
+        ...(out.notes.length > 0 ? { notes: out.notes.join(' / ') } : {}),
+      });
+      if (out.chunks.length === 0) return { knowledge: null, failed: false };
+      return { knowledge: { version: rag.knowledgeVersion, chunks: out.chunks.map((c) => ({ id: c.id, content: c.content })) }, failed: false };
+    } catch (err) {
+      logger.warn('RAG 검색 실패, RAG 없이 진행합니다', { matchId, error: formatError(err), ms: now() - t0 });
+      return { knowledge: null, failed: true };
+    }
+  }
+
+  /** 리더 요청만 실행: Riot → 사전 검사 → 엔진 → (RAG) → (예약) → 문장 → 정산 → 캐시 */
   async function analyze(matchId: string, puuid: string, key: string, stats: RunStats): Promise<FeedbackDto> {
     // ⑤ match
     let match: MatchDto;
@@ -224,14 +278,16 @@ export function createFeedbackService(deps: FeedbackServiceDeps): FeedbackFn {
     let budgetHold: number | null = null;
     let releaseSlot: (() => void) | null = null;
     let spentThisRun = 0;
+    // ⑩-1 RAG 조각 (LLM을 부를 때만. 템플릿 문장은 조각을 쓰지 않는다)
+    const found = client ? await findKnowledge(result, matchId) : { knowledge: null, failed: false };
     try {
       let factor = FEEDBACK_DEFAULT_INPUT_FACTOR;
       if (client) {
         // ⑪ 한도 예약: 하루 자리 → 예산(최악 비용) → 동시 실행 자리
-        factor = inputFactor();
+        factor = inputFactor(found.knowledge !== null);
         if (!daily.tryReserve(now())) throw dailyError(now());
         dailyHeld = true;
-        budgetHold = budget.tryReserve(worstUsd(result, champ.names, factor));
+        budgetHold = budget.tryReserve(worstUsd(result, champ.names, factor, found.knowledge?.chunks ?? null));
         if (budgetHold === null) {
           logger.warn('예산 상한으로 분석 거절', { matchId, spent: budget.spentUsd(), budget: budget.budgetUsd });
           throw budgetError();
@@ -250,7 +306,7 @@ export function createFeedbackService(deps: FeedbackServiceDeps): FeedbackFn {
         now,
         inputFactor: factor,
       });
-      const { feedback } = await run(result);
+      const { feedback } = await run(result, found.knowledge);
       stats.feedback = feedback;
       spentThisRun = feedback.meta.costUsd;
 
@@ -269,11 +325,12 @@ export function createFeedbackService(deps: FeedbackServiceDeps): FeedbackFn {
       // ⑬ DTO + 캐시
       const dto = toFeedbackDto(result, feedback, {
         templateReason: client ? 'llm_error' : templateReason,
-        knowledgeVersion: FEEDBACK_KNOWLEDGE_VERSION,
+        knowledgeVersion: feedback.meta.knowledgeVersion ?? FEEDBACK_KNOWLEDGE_VERSION,
         championDataVersion: champ.version,
         generatedAtMs: now(),
       });
-      if (dto.mode === 'llm') results.set(key, dto, now());
+      // RAG 검색이 실패해 조각 없이 만든 결과는 RAG 키의 긴 캐시에 넣지 않는다 (짧은 템플릿 캐시 뒤 다시 시도)
+      if (dto.mode === 'llm' && !found.failed) results.set(key, dto, now());
       else templates.set(key, dto, now());
       return dto;
     } finally {

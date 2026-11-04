@@ -9,7 +9,7 @@ import { generateTexts, type FallbackReason, type GenerateOutcome, type TextSour
 import { AREAS, type Area } from './llm/labels.js';
 import type { Ledger } from './llm/ledger.js';
 import type { TokenUsage } from './llm/pricing.js';
-import { PROMPT_VERSION } from './llm/prompt.js';
+import type { KnowledgeChunkInput } from './llm/prompt.js';
 import { LANING_UNAVAILABLE_TEXT } from './llm/template.js';
 import type { VerifyFailure } from './llm/verify.js';
 import type { AnalysisInput, AnalysisResult } from './types.js';
@@ -19,16 +19,28 @@ export interface FeedbackItem {
   text: string;
   factIds: string[];
   source: TextSource;
+  /** RAG 조각을 준 판에서만: 이 문장에 반영한 조각 ID */
+  chunkIds?: string[];
+}
+
+/** 판 하나에 넣을 RAG 조각 묶음 (B4). version = 적재한 지식 문서 전체의 knowledgeVersion */
+export interface KnowledgeInput {
+  version: string;
+  chunks: readonly KnowledgeChunkInput[];
 }
 
 export interface FeedbackResult {
   mode: 'llm' | 'template';
-  summary: { text: string; factIds: string[]; source: TextSource };
+  summary: { text: string; factIds: string[]; source: TextSource; chunkIds?: string[] };
   sections: Record<Area, { good: FeedbackItem[]; bad: FeedbackItem[]; note?: string }>;
-  keyMoments: { index: number; text: string; factIds: string[]; source: TextSource }[];
+  keyMoments: { index: number; text: string; factIds: string[]; source: TextSource; chunkIds?: string[] }[];
   meta: {
     engineVersion: string;
     promptVersion: string;
+    /** 조각을 프롬프트에 넣었을 때만 값. RAG 꺼짐·검색 0개·검색 실패면 null */
+    knowledgeVersion: string | null;
+    /** 프롬프트에 넣은 조각 ID (없으면 빈 배열) */
+    knowledgeIds: string[];
     model: string;
     effort: LlmEffort;
     attempts: number;
@@ -64,7 +76,12 @@ export interface FeedbackDeps {
 }
 
 /** 엔진 결과 + 생성 결과 → 화면용 구조 */
-export function assembleFeedback(sheet: FactSheet, out: GenerateOutcome, deps: Pick<FeedbackDeps, 'model' | 'effort'>): FeedbackResult {
+export function assembleFeedback(
+  sheet: FactSheet,
+  out: GenerateOutcome,
+  deps: Pick<FeedbackDeps, 'model' | 'effort'>,
+  knowledgeVersion: string | null = null,
+): FeedbackResult {
   const r = sheet.result;
   const t = (slot: string) => out.texts.get(slot)!;
   const sections = {} as FeedbackResult['sections'];
@@ -72,7 +89,7 @@ export function assembleFeedback(sheet: FactSheet, out: GenerateOutcome, deps: P
     const sec: FeedbackResult['sections'][Area] = { good: [], bad: [] };
     for (const s of sheet.slots.filter((x) => x.area === area)) {
       const ft = t(s.slot);
-      sec[s.kind!].push({ subjectId: s.subjectId!, text: ft.text, factIds: ft.factIds, source: ft.source });
+      sec[s.kind!].push({ subjectId: s.subjectId!, text: ft.text, factIds: ft.factIds, source: ft.source, ...(ft.chunkIds ? { chunkIds: ft.chunkIds } : {}) });
     }
     if (area === 'laning' && r.laning === null) sec.note = LANING_UNAVAILABLE_TEXT;
     sections[area] = sec;
@@ -80,14 +97,16 @@ export function assembleFeedback(sheet: FactSheet, out: GenerateOutcome, deps: P
   const summary = t('summary');
   return {
     mode: out.mode,
-    summary: { text: summary.text, factIds: summary.factIds, source: summary.source },
+    summary: { text: summary.text, factIds: summary.factIds, source: summary.source, ...(summary.chunkIds ? { chunkIds: summary.chunkIds } : {}) },
     sections,
     keyMoments: sheet.slots
       .filter((s) => s.area === 'keyMoment')
       .map((s) => ({ index: s.index!, ...t(s.slot) })),
     meta: {
       engineVersion: r.engineVersion,
-      promptVersion: PROMPT_VERSION,
+      promptVersion: out.promptVersion,
+      knowledgeVersion: out.knowledgeIds.length > 0 ? knowledgeVersion : null,
+      knowledgeIds: out.knowledgeIds,
       model: deps.model,
       effort: deps.effort,
       attempts: out.attempts,
@@ -104,9 +123,12 @@ export function allChampionNames(names: ReadonlyMap<number, string>): string[] {
   return [...new Set(names.values())].sort((a, b) => b.length - a.length);
 }
 
-/** 엔진 결과로 문장 피드백을 만든다. 분석 불가(AnalysisError)는 그대로 던진다 */
+/** 엔진 결과로 문장 피드백을 만든다. 분석 불가(AnalysisError)는 그대로 던진다. knowledge는 판마다 검색한 RAG 조각 (없으면 Q1과 같음) */
 export function createFeedbackFromResult(deps: FeedbackDeps) {
-  return async (result: AnalysisResult): Promise<{ result: AnalysisResult; sheet: FactSheet; feedback: FeedbackResult }> => {
+  return async (
+    result: AnalysisResult,
+    knowledge: KnowledgeInput | null = null,
+  ): Promise<{ result: AnalysisResult; sheet: FactSheet; feedback: FeedbackResult }> => {
     const sheet = buildFacts(result, deps.championNames);
     const out = await generateTexts(sheet, {
       client: deps.client,
@@ -119,8 +141,9 @@ export function createFeedbackFromResult(deps: FeedbackDeps) {
       ...(deps.inputFactor !== undefined ? { inputFactor: deps.inputFactor } : {}),
       ...(deps.onCall ? { onCall: deps.onCall } : {}),
       recordingName: deps.recordingName ?? null,
+      knowledge: knowledge?.chunks ?? null,
     });
-    return { result, sheet, feedback: assembleFeedback(sheet, out, deps) };
+    return { result, sheet, feedback: assembleFeedback(sheet, out, deps, knowledge?.version ?? null) };
   };
 }
 

@@ -185,9 +185,29 @@ describe('Data Dragon 챔피언 데이터 (05-5 B안)', () => {
 });
 
 describe('loadFeedbackEnv (05-12)', () => {
-  it('기본값: 꺼짐/꺼짐/20/0.25/claude-opus-5-5/low, 키 없음', () => {
+  it('기본값: 꺼짐/꺼짐/20/0.25/claude-opus-5-5/low, 키 없음, RAG 꺼짐', () => {
     const e = loadFeedbackEnv({});
-    assert.deepEqual(e, { enabled: false, llmEnabled: false, apiKey: null, model: 'claude-opus-5-5', effort: 'low', dailyLimit: 20, budgetUsd: 0.25, problems: [] });
+    assert.deepEqual(e, {
+      enabled: false,
+      llmEnabled: false,
+      apiKey: null,
+      model: 'claude-opus-5-5',
+      effort: 'low',
+      dailyLimit: 20,
+      budgetUsd: 0.25,
+      ragEnabled: false,
+      voyageKey: null,
+      problems: [],
+    });
+  });
+  it('RAG (B4-4): FEEDBACK_RAG_ENABLED=true·VOYAGE_API_KEY 읽음, true/false 밖이면 기능 끔', () => {
+    const e = loadFeedbackEnv({ FEEDBACK_ENABLED: 'true', FEEDBACK_RAG_ENABLED: 'true', VOYAGE_API_KEY: 'vk-x' });
+    assert.equal(e.ragEnabled, true);
+    assert.equal(e.voyageKey, 'vk-x');
+    const bad = loadFeedbackEnv({ FEEDBACK_ENABLED: 'true', FEEDBACK_RAG_ENABLED: 'on' });
+    assert.equal(bad.enabled, false);
+    assert.equal(bad.ragEnabled, false);
+    assert.match(bad.problems[0]!, /FEEDBACK_RAG_ENABLED/);
   });
   it('켬 + 값', () => {
     const e = loadFeedbackEnv({ FEEDBACK_ENABLED: 'true', FEEDBACK_LLM_ENABLED: 'false', FEEDBACK_DAILY_LIMIT: '5', FEEDBACK_API_BUDGET_USD: '1.5', ANTHROPIC_API_KEY: 'sk-ant-x' });

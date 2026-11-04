@@ -18,6 +18,7 @@
   - [2-8. 킬관여·라인전 15분 골드 (변경 04)](#2-8-킬관여라인전-15분-골드-변경-04)
   - [2-9. 게임 피드백 분석 API (변경 05)](#2-9-게임-피드백-분석-api-변경-05)
   - [2-10. 매치 상세 지표 (변경 06)](#2-10-매치-상세-지표-변경-06)
+  - [2-11. 피드백 분석 RAG 연결 (!ai B4-4)](#2-11-피드백-분석-rag-연결-ai-b4-4)
 - [3. 사용자가 실행하는 명령](#3-사용자가-실행하는-명령)
 - [4. 검증 결과](#4-검증-결과)
   - [4-1. 실제 소량 수집](#4-1-실제-소량-수집)
@@ -250,6 +251,18 @@
 | 테스트 | `test/unit/matchDetail.test.ts` 6개: isMe 1명, 필드 매핑, subStyle null·누락 0, 팀 합계·objectives·방향, bans -1 제외, horde·objectives 없음 → 0 | ✅ |
 | 응답 크기 | fixture 2판(KR_8408851980·KR_8437852704)을 번갈아 20판, `matchListItem`만 JSON 직렬화: **29,349 B → 102,359 B** (판당 1,467 → 5,118 B, 압축 전) | ✅ |
 | 계약 | `api_contract.md` 2-5 예시·필드 표, 6장 기록 1줄(v4 작은 추가, 기존 관례) | ✅ |
+
+### 2-11. 피드백 분석 RAG 연결 (!ai B4-4)
+
+> 요약: `!ai` B4(2026-11-04)의 작은 백엔드 변경. 계약 변경 없음(`meta.knowledgeVersion`은 v4에 이미 있음). 기본 꺼짐이면 요청·응답·캐시 키가 이전과 같다. API 서버로 실제 Voyage·Anthropic을 부르는 확인은 아직 하지 않았다(`!ai` CLI로 적재·검색·5판 실측은 함, `docs/ai/ai_build.md` 19장).
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 스위치·키 | `config/env.ts` `loadFeedbackEnv`: `FEEDBACK_RAG_ENABLED`(true/false, 그 밖이면 기능 끔)·`VOYAGE_API_KEY`. `config/feedback.ts`: `ragEnabled` 기본 false, `FEEDBACK_RAG_TIMEOUT_MS` 3,000, `FEEDBACK_KNOWLEDGE_DIR`. `.env.example` 2개 추가 | ✅ |
+| 조립 | `server.ts` `buildRag`: LLM 클라이언트가 있고 스위치 true + Voyage 키 + 지식 문서 검사 통과일 때만 `retrieveKnowledge`(Voyage 질의 임베딩 + 기존 풀로 `search_rag_chunks`). 아니면 경고 1줄 후 꺼짐. 시작 로그에 조각 수·knowledgeVersion | ✅ |
+| 서비스 | `service.ts`: LLM을 부를 때만 엔진 뒤·예약 전에 검색(3초 상한). 실패·시간 초과 → RAG 없이 진행 + 경고 로그, 결과는 10분 템플릿 캐시에만. 성공 → 조각을 문장 생성에 넘기고 `meta.knowledgeVersion` 채움. 최악 비용 예약에 조각 블록 포함. 캐시 키 = `promptVersionFor(RAG 켜짐)`·knowledgeVersion(꺼짐이면 이전과 같은 `.1`·`none`) | ✅ |
+| 주의 | API는 Voyage 429(무료 등급 분당 한도)를 재시도하지 않는다(3초 상한). 동시 분석이 늘면 그 판은 RAG 없이 만들어진다. 서비스로 켜기 전에 Voyage 결제 등록(한도 상향) 여부를 정한다 | ⚠️ |
+| 테스트 | `test/unit/api/feedbackRag.test.ts` 6개(꺼짐 = 이전 요청, 켜짐 → `<knowledge>`·knowledgeVersion·캐시, 0개, 실패·시간 초과, 템플릿이면 검색 안 함, 켜짐/꺼짐 캐시 키 다름) + env 1개. 하네스 `rag` 옵션·`ScriptClient.requests` 추가 | ✅ |
 
 ---
 

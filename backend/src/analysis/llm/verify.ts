@@ -30,6 +30,8 @@ export interface VerifyFailure {
 export interface SlotText {
   text: string;
   factIds: string[];
+  /** RAG 조각을 준 요청에서만: 이 문장에 반영한 조각 ID (B4) */
+  chunkIds?: string[];
 }
 
 export const LIMITS = {
@@ -183,6 +185,8 @@ export interface VerifyContext {
   sheet: FactSheet;
   /** Data Dragon 챔피언 한국어 이름 전체 */
   allChampionNames: readonly string[];
+  /** 프롬프트에 준 RAG 조각 ID. 없으면(RAG 꺼짐) chunkIds를 쓰면 안 된다 */
+  knowledgeIds?: ReadonlySet<string>;
 }
 
 export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): VerifyFailure[] {
@@ -197,6 +201,11 @@ export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): Verify
   for (const id of st.factIds) {
     if (!sheet.byId.has(id)) add('shape', `없는 fact ID: ${id}`);
     else if (!allowed.has(id)) add('shape', `이 칸에서 쓸 수 없는 fact ID: ${id}`);
+  }
+  // 1-1. 조각 ID: 프롬프트에 준 조각 안에서만 (B4)
+  for (const id of st.chunkIds ?? []) {
+    if (!ctx.knowledgeIds) add('shape', `조각을 주지 않았는데 chunkIds가 있음: ${id}`);
+    else if (!ctx.knowledgeIds.has(id)) add('shape', `준 적 없는 조각 ID: ${id}`);
   }
 
   // 2. 방향
@@ -262,16 +271,19 @@ export interface LlmItem {
   subjectId: string;
   text: string;
   factIds: string[];
+  chunkIds?: string[];
 }
 
 export interface FirstAnswer {
   summary: SlotText;
   sections: Record<Area, { good: LlmItem[]; bad: LlmItem[] }>;
-  keyMoments: { index: number; text: string; factIds: string[] }[];
+  keyMoments: { index: number; text: string; factIds: string[]; chunkIds?: string[] }[];
+  /** RAG 요청만: 칸마다 반영한 조각 ID (B4). 칸 이름은 slots[].slot */
+  chunkUse?: { slot: string; chunkIds: string[] }[];
 }
 
 export interface RetryAnswer {
-  fixes: { slot: string; text: string; factIds: string[] }[];
+  fixes: { slot: string; text: string; factIds: string[]; chunkIds?: string[] }[];
 }
 
 export interface AnswerCheck {
@@ -282,6 +294,11 @@ export interface AnswerCheck {
   failures: VerifyFailure[];
   /** 칸에 대응하지 않는 답 (엔진이 안 고른 과목 등) */
   extras: VerifyFailure[];
+}
+
+/** 답 한 칸 → SlotText (chunkIds는 있을 때만 옮긴다. RAG 꺼짐이면 Q1과 같은 모양) */
+function slotText(x: { text: string; factIds: string[]; chunkIds?: string[] }): SlotText {
+  return { text: x.text, factIds: x.factIds, ...(x.chunkIds !== undefined ? { chunkIds: x.chunkIds } : {}) };
 }
 
 /** 답을 칸에 맞춰 나누고 칸마다 검사한다. 빠진 칸은 shape 실패 */
@@ -298,7 +315,7 @@ export function checkFirstAnswer(answer: FirstAnswer, ctx: VerifyContext): Answe
         const j = items.findIndex((it, k) => !used.has(k) && it.subjectId === s.subjectId);
         if (j >= 0) {
           used.add(j);
-          texts.set(s.slot, { text: items[j]!.text, factIds: items[j]!.factIds });
+          texts.set(s.slot, slotText(items[j]!));
         }
       }
       items.forEach((it, k) => {
@@ -314,8 +331,18 @@ export function checkFirstAnswer(answer: FirstAnswer, ctx: VerifyContext): Answe
       continue;
     }
     kmUsed.add(km.index);
-    texts.set(s.slot, { text: km.text, factIds: km.factIds });
+    texts.set(s.slot, slotText(km));
   }
+  // RAG: chunkUse의 조각 ID를 칸에 붙인다. 조각을 준 요청이면 적지 않은 칸은 빈 배열
+  for (const u of answer.chunkUse ?? []) {
+    const st = texts.get(u.slot);
+    if (!st) {
+      extras.push({ slot: 'chunkUse', rule: 'shape', detail: `chunkUse에 없는 칸: ${u.slot}` });
+      continue;
+    }
+    texts.set(u.slot, { ...st, chunkIds: [...(st.chunkIds ?? []), ...u.chunkIds] });
+  }
+  if (ctx.knowledgeIds) for (const [k, st] of texts) if (st.chunkIds === undefined) texts.set(k, { ...st, chunkIds: [] });
   return finish(texts, extras, ctx);
 }
 
@@ -341,7 +368,7 @@ export function checkRetryAnswer(answer: RetryAnswer, wanted: readonly string[],
   const failures: VerifyFailure[] = [];
   const passed = new Set<string>();
   for (const fx of answer.fixes) {
-    if (wanted.includes(fx.slot) && !texts.has(fx.slot)) texts.set(fx.slot, { text: fx.text, factIds: fx.factIds });
+    if (wanted.includes(fx.slot) && !texts.has(fx.slot)) texts.set(fx.slot, slotText(fx));
   }
   for (const slotId of wanted) {
     const s = ctx.sheet.slots.find((x) => x.slot === slotId)!;

@@ -22,7 +22,10 @@ import { fileLedger } from './analysis/llm/ledger.js';
 import { priceOf } from './analysis/llm/pricing.js';
 import { createChampionData, loadSnapshot } from './api/feedback/championData.js';
 import { createBreaker, createBudgetGuard, createDailyLimit, createSemaphore, countTodayFromLedger } from './api/feedback/limits.js';
-import { createFeedbackService, unavailableFeedback, type FeedbackFn } from './api/feedback/service.js';
+import { createFeedbackService, unavailableFeedback, type FeedbackFn, type FeedbackRagConfig } from './api/feedback/service.js';
+import { knowledgeVersion, loadKnowledgeDir } from './analysis/rag/chunks.js';
+import { pgSearch, retrieveKnowledge, type RagDb } from './analysis/rag/retrieve.js';
+import { createVoyageEmbed } from './analysis/rag/voyage.js';
 import {
   DDRAGON_BASE_URL,
   DDRAGON_CACHE_VERSIONS,
@@ -32,10 +35,12 @@ import {
   DDRAGON_WARN_INTERVAL_MS,
   FEEDBACK_BREAKER_MS,
   FEEDBACK_CONCURRENCY,
+  FEEDBACK_KNOWLEDGE_DIR,
   FEEDBACK_LEDGER_PATH,
   FEEDBACK_LLM_MAX_RETRIES,
   FEEDBACK_LLM_TIMEOUT_MS,
   FEEDBACK_QUEUE_MAX,
+  FEEDBACK_RAG_TIMEOUT_MS,
 } from './config/feedback.js';
 
 const logger = createLogger('server');
@@ -74,7 +79,35 @@ function buildRiotServices(): { summonerSearch: SummonerSearchFn; laneGold: Lane
  * 게임 피드백 분석 조립 (back_spec 변경 05, 05-6). 무거운 것(LLM 클라이언트·장부·캐시)은 시작 때 1번 만든다.
  * 기본(.env에 새 변수 없음)은 꺼짐 → 503 ANALYSIS_DISABLED, LLM 클라이언트를 만들지 않는다. 키 값은 로그에 남기지 않는다.
  */
-function buildFeedback(riot: RiotClient | null): FeedbackFn {
+/**
+ * RAG 조립 (ai_spec B4-4). FEEDBACK_RAG_ENABLED=true + VOYAGE_API_KEY + 지식 문서 검사 통과일 때만 켠다. 아니면 null(RAG 전과 같음).
+ * knowledgeVersion은 저장소의 지식 문서로 만든다 (DB 적재본과 같게 하려면 문서를 고친 뒤 npm run rag -- ingest --yes).
+ */
+function buildRag(env: { ragEnabled: boolean; voyageKey: string | null }, db: RagDb, fbLogger: ReturnType<typeof createLogger>): FeedbackRagConfig | null {
+  if (!env.ragEnabled) return null;
+  if (!env.voyageKey) {
+    fbLogger.warn('FEEDBACK_RAG_ENABLED=true지만 VOYAGE_API_KEY가 없어 RAG를 끕니다');
+    return null;
+  }
+  let parsed;
+  try {
+    parsed = loadKnowledgeDir(FEEDBACK_KNOWLEDGE_DIR);
+  } catch (err) {
+    fbLogger.warn('지식 문서를 읽을 수 없어 RAG를 끕니다', { error: formatError(err) });
+    return null;
+  }
+  if (parsed.errors.length > 0 || parsed.chunks.length === 0) {
+    fbLogger.warn('지식 문서 검사 오류로 RAG를 끕니다 (npm run rag -- ingest --offline으로 확인)', { errors: parsed.errors.length, chunks: parsed.chunks.length });
+    return null;
+  }
+  const embed = createVoyageEmbed({ apiKey: env.voyageKey, timeoutMs: FEEDBACK_RAG_TIMEOUT_MS });
+  const search = pgSearch(db);
+  const version = knowledgeVersion(parsed.chunks);
+  fbLogger.info(`RAG on: 조각 ${parsed.chunks.length}개 knowledgeVersion=${version} voyageKey=있음`);
+  return { retrieve: (result) => retrieveKnowledge(result, { embed, search }), knowledgeVersion: version, timeoutMs: FEEDBACK_RAG_TIMEOUT_MS };
+}
+
+function buildFeedback(riot: RiotClient | null, ragDb: RagDb): FeedbackFn {
   const fbLogger = createLogger('feedback');
   const env = loadFeedbackEnv();
   for (const p of env.problems) fbLogger.warn(`피드백 API 설정 오류로 기능을 끕니다: ${p}`);
@@ -131,6 +164,7 @@ function buildFeedback(riot: RiotClient | null): FeedbackFn {
   return createFeedbackService({
     riot,
     llm: { client, model: env.model, effort: env.effort },
+    rag: client ? buildRag(env, ragDb, fbLogger) : null,
     ledger,
     champData,
     daily,
@@ -151,7 +185,7 @@ function main(): void {
     snapshot: (fn) => readSnapshot(pool, fn, logger),
   };
   const { summonerSearch, laneGold, riot } = buildRiotServices();
-  const feedback = buildFeedback(riot);
+  const feedback = buildFeedback(riot, { query: (text, values) => pool.query(text, values) });
   // logger는 생략해 createApp 기본값([api] 태그)을 그대로 쓴다 (기존 동작 유지)
   const app = createApp(db, undefined, { summonerSearch, laneGold, feedback });
   const server = app.listen(port, () => logger.info('API 서버 시작', { url: `http://localhost:${port}/api/v1` }));
