@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { minuteDisplay, numberDisplay } from '../../../../src/analysis/llm/facts.js';
-import { buildUserMessage } from '../../../../src/analysis/llm/prompt.js';
-import { senaSheet } from './helpers.js';
+import { buildUserMessage, type UserPayload } from '../../../../src/analysis/llm/prompt.js';
+import { senaSheet, set5Sheet } from './helpers.js';
 
 const sheet = senaSheet();
 const fact = (id: string) => {
@@ -100,5 +100,37 @@ describe('facts: 칸 구성 (영역마다 좋은 점·부족한 점 최대 2개)
     const s = sheet.slots.find((x) => x.slot === 'summary')!;
     assert.ok(s.factIds.includes('keyMoment.0.gapChangeAbs'));
     assert.ok(!s.factIds.includes('keyMoment.1.gapChangeAbs'));
+  });
+});
+
+describe('facts: 결정적 장면 우리 팀 기준 변화와 역전 (Q1)', () => {
+  it('세나 판(역전 없음): swingAbs = gapChangeAbs, reversed 그대로, 우리 팀이 잃음', () => {
+    assert.equal(fact('keyMoment.0.swingAbs').value, 3895);
+    assert.deepEqual(fact('keyMoment.0.swingAbs').approx, { step: 100 });
+    assert.equal(fact('keyMoment.0.swingSide').value, '우리 팀이 잃음');
+    assert.equal(fact('keyMoment.0.reversed').value, '그대로');
+  });
+  it('원딜 판 KR_8419447142 p4: 역전 장면 0·2는 swingAbs·바뀜만 있고 gapChangeAbs가 없다', () => {
+    const s = set5Sheet('KR_8419447142');
+    const f = (id: string) => s.byId.get(id);
+    assert.equal(f('keyMoment.0.swingAbs')?.value, 4376);
+    assert.equal(f('keyMoment.0.swingSide')?.value, '우리 팀이 잃음');
+    assert.equal(f('keyMoment.0.reversed')?.value, '바뀜');
+    assert.equal(f('keyMoment.0.gapChangeAbs'), undefined);
+    assert.equal(f('keyMoment.2.swingAbs')?.value, 3618);
+    assert.equal(f('keyMoment.2.gapChangeAbs'), undefined);
+    // 역전이 아닌 장면 1은 그대로
+    assert.equal(f('keyMoment.1.reversed')?.value, '그대로');
+    assert.ok(f('keyMoment.1.gapChangeAbs'));
+    const km0Slot = s.slots.find((x) => x.slot === 'keyMoment.0')!;
+    assert.ok(km0Slot.factIds.includes('keyMoment.0.swingAbs'));
+  });
+  it('사용자 메시지: 역전 장면 direction은 "앞선 팀이 바뀜", 숫자 fact에 허용 단위어(units)', () => {
+    const s = set5Sheet('KR_8419447142');
+    const msg = JSON.parse(buildUserMessage(s)) as UserPayload;
+    assert.deepEqual(msg.keyMoments.map((k) => k.direction), ['앞선 팀이 바뀜', '벌어짐', '앞선 팀이 바뀜']);
+    assert.equal(msg.keyMoments[0]!.swingSide, '우리 팀이 잃음');
+    assert.deepEqual(msg.facts.find((x) => x.id === 'keyMoment.1.killsTheirs')!.units, ['킬', '개', '번']);
+    assert.equal(msg.facts.find((x) => x.id === 'laning.kda.me')?.units, undefined);
   });
 });

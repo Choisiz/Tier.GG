@@ -1,0 +1,35 @@
+{
+  "matchId": "KR_8419451137",
+  "participantId": 3,
+  "engineVersion": "2026-11-02.2",
+  "promptVersion": "2026-11-04.1",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-04T13:10:10.996Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "9a702ed1d1d56d53b2b9906fc55e2b7df6fd8a936360c77d06aeac469826b080",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"라인전은 다이애나 상대로 우세했고, 오브젝트 싸움은 부족했으며, 그 밖의 운영은 잘했습니다. 16.2분 싸움에서 우리 팀 4킬, 상대 팀 0킬로 골드 격차가 약 4,000 벌어졌습니다.\",\"factIds\":[\"laning.opponent\",\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\"]},\"sections\":{\"laning\":{\"good\":[{\"subjectId\":\"laning.gold\",\"text\":\"15분 골드가 6,006으로 상대 다이애나보다 48 많았습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.gold.me\",\"laning.opponent\",\"laning.gold.diffAbs\"]},{\"subjectId\":\"laning.level\",\"text\":\"15분 레벨이 11레벨로 상대 다이애나의 9레벨보다 2레벨 높았습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.level.me\",\"laning.opponent\",\"laning.level.enemy\",\"laning.level.diffAbs\"]}],\"bad\":[]},\"fight\":{\"good\":[{\"subjectId\":\"fight.advantage\",\"text\":\"오브젝트 싸움 4번에 참여했고, 득실 중 우리 팀 몫이 78.1%였습니다.\",\"factIds\":[\"fight.advantage.fights\",\"fight.advantage.sharePct\"]}],\"bad\":[{\"subjectId\":\"fight.damage\",\"text\":\"15분 이후 챔피언 딜 비중이 6.9%로, 기대 비중 22%보다 15.1%p 낮았습니다.\",\"factIds\":[\"fight.damage.phase1StartMin\",\"fight.damage.share1\",\"fight.damage.expected1\",\"fight.damage.diff1Abs\"]},{\"subjectId\":\"fight.vision\",\"text\":\"오브젝트 3개 전 시야 점수 합이 1로, 오브젝트당 0.33에 그쳤습니다.\",\"factIds\":[\"fight.vision.objectives\",\"fight.vision.points\",\"fight.vision.perObjective\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.advantage\",\"text\":\"오브젝트 밖 싸움 2번에서 득실 중 우리 팀 몫이 83.3%였습니다.\",\"factIds\":[\"macro.advantage.fights\",\"macro.advantage.sharePct\"]},{\"subjectId\":\"macro.side\",\"text\":\"포탑 피해량이 13,705, 분당 709.5로 사이드 압박이 좋았습니다.\",\"factIds\":[\"macro.side.turretDamage\",\"macro.side.perMinute\"]}],\"bad\":[]}},\"keyMoments\":[{\"index\":0,\"text\":\"16.2분 싸움에서 우리 팀 4킬, 상대 팀 0킬로 골드 격차가 약 4,000 벌어졌고, 이어서 상대 미드 1차 포탑을 깼습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},{\"index\":1,\"text\":\"11.1분 싸움에서 우리 팀 6킬, 상대 팀 2킬로 골드 격차가 약 3,500 벌어졌습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.gapChangeAbs\"]},{\"index\":2,\"text\":\"14.2분 싸움에서 우리 팀 3킬, 상대 팀 3킬로 골드 격차가 약 1,700 좁혀졌고, 우리 탑 1차 포탑을 잃었습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.killsTheirs\",\"keyMoment.2.gapChangeAbs\",\"keyMoment.2.followUp.0\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 6436,
+          "cacheWrite": 0,
+          "cacheRead": 5216,
+          "output": 1410
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 12793
+    }
+  ]
+}

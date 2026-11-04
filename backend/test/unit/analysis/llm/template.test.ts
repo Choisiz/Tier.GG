@@ -5,7 +5,7 @@ import { buildFacts } from '../../../../src/analysis/llm/facts.js';
 import { ro, templateFor } from '../../../../src/analysis/llm/template.js';
 import { verifySlot } from '../../../../src/analysis/llm/verify.js';
 import type { AnalysisResult } from '../../../../src/analysis/types.js';
-import { ctxOf, NAMES, secondResult, senaResult } from './helpers.js';
+import { ctxOf, NAMES, secondResult, senaResult, SET5_IDS, set5Sheet } from './helpers.js';
 
 /** 한 과목을 좋은 점·부족한 점 양쪽에 억지로 넣어 템플릿 두 개를 모두 만든다 */
 function bothWays(r: AnalysisResult, area: 'laning' | 'fight' | 'macro', id: string): AnalysisResult {
@@ -82,5 +82,36 @@ describe('숫자 뒤 조사 로/으로', () => {
   it('끝소리에 맞춰 고른다', () => {
     for (const n of ['1', '2', '0.5', '4', '87.4', '7', '8', '9', '1.5']) assert.equal(ro(n), '로', n);
     for (const n of ['3', '0.93', '6', '10', '2,000', '0.40', '100']) assert.equal(ro(n), '으로', n);
+  });
+});
+
+describe('템플릿: 기준선 5판(set5) 모든 칸이 새 검증기를 통과 (Q1)', () => {
+  it('5판 모든 칸 실패 0, 원딜 판 역전 장면은 "앞선 팀이 바뀜 + 손해" 문장', () => {
+    const fails: string[] = [];
+    for (const id of SET5_IDS) {
+      const sheet = set5Sheet(id);
+      for (const slot of sheet.slots) {
+        const t = templateFor(sheet, slot);
+        const f = verifySlot(slot, t, ctxOf(sheet));
+        if (f.length > 0) fails.push(`${id} ${slot.slot}: ${t.text} → ${JSON.stringify(f)}`);
+      }
+    }
+    assert.deepEqual(fails, []);
+    const adc = set5Sheet('KR_8419447142');
+    const km0 = templateFor(adc, adc.slots.find((s) => s.slot === 'keyMoment.0')!);
+    assert.equal(km0.text, '23.6분 킬 3개가 난 싸움 뒤 골드가 앞선 팀이 우리 팀에서 상대 팀으로 바뀌었고, 우리 팀이 골드 4,376 손해를 봤습니다. 이어서 우리 미드 2차 포탑을 잃었습니다.');
+    assert.ok(km0.factIds.includes('keyMoment.0.swingAbs'));
+    assert.ok(!km0.factIds.some((x) => x.endsWith('gapChangeAbs')));
+  });
+  it('역전 + 우리 팀 이득(앞선 팀이 상대 → 우리)도 통과 (원딜 판 장면 0을 뒤집어 만듦)', () => {
+    const adc = set5Sheet('KR_8419447142');
+    const r = structuredClone(adc.result);
+    const m = r.keyMoments[0]!;
+    [m.goldDiffBefore, m.goldDiffAfter, m.swing] = [-m.goldDiffBefore, -m.goldDiffAfter, -m.swing];
+    const sheet = buildFacts(r, NAMES);
+    const slot = sheet.slots.find((s) => s.slot === 'keyMoment.0')!;
+    const t = templateFor(sheet, slot);
+    assert.match(t.text, /상대 팀에서 우리 팀으로 바뀌었고, 우리 팀이 골드 4,376 이득을 봤습니다/);
+    assert.deepEqual(verifySlot(slot, t, ctxOf(sheet)), []);
   });
 });

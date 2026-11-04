@@ -1,16 +1,23 @@
 // 검증기 (ai_spec 2-6): 문장마다 모양·방향·숫자·금지어·길이·이름을 검사한다.
 // 판단은 코드가 한다. LLM 문장의 숫자는 그 문장의 factIds가 가리키는 fact의 표기(또는 어림 규칙)와만 대조한다.
-import type { Fact, FactSheet, Slot } from './facts.js';
+import { isReversed, type Fact, type FactSheet, type Slot } from './facts.js';
 import {
+  allowedUnitWords,
   AREAS,
+  DEATH_CLAUSE,
   DIRECTION_WORDS,
   FORBIDDEN_PATTERNS,
   INTERPRETIVE_WORDS,
   NUMBER_NAME_PATTERNS,
+  REVERSAL_WORDS,
+  SUBJECT_DIRECTION_WORDS,
+  SWING_WORDS,
+  UNIT_WORD_RE,
   VERDICT_OPPOSITE,
   VERDICT_WORDS,
   type Area,
 } from './labels.js';
+import type { KeyMoment } from '../types.js';
 
 export type VerifyRule = 'shape' | 'direction' | 'number' | 'forbidden' | 'length' | 'name';
 
@@ -39,6 +46,8 @@ export interface NumberToken {
   value: number;
   /** 약/정도 = about, 넘게/이상/남짓 = over, 가까이/미만/이하 = under */
   approx: 'about' | 'over' | 'under' | null;
+  /** 숫자 바로 뒤 단위어 (골드·킬·데스·CS·개·번·분·%p 등). 없으면 null */
+  unit: string | null;
 }
 
 const KOREAN_NUM: Readonly<Record<string, number>> = {
@@ -53,7 +62,7 @@ const KOREAN_NUM: Readonly<Record<string, number>> = {
   아홉: 9,
   열: 10,
 };
-const KOREAN_UNIT = '(?:번|명|개|킬|데스|차례|회|판|마리)';
+const KOREAN_UNIT = '(번|명|개|킬|데스|차례|회|판|마리)';
 const KOREAN_RE = new RegExp(`(^|[^가-힣])(한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\\s*${KOREAN_UNIT}(?!째)(도)?`, 'g');
 const NUMBER_RE = /(약\s*)?([-−])?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?(\s*(?:넘게|이상|남짓|가까이|미만|이하|정도))?/g;
 
@@ -71,13 +80,21 @@ export function extractNumbers(text: string): NumberToken[] {
     const value = Number(m[3]!.replace(/,/g, '') + (m[4] ?? '')) * (negative ? -1 : 1);
     const word = m[5]?.trim();
     const approx = m[1] || word === '정도' ? 'about' : word && ['넘게', '이상', '남짓'].includes(word) ? 'over' : word ? 'under' : null;
-    out.push({ raw: m[0].trim(), value, approx });
+    // 단위는 숫자(소수 포함) 바로 뒤에서 읽는다 ("약 3,900골드 넘게"의 골드)
+    const end = idx + (m[1]?.length ?? 0) + (m[2]?.length ?? 0) + m[3]!.length + (m[4]?.length ?? 0);
+    out.push({ raw: m[0].trim(), value, approx, unit: unitWord(t.slice(end)) });
   }
   for (const m of t.matchAll(KOREAN_RE)) {
-    const n = m[3] === '도' && m[2] === '한' ? 0 : KOREAN_NUM[m[2]!]!;
-    out.push({ raw: m[0].trim(), value: n, approx: null });
+    const n = m[4] === '도' && m[2] === '한' ? 0 : KOREAN_NUM[m[2]!]!;
+    out.push({ raw: m[0].trim(), value: n, approx: null, unit: unitWord(m[3]!) });
   }
   return out;
+}
+
+/** 문자열 맨 앞의 단위어 (공백 1칸까지 허용). CS는 대문자로 맞춘다 */
+function unitWord(rest: string): string | null {
+  const u = UNIT_WORD_RE.exec(rest)?.[1];
+  return u ? (u === 'cs' ? 'CS' : u) : null;
 }
 
 function displayValues(f: Fact): number[] {
@@ -100,6 +117,36 @@ export function numberMatchesFact(tok: NumberToken, f: Fact): boolean {
 // ---------- 칸 하나 검사 ----------
 
 const hasAny = (text: string, words: readonly string[]) => words.some((w) => text.includes(w));
+
+/** 결정적 장면 방향 검사: 역전이면 벌어/좁혀 둘 다 금지, 아니면 반대 방향 금지. 우리 팀 손익(이득/손해)이 반대면 실패 */
+function keyMomentDirection(km: KeyMoment, text: string, requireWord: boolean): string[] {
+  const out: string[] = [];
+  if (isReversed(km.goldDiffBefore, km.goldDiffAfter)) {
+    if (requireWord && !hasAny(text, REVERSAL_WORDS)) out.push(`앞선 팀이 바뀐 장면인데 바뀜을 뜻하는 말(${REVERSAL_WORDS.join('/')})이 없음`);
+    const w = [...DIRECTION_WORDS.widened, ...DIRECTION_WORDS.narrowed].find((x) => text.includes(x));
+    if (w) out.push(`앞선 팀이 바뀐 장면에는 격차가 벌어졌다/좁혀졌다고 쓰지 않음: "${w}" (우리 팀 기준 골드 변화 swingAbs로 쓴다)`);
+  } else {
+    const opp = km.direction === 'widened' ? 'narrowed' : 'widened';
+    if (requireWord && !hasAny(text, DIRECTION_WORDS[km.direction])) out.push(`격차 방향 단어(${DIRECTION_WORDS[km.direction].join('/')})가 없음`);
+    const w = DIRECTION_WORDS[opp].find((x) => text.includes(x));
+    if (w) out.push(`격차가 ${km.direction === 'widened' ? '벌어졌는데' : '좁혀졌는데'} "${w}"`);
+  }
+  if (km.swing !== 0) {
+    const wrong = SWING_WORDS[km.swing > 0 ? 'loss' : 'gain'].find((x) => text.includes(x));
+    if (wrong) out.push(`우리 팀 골드가 ${km.swing > 0 ? '늘었는데' : '줄었는데'} "${wrong}"`);
+  }
+  return out;
+}
+
+/** 좋은 점 칸에 부족 방향 단어, 부족한 점 칸에 좋음 방향 단어가 있는지 */
+function subjectDirection(subjectId: string, kind: 'good' | 'bad', text: string): string | null {
+  const words = SUBJECT_DIRECTION_WORDS[subjectId];
+  if (!words) return null;
+  // 데스가 주인공이 아닌 과목은 "데스가 많았" 같은 구절을 빼고 본다
+  const t = subjectId === 'macro.solo' ? text : text.replace(DEATH_CLAUSE, ' ');
+  const wrong = (kind === 'good' ? words.bad : words.good).find((w) => t.includes(w));
+  return wrong ? `${kind === 'good' ? '좋은 점' : '부족한 점'} 칸에 반대 방향 단어 "${wrong}"` : null;
+}
 
 function sentenceCount(text: string): number {
   return text
@@ -166,28 +213,26 @@ export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): Verify
     }
     if (v.keyMomentIndex !== null) {
       const km = sheet.result.keyMoments[v.keyMomentIndex];
-      if (km) {
-        const opp = km.direction === 'widened' ? 'narrowed' : 'widened';
-        const w = DIRECTION_WORDS[opp].find((x) => text.includes(x));
-        if (w) add('direction', `결정적 장면은 격차가 ${km.direction === 'widened' ? '벌어졌는데' : '좁혀졌는데'} "${w}"`);
-      }
+      if (km) for (const d of keyMomentDirection(km, text, false)) add('direction', `결정적 장면: ${d}`);
     }
   } else if (slot.area === 'keyMoment' && slot.index !== null) {
     const km = sheet.result.keyMoments[slot.index];
-    if (km) {
-      const opp = km.direction === 'widened' ? 'narrowed' : 'widened';
-      if (!hasAny(text, DIRECTION_WORDS[km.direction])) add('direction', `격차 방향 단어(${DIRECTION_WORDS[km.direction].join('/')})가 없음`);
-      const w = DIRECTION_WORDS[opp].find((x) => text.includes(x));
-      if (w) add('direction', `격차가 ${km.direction === 'widened' ? '벌어졌는데' : '좁혀졌는데'} "${w}"`);
-    }
+    if (km) for (const d of keyMomentDirection(km, text, true)) add('direction', d);
+  } else if (slot.kind !== null && slot.subjectId !== null) {
+    const d = subjectDirection(slot.subjectId, slot.kind, text);
+    if (d) add('direction', d);
   }
 
-  // 3. 숫자
+  // 3. 숫자 (값 + 단위: 숫자 바로 뒤 단위어가 있으면 맞은 fact 중 하나는 그 단위를 허용해야 한다)
   const facts = st.factIds.map((id) => sheet.byId.get(id)).filter((f): f is Fact => f !== undefined);
   for (const tok of extractNumbers(text)) {
-    if (!facts.some((f) => numberMatchesFact(tok, f))) {
+    const matched = facts.filter((f) => numberMatchesFact(tok, f));
+    if (matched.length === 0) {
       const near = facts.filter((f) => typeof f.value === 'number').map((f) => `${f.id}=${f.display[0]}`);
       add('number', `"${tok.raw}"가 이 문장의 factIds 값과 맞지 않음${near.length ? ` (쓸 수 있는 값: ${near.slice(0, 6).join(', ')})` : ' (factIds에 숫자 fact 없음)'}`);
+    } else if (tok.unit !== null && !matched.some((f) => allowedUnitWords(f.id, f.unit).includes(tok.unit!))) {
+      const can = matched.map((f) => `${f.id}(${allowedUnitWords(f.id, f.unit).join('·') || '단위어 없음'})`).join(', ');
+      add('number', `단위: "${tok.raw}" 뒤 "${tok.unit}"는 이 값의 fact가 허용하지 않음 — ${can}`);
     }
   }
 

@@ -147,7 +147,7 @@ export function buildFacts(result: AnalysisResult, championNames: ReadonlyMap<nu
         ids.push(b.num(`${it.id}.me`, `${name} (나)`, it.me, unit, step));
         ids.push(b.num(`${it.id}.enemy`, `${name} (상대)`, it.enemy, unit, step));
       }
-      ids.push(b.num(`${it.id}.diffAbs`, `${name} 차이`, Math.abs(it.diff), it.id === 'laning.gold' ? '골드' : '', step));
+      ids.push(b.num(`${it.id}.diffAbs`, `${name} 차이`, Math.abs(it.diff), it.id === 'laning.gold' ? '골드' : it.id === 'laning.cs' ? '개' : '', step));
       perItem.set(it.id, ids);
     }
     if (laning.deathsBeforeReferenceSec.length > 0) {
@@ -180,8 +180,11 @@ export function buildFacts(result: AnalysisResult, championNames: ReadonlyMap<nu
   }
 
   // ---------- 결정적 장면 ----------
+  // 앞선 팀이 바뀐 장면(역전)은 |뒤|−|앞|(gapChangeAbs)이 실제 손익을 작게 보이게 하므로 주지 않고,
+  // 우리 팀 기준 골드 변화 크기(swingAbs)와 얻음/잃음(swingSide)으로 말하게 한다 (Q1)
   const kmIds: string[][] = result.keyMoments.map((m, i) => {
     const p = `keyMoment.${i}`;
+    const reversed = isReversed(m.goldDiffBefore, m.goldDiffAfter);
     const ids = [
       b.min(`${p}.startMin`, `${i + 1}번째 장면 싸움 시작`, m.startSec),
       b.min(`${p}.endMin`, `${i + 1}번째 장면 마지막 킬`, m.endSec),
@@ -190,7 +193,10 @@ export function buildFacts(result: AnalysisResult, championNames: ReadonlyMap<nu
       b.num(`${p}.killsTheirs`, `${i + 1}번째 장면 상대 팀 킬`, m.killsTheirs, '개'),
       b.num(`${p}.goldGapBeforeAbs`, `${i + 1}번째 장면 전 팀 골드 격차`, Math.abs(m.goldDiffBefore), '골드', GOLD_STEP),
       b.num(`${p}.goldGapAfterAbs`, `${i + 1}번째 장면 뒤 팀 골드 격차`, Math.abs(m.goldDiffAfter), '골드', GOLD_STEP),
-      b.num(`${p}.gapChangeAbs`, `${i + 1}번째 장면 골드 격차 변화`, Math.abs(m.gapChange), '골드', GOLD_STEP),
+      ...(reversed ? [] : [b.num(`${p}.gapChangeAbs`, `${i + 1}번째 장면 골드 격차 변화`, Math.abs(m.gapChange), '골드', GOLD_STEP)]),
+      b.num(`${p}.swingAbs`, `${i + 1}번째 장면에서 우리 팀 골드가 얻거나 잃은 크기`, Math.abs(m.swing), '골드', GOLD_STEP),
+      b.text(`${p}.swingSide`, `${i + 1}번째 장면 골드 변화 (우리 팀 기준)`, swingSide(m.swing)),
+      b.text(`${p}.reversed`, `${i + 1}번째 장면에서 앞선 팀이 바뀌었나`, reversed ? '바뀜' : '그대로'),
       b.text(`${p}.leaderBefore`, `${i + 1}번째 장면 전 골드가 앞선 팀`, leader(m.goldDiffBefore)),
       b.text(`${p}.leaderAfter`, `${i + 1}번째 장면 뒤 골드가 앞선 팀`, leader(m.goldDiffAfter)),
     ];
@@ -229,6 +235,17 @@ export function buildFacts(result: AnalysisResult, championNames: ReadonlyMap<nu
     allowedNames: uniq(allowedNames),
     result,
   };
+}
+
+/** 앞선 팀이 바뀌었나 (우리 팀 기준 골드 차의 부호가 반대로). 0(같음)에서 시작하거나 끝나면 역전이 아니다 */
+export function isReversed(before: number, after: number): boolean {
+  return before * after < 0;
+}
+
+function swingSide(swing: number): string {
+  if (swing > 0) return '우리 팀이 얻음';
+  if (swing < 0) return '우리 팀이 잃음';
+  return '변화 없음';
 }
 
 function leader(diff: number): string {

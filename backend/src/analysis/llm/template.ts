@@ -1,6 +1,6 @@
 // 템플릿 문장 (ai_spec 2-6): LLM 실패·검증 실패 때 쓰는 대체 문장.
 // 숫자는 facts의 display[0]을 그대로 넣어 검증기를 항상 통과한다 (테스트로 확인).
-import type { FactSheet, Slot } from './facts.js';
+import { isReversed, type FactSheet, type Slot } from './facts.js';
 import type { SlotText } from './verify.js';
 
 export const LANING_UNAVAILABLE_TEXT = '이 판은 라인전 상대를 비교할 수 없었습니다.';
@@ -84,8 +84,15 @@ const VERDICT_END: Record<string, string> = { 우세: '우세였습니다', 열�
 function keyMomentText(sheet: FactSheet, index: number, p: Pick, withFollowUp: boolean): string {
   const km = sheet.result.keyMoments[index]!;
   const k = `keyMoment.${index}`;
-  const dir = km.direction === 'widened' ? '벌어졌습니다' : '좁혀졌습니다';
-  let s = `${p(`${k}.startMin`)}분 킬 ${p(`${k}.kills`)}개가 난 싸움 뒤 골드 격차가 ${p(`${k}.gapChangeAbs`)} ${dir}.`;
+  let s: string;
+  if (isReversed(km.goldDiffBefore, km.goldDiffAfter)) {
+    // 역전: 격차 변화(|뒤|−|앞|) 대신 앞선 팀이 바뀐 것과 우리 팀 기준 손익을 쓴다 (Q1)
+    const side = km.swing > 0 ? '이득을' : '손해를';
+    s = `${p(`${k}.startMin`)}분 킬 ${p(`${k}.kills`)}개가 난 싸움 뒤 골드가 앞선 팀이 ${p(`${k}.leaderBefore`)}에서 ${p(`${k}.leaderAfter`)}으로 바뀌었고, 우리 팀이 골드 ${p(`${k}.swingAbs`)} ${side} 봤습니다.`;
+  } else {
+    const dir = km.direction === 'widened' ? '벌어졌습니다' : '좁혀졌습니다';
+    s = `${p(`${k}.startMin`)}분 킬 ${p(`${k}.kills`)}개가 난 싸움 뒤 골드 격차가 ${p(`${k}.gapChangeAbs`)} ${dir}.`;
+  }
   if (withFollowUp && has(sheet, `${k}.followUp.0`)) s += ` 이어서 ${p(`${k}.followUp.0`)}.`;
   return s;
 }

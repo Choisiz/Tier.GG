@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { numberDisplay } from '../../../../src/analysis/llm/facts.js';
 import { checkFirstAnswer, extractNumbers, findChampionNames, numberMatchesFact, verifySlot } from '../../../../src/analysis/llm/verify.js';
-import { ALL_NAMES, ctxOf, passingAnswer, senaSheet } from './helpers.js';
+import { SUBJECT_DIRECTION_WORDS } from '../../../../src/analysis/llm/labels.js';
+import { ALL_NAMES, ctxOf, passingAnswer, senaSheet, set5Sheet } from './helpers.js';
 
 const sheet = senaSheet();
 const ctx = ctxOf(sheet);
@@ -145,5 +146,78 @@ describe('검사 1: 모양', () => {
     const c = checkFirstAnswer(a, ctx);
     assert.deepEqual(c.failures.map((f) => [f.slot, f.rule]), [['laning.bad.1', 'shape']]);
     assert.equal(c.extras.length, 2);
+  });
+});
+
+describe('검사 3-1: 단위 (Q1)', () => {
+  it('숫자 바로 뒤 단위어를 읽는다 (공백 1칸, "분당"·"번째"는 단위로 보지 않음)', () => {
+    assert.deepEqual(
+      extractNumbers('1킬 5데스, 3,895골드, 7.4개, 5.7%p, 28.7%, 8 레벨, 두 번, 15분, 3 분당').map((x) => x.unit),
+      ['킬', '데스', '골드', '개', '%p', '%', '레벨', '분', null, '번'],
+    );
+  });
+  const KM1 = ['keyMoment.1.startMin', 'keyMoment.1.killsOurs', 'keyMoment.1.killsTheirs', 'keyMoment.1.gapChangeAbs'];
+  it('팀 킬은 "킬"로 쓰면 통과, "데스"로 쓰면 실패 (원딜 km1 "1킬 5데스" 유형)', () => {
+    // 세나 km1: 우리 팀 0킬, 상대 팀 3킬
+    assert.deepEqual(rules('keyMoment.1', '16.7분 싸움에서 우리 팀 0킬, 상대 팀 3킬로 골드 격차가 3,887 벌어졌습니다.', KM1), []);
+    assert.deepEqual(rules('keyMoment.1', '16.7분 싸움에서 0킬 3데스로 골드 격차가 3,887 벌어졌습니다.', KM1), ['number']);
+  });
+  it('플레이어 데스 fact는 "데스"·"번" 허용, 골드 차이에 "개"는 실패, 단위어 없으면 값만 본다', () => {
+    const ids = [...GOLD, 'laning.deathsBefore.count'];
+    assert.deepEqual(rules('laning.bad.0', '15분 전 2데스로 골드가 상대 애쉬보다 703골드 적었습니다.', ids), []);
+    assert.deepEqual(rules('laning.bad.0', '15분 전 2번 죽어 골드가 상대 애쉬보다 703 적었습니다.', ids), []);
+    assert.deepEqual(rules('laning.bad.0', '15분 골드가 상대 애쉬보다 703개 적었습니다.', GOLD), ['number']);
+    assert.deepEqual(rules('laning.bad.0', '15골드 시점에 상대 애쉬보다 703 적었습니다.', GOLD), ['number']);
+  });
+  it('%와 %p를 구분한다 (차이는 %p)', () => {
+    assert.deepEqual(rules('fight.bad.1', '오브젝트 싸움 득실 중 우리 팀 몫이 4.5%에 그쳤습니다.', ['fight.advantage.sharePct']), []);
+    assert.deepEqual(rules('fight.bad.1', '오브젝트 싸움 득실 중 우리 팀 몫이 4.5%p에 그쳤습니다.', ['fight.advantage.sharePct']), ['number']);
+  });
+});
+
+describe('검사 2-1: 좋은 점·부족한 점 칸 방향 (Q1)', () => {
+  const fake = (subjectId: string, kind: 'good' | 'bad') => ({ slot: `${subjectId.split('.')[0]}.${kind}.0`, area: subjectId.split('.')[0] as 'laning', kind, subjectId, index: null, factIds: [] });
+  const dir = (subjectId: string, kind: 'good' | 'bad', text: string) => verifySlot(fake(subjectId, kind), { text, factIds: [] }, ctx).map((f) => f.rule);
+  it('과목마다 반대 방향 단어가 있으면 실패, 맞는 방향은 통과', () => {
+    for (const [id, w] of Object.entries(SUBJECT_DIRECTION_WORDS)) {
+      assert.deepEqual(dir(id, 'bad', `상대보다 ${w.good[0]}습니다.`), ['direction'], `${id} bad "${w.good[0]}"`);
+      assert.deepEqual(dir(id, 'good', `상대보다 ${w.bad[0]}습니다.`), ['direction'], `${id} good "${w.bad[0]}"`);
+      assert.deepEqual(dir(id, 'good', `상대보다 ${w.good[0]}습니다.`), [], `${id} good "${w.good[0]}"`);
+      assert.deepEqual(dir(id, 'bad', `상대보다 ${w.bad[0]}습니다.`), [], `${id} bad "${w.bad[0]}"`);
+    }
+  });
+  it('리뷰 탐침: 부족한 점 칸에 "703 많았습니다"는 실패', () => {
+    assert.deepEqual(rules('laning.bad.0', '15분 골드가 상대 애쉬보다 703 많았습니다.', GOLD), ['direction']);
+  });
+  it('데스가 주인공이 아닌 과목은 "데스가 많았" 구절을 빼고 본다, 단독 킬·데스는 데스 방향이 뒤집힌다', () => {
+    assert.deepEqual(dir('laning.gold', 'bad', '그 전에 데스가 많았고 골드가 적었습니다.'), []);
+    assert.deepEqual(dir('macro.solo', 'bad', '단독 데스가 많았습니다.'), []);
+    assert.deepEqual(dir('macro.solo', 'good', '단독 데스가 많았습니다.'), ['direction']);
+    assert.deepEqual(dir('macro.solo', 'good', '단독 데스가 적었습니다.'), []);
+  });
+});
+
+describe('검사 2-2: 앞선 팀이 바뀐 결정적 장면 (Q1, 원딜 판 KR_8419447142 p4)', () => {
+  const s = set5Sheet('KR_8419447142');
+  const c = ctxOf(s);
+  const r = (slotId: string, text: string, factIds: string[]) => verifySlot(s.slots.find((x) => x.slot === slotId)!, { text, factIds }, c);
+  const KM0 = ['keyMoment.0.startMin', 'keyMoment.0.killsOurs', 'keyMoment.0.killsTheirs', 'keyMoment.0.swingAbs', 'keyMoment.0.leaderBefore', 'keyMoment.0.leaderAfter'];
+  it('바뀜 + 우리 팀 손해 swingAbs는 통과 (어림 포함)', () => {
+    assert.deepEqual(r('keyMoment.0', '23.6분 싸움에서 우리 팀 0킬, 상대 팀 3킬로 앞선 팀이 상대 팀으로 바뀌었고, 우리 팀은 골드 약 4,400 손해를 봤습니다.', KM0), []);
+  });
+  it('리뷰 문장 "300 벌어졌고 … 바뀌었습니다"는 방향·숫자·없는 fact로 실패', () => {
+    const f = r('keyMoment.0', '23.6분 싸움에서 상대 팀만 3킬을 올리며 골드 격차가 300 벌어졌고, 앞선 팀이 상대 팀으로 바뀌었습니다.', [...KM0, 'keyMoment.0.gapChangeAbs']);
+    assert.deepEqual([...new Set(f.map((x) => x.rule))].sort(), ['direction', 'number', 'shape']);
+  });
+  it('"좁혀졌습니다"(km2)·바뀜 말 없음·"이득"(실제 손해)은 실패', () => {
+    const KM2 = ['keyMoment.2.startMin', 'keyMoment.2.swingAbs'];
+    assert.ok(r('keyMoment.2', '16.6분 싸움 뒤 우리 팀이 앞서던 골드 격차가 3,618 좁혀졌습니다.', KM2).some((x) => x.rule === 'direction'));
+    assert.deepEqual(r('keyMoment.2', '16.6분 싸움으로 우리 팀이 골드 3,618 손해를 봤습니다.', KM2).map((x) => x.rule), ['direction']);
+    assert.deepEqual(r('keyMoment.2', '16.6분 싸움으로 앞선 팀이 바뀌었고 우리 팀이 골드 3,618 이득을 봤습니다.', KM2).map((x) => x.rule), ['direction']);
+  });
+  it('요약도 역전 장면이면 벌어/좁혀 금지', () => {
+    const ids = s.slots.find((x) => x.slot === 'summary')!.factIds;
+    const f = r('summary', '라인전은 열세였고, 오브젝트 싸움은 잘했고, 그 밖의 운영은 부족했습니다. 23.6분 싸움 뒤 골드 격차가 벌어졌습니다.', ids);
+    assert.deepEqual(f.map((x) => x.rule), ['direction']);
   });
 });

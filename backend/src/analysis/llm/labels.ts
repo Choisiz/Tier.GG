@@ -86,6 +86,75 @@ export const DIRECTION_WORDS: Readonly<Record<'widened' | 'narrowed', readonly s
   narrowed: ['좁혀', '줄어', '줄었', '따라잡', '따라붙'],
 };
 
+/** 앞선 팀이 바뀐 결정적 장면에 있어야 하는 말 (역전 장면에는 벌어/좁혀 대신 이 말을 쓴다) */
+export const REVERSAL_WORDS: readonly string[] = ['바뀌', '바뀐', '뒤집', '역전', '넘어갔', '넘어간'];
+
+/** 결정적 장면에서 우리 팀이 골드를 얻었는지/잃었는지 말하는 단어. 반대쪽 단어가 있으면 실패 */
+export const SWING_WORDS: Readonly<Record<'gain' | 'loss', readonly string[]>> = {
+  gain: ['이득'],
+  loss: ['손해'],
+};
+
+/**
+ * 좋은 점·부족한 점 칸의 방향 단어 (과목마다). good = 잘했다는 뜻, bad = 부족했다는 뜻.
+ * 좋은 점 칸에 bad 단어, 부족한 점 칸에 good 단어가 있으면 실패.
+ * 데스가 섞인 과목(KDA·단독 킬/데스)은 "많았·적었"이 뒤집히므로 그 말을 빼고 따로 둔다.
+ */
+const MORE_IS_GOOD = { good: ['많았', '높았', '앞섰'], bad: ['적었', '낮았', '뒤졌', '뒤처', '그쳤'] } as const;
+const SHARE = { good: ['컸', '높았', '많았'], bad: ['그쳤', '작았', '낮았', '적었'] } as const;
+export const SUBJECT_DIRECTION_WORDS: Readonly<Record<string, { good: readonly string[]; bad: readonly string[] }>> = {
+  'laning.gold': MORE_IS_GOOD,
+  'laning.cs': MORE_IS_GOOD,
+  'laning.level': MORE_IS_GOOD,
+  'laning.kda': { good: ['좋았', '앞섰', '높았'], bad: ['나빴', '뒤졌', '뒤처', '낮았'] },
+  'fight.advantage': SHARE,
+  'fight.damage': SHARE,
+  'fight.vision': { good: ['높았', '많았'], bad: ['낮았', '적었', '그쳤'] },
+  'fight.objective': { good: ['많았'], bad: ['못했', '적었', '그쳤'] },
+  'macro.advantage': SHARE,
+  'macro.side': { good: ['높았', '컸', '많았', '좋았'], bad: ['낮았', '약했', '적었', '그쳤'] },
+  'macro.farm': MORE_IS_GOOD,
+  'macro.vision': { good: ['높았', '많았'], bad: ['낮았', '적었', '그쳤'] },
+  // 데스는 적을수록 좋다: "데스가 적었" = 좋음, "데스가 많았" = 부족
+  'macro.solo': { good: ['좋았', '앞섰', '킬이 많', '데스가 적', '데스는 적'], bad: ['나빴', '밀렸', '데스가 많', '데스는 많', '데스가 더 많', '킬이 적', '킬은 적'] },
+};
+
+/** 데스를 말하는 구절. 데스가 주인공이 아닌 과목의 방향 검사에서는 이 구절을 지우고 본다 ("그 전 데스가 많았습니다") */
+export const DEATH_CLAUSE = /데스[가는이도]?\s*(?:더\s*)?(?:많았|적었)/g;
+
+/** 숫자 바로 뒤에 오면 단위로 읽는 말 (긴 것부터) */
+export const UNIT_WORD_RE = /^\s?(%p|%포인트|%|골드|킬|데스|어시스트|CS|cs|개|번(?!째)|회|분(?!당|석|명)|초(?!반)|레벨)/;
+
+/**
+ * fact별 허용 단위어. 기본은 fact.unit에서 정하고, 아래 표의 id 패턴이 맞으면 그 목록을 쓴다.
+ * 숫자 뒤에 단위어가 있으면 그 숫자와 맞은 fact 중 하나는 그 단위를 허용해야 한다 (예: 팀 킬 5를 "5데스"로 쓰면 실패).
+ */
+const UNIT_BY_FACT: readonly { re: RegExp; units: readonly string[] }[] = [
+  { re: /^keyMoment\.\d+\.(kills|killsOurs|killsTheirs)$/, units: ['킬', '개', '번'] },
+  { re: /^laning\.kda\.(me|enemy)\.kills$/, units: ['킬', '번', '회'] },
+  { re: /^laning\.kda\.(me|enemy)\.deaths$/, units: ['데스', '번', '회'] },
+  { re: /^laning\.kda\.(me|enemy)\.assists$/, units: ['어시스트', '번', '회'] },
+  { re: /^laning\.deathsBefore\.count$/, units: ['번', '회', '데스'] },
+  { re: /^laning\.level\./, units: ['레벨'] },
+  { re: /^(laning\.cs|macro\.farm\.(cs15|csEnd|perMinute))(\.|$)/, units: ['개', 'CS'] },
+  { re: /^macro\.solo\.kills$/, units: ['번', '회', '킬'] },
+  { re: /^macro\.solo\.deaths$/, units: ['번', '회', '데스'] },
+  { re: /^fight\.objective\.lastHits$/, units: ['번', '회', '개'] },
+];
+const UNIT_DEFAULT: Readonly<Record<string, readonly string[]>> = {
+  골드: ['골드'],
+  분: ['분'],
+  '%': ['%'],
+  '%p': ['%p', '%포인트'],
+  개: ['개'],
+  번: ['번', '회'],
+};
+
+/** 이 fact 숫자 바로 뒤에 써도 되는 단위어 (비어 있으면 단위어를 붙이지 않는다) */
+export function allowedUnitWords(factId: string, unit: string): readonly string[] {
+  return UNIT_BY_FACT.find((x) => x.re.test(factId))?.units ?? UNIT_DEFAULT[unit] ?? [];
+}
+
 /** 데이터가 직접 말하지 않는 해석어. 있으면 "보입니다"로 끝맺어야 한다 */
 export const INTERPRETIVE_WORDS: readonly string[] = ['이니시', '버스', '캐리', '무리', '던지', '던졌', '실수', '판단', '집중력', '욕심'];
 
