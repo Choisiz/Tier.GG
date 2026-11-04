@@ -436,6 +436,27 @@ npm run test:integration            # 실제 Supabase, 모두 ROLLBACK. 05:00 KS
  "meta":{"engineVersion":"2026-11-02.2","promptVersion":"2026-11-03.1","knowledgeVersion":null,"championDataVersion":"16.21.1","generatedAt":"2026-11-03T06:27:01.041Z"}}
 ```
 
+### 4-9. 개인 키 전환과 전체 재수집 (2026-11-04, 코드 변경 없음)
+
+> 요약: 개발 키(24시간 만료) → Riot 개인 키로 바꾸고, 옛 데이터를 모두 지운 뒤 다시 모았다. 로그 `backend/logs/collect-2026-11-04.log`.
+
+- 이유: PUUID는 앱(키)마다 다르게 암호화된다. 개인 키(새 앱)로는 저장된 표본 PUUID가 `400 Exception decrypting`이라 표본부터 다시 뽑아야 했다. 옛 게임(9/30~10/14)은 14일 창 밖이라 통계에 쓰이지 않았다.
+- 삭제(사용자 승인, 한 트랜잭션): `purge_old_games(14)` 3,975게임(match_players CASCADE), `DELETE FROM ranked_players` 765명. 집계 표는 남겨 두었다가 재집계로 교체.
+
+| 값 | 수치 |
+|----|------|
+| 명령 | `caffeinate -i npm run collect -- run --preset test --players-per-tier 500` |
+| 표본 | **1,500명** (플래티넘·에메랄드·다이아 각 500), seed `1883923805` |
+| 게임 ID 0개 플레이어 | 825명 (55%) |
+| 찾은 ID / 새 ID | 6,961 / 6,922 |
+| 저장 | **6,800게임** (2026-10-20 ~ 11-03), 실패 0 |
+| 건너뜀 | `too_short` 115, `out_of_window` 7, 경고 0 |
+| Riot 호출 | **15,234회** (모두 200), 429 0회, 재시도 0 |
+| 시간 | 18,734초 (약 5.2시간), 그중 제한기 대기 14,727초 |
+| 패치 | 16.21, 16.20 |
+| 집계 | `aggregate` 성공: 창 안 6,788게임(패치 16.21), 아이템 20,646 · 룬 4,480 · 스킬 3,830 · 주문 1,856행 |
+| DB 크기 | 96MB(옛 데이터) → **103MB** |
+
 ---
 
 ## 5. 계획과 다른 점
