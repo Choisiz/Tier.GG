@@ -1,8 +1,9 @@
 # DB 구현 상태 (`!db` Build)
 
-- 기준: `db/docs/db_spec.md` (현재 계획), 계약 `docs/contracts/db_contract.md` / `db_contract.dbml` **v8**
+- 기준: `db/docs/db_spec.md` (현재 계획), 계약 `docs/contracts/db_contract.md` / `db_contract.dbml` **v9**
 - 대상 DB: Supabase PostgreSQL 17.11, Session pooler, 접속 계정 `postgres` (superuser 아님)
-- 마지막 반영: 변경 04 Build (2026-10-16, 마이그레이션 016 적용) + 변경 04 Review (2026-10-16, PASS with issues, 코드 수정 없음)
+- 마지막 반영: 변경 05 Build (2026-11-04, 마이그레이션 017 적용, RAG 벡터 저장소). 직전: 변경 04 Build + Review (2026-10-16, PASS with issues)
+- 변경 05는 아직 독립 Review 전이다.
 - 이 문서는 **지금 구현 상태만** 둔다. 예전 시도·편차·측정 기록은 git 커밋 `24918eb`의 `db/docs/db_build.md`에 있다.
 - 상태 표기: ✅ 완료 / ⚠️ 부분 완료 / ❌ 실패 / ⏸️ 보류
 
@@ -38,13 +39,14 @@
 | `schema_migrations` | `filename` PK, `checksum`, `applied_at`. RLS 켜짐, `anon`·`authenticated` 권한 회수 | ✅ |
 | `MIGRATIONS_DIR` | 폴더를 바꿔 체크섬 검사를 복사본으로 시험 (운영에서 쓰지 않음) | ✅ |
 | 비밀값 가리기 | `scripts/lib.mjs` `secretsToHide()`: 접속 문자열 전체, 비밀번호·사용자 이름(원문과 디코딩 형태), 호스트를 `***`로. 잘못된 `%` 인코딩이 있어도 나머지는 가려짐 | ✅ |
-| `verify.mjs` | `db/tests/*.sql`을 파일마다 `BEGIN … ROLLBACK`. `TABLES` 11개(원본 3, 운영 1, 집계 7)의 전후 줄 수 비교. `--fresh`면 임시 스키마에 마이그레이션부터 적용 | ✅ |
+| `verify.mjs` | `db/tests/*.sql`을 파일마다 `BEGIN … ROLLBACK`. `TABLES` 11개(원본 3, 운영 1, 집계 7)의 전후 줄 수 비교(`rag_chunk`는 목록에 없음, 13장 #3). `--fresh`면 임시 스키마에 마이그레이션부터 적용 | ✅ |
+| 변경 05 실행기 | **수정 없음.** search_path는 그대로 `public, pg_catalog`(fresh는 `migration_check, pg_catalog`)이고, 017이 `extensions.vector`·`OPERATOR(extensions.<=>)`로 접두사를 붙여 해결 (12장 #10) | ✅ |
 
 ---
 
 ## 2. 마이그레이션 파일
 
-> 요약: 001~016이 실제 DB에 적용되어 있고 체크섬 불일치가 없다. 다음 파일은 017이다.
+> 요약: 001~017이 실제 DB에 적용되어 있고 체크섬 불일치가 없다. 다음 파일은 018이다.
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
@@ -65,13 +67,15 @@
 | `015_schedule_daily_refresh.sql` | `CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog`, 같은 이름 작업 `unschedule` 뒤 `tiergg_daily_refresh` 등록 | ✅ |
 | `016_rune_sub_perk_sorted.sql` | `refresh_window_stats` `CREATE OR REPLACE`(013 본문에서 룬 블록만 `least`/`greatest` + `sub_perk1 <> sub_perk2`, `GROUP BY`에는 식 그대로) → 함수 주석 → `REVOKE EXECUTE` → `ANALYZE matches, match_players` → `stats_window`가 있으면 같은 창 `refresh_window_stats(days, window_end)` → CHECK `champion_rune_sub_perk_order_check` → 주석 6개(`ranked_players`, `champion_rune` 테이블·`sub_perk1`·`sub_perk2`, `match_players.sub_perk1`·`sub_perk2`). 2026-10-16 11:13 UTC 적용, 실행기 전체 약 2.8초 | ✅ |
 
+| `017_create_rag_chunk.sql` | `CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions`(0.8.2) → `rag_chunk`(14컬럼, `embedding extensions.vector(1024) NOT NULL`, CHECK 13개) → `rag_chunk_area_role_idx` → 주석(테이블·컬럼 14개) → RLS·`REVOKE ALL` → `search_rag_chunks`(plpgsql, `STABLE`, `SECURITY INVOKER`, `SET search_path FROM CURRENT`, `p_limit` 1~20 아니면 22023) → 함수 주석 → `REVOKE EXECUTE … FROM PUBLIC, anon, authenticated`. 벡터 인덱스 없음. 2026-11-04 13:28 UTC 적용 | ✅ |
+
 - 011·012의 삭제와 015의 지속 설정은 사용자 승인(2026-10-14) 뒤 적용했다. 016의 같은 창 재집계는 승인된 동작(결정 04-A)이고 원본은 바꾸지 않았다. 실제 DB에서 `purge_old_games`는 Build·Review가 실행한 적 없다.
 
 ---
 
 ## 3. 테이블과 제약 조건
 
-> 요약: 테이블 11개 + `schema_migrations`가 계약 v8과 같다.
+> 요약: 테이블 12개 + `schema_migrations`가 계약 v9와 같다.
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
@@ -80,6 +84,8 @@
 | PK / 유니크 | 모든 테이블 PK, 유니크 `champion_rune_page_key` (`champion_id`, `position`, 룬 11개) | ✅ |
 | FK와 삭제 동작 | `matches.puuid` → `ranked_players` SET NULL, `match_players.match_id` → `matches` CASCADE, 상세 4개 `(champion_id, position)` → `champion` CASCADE | ✅ |
 | CHECK | 포지션, 티어(`PLATINUM`~`CHALLENGER`)·랭크, 패치 형식, `KR_` 게임 ID, `game_start_at >= 2020-01-01`, 원본 `skill_order ~ '^[QWER]*$'`, 아이템 ≥ 0, 밴 > 0, 개수(`pick > 0`, `0 ≤ win ≤ pick`), `spell1_id < spell2_id`, `champion_rune_sub_perk_order_check`(`sub_perk1 < sub_perk2`, `convalidated = true`), 집계 `skill_order ~ '^[QWER]{11}$'`, `stats_window`(id 1, days 1~60, 시작 < 끝, games > 0), `stats_window_patch`(형식, games > 0), `collection_logs` 상태·시각·개수 | ✅ |
+| AI 1개 (변경 05) | `rag_chunk`: `id` text PK, `source`·`position`·`role`·`area`·`polarity`·`content`·`content_hash`·`embedding_model` text NOT NULL, `subject`·`patch` text NULL, `champion_id` int NULL, `embedding extensions.vector(1024)` NOT NULL, `updated_at` timestamptz NOT NULL DEFAULT `now()`. 다른 테이블과 FK 없음 | ✅ |
+| `rag_chunk` CHECK 13개 | `id`·`subject`·`content`·`embedding_model` 빈 문자열 금지, `source`(perspective/champion), `position`(5 + ALL), `role`(엔진 유형 10 + ALL, `backend/src/analysis/types.ts`의 `Role`과 같음), `area`(laning/fight/macro/general), `polarity`(good/bad/any), `champion_id > 0`, `source = 'champion'`이면 `champion_id` NOT NULL, `patch ~ '^[0-9]+\.[0-9]+$'`, `content_hash ~ '^[0-9a-f]{64}$'`. 차원이 1,024가 아니면 pgvector가 거부 | ✅ |
 | 주석 | 원본 컬럼에 Riot JSON 경로, 집계·뷰 컬럼 설명. `ranked_players` "티어당 250명", 보조 룬 정렬 문구 (016) | ✅ |
 
 ---
@@ -88,7 +94,8 @@
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
-| 일반 인덱스 | `match_players_champion_id_team_position_idx` 1개. 나머지는 PK·유니크. `matches.game_start_at` 인덱스 없음 (결정 D21) | ✅ |
+| 일반 인덱스 | `match_players_champion_id_team_position_idx`, `rag_chunk_area_role_idx` (`area, role` B-tree, 변경 05) 2개. 나머지는 PK·유니크. `matches.game_start_at` 인덱스 없음 (결정 D21) | ✅ |
+| 벡터 인덱스 | 만들지 않음 (결정 05-B). 1,000행 측정은 11장 | ✅ |
 
 ---
 
@@ -98,12 +105,13 @@
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
-| RLS | public 테이블 12개(`schema_migrations` 포함) 켜짐, FORCE 아님, 정책 0개 | ✅ |
+| RLS | public 테이블 13개(`schema_migrations`, `rag_chunk` 포함) 켜짐, FORCE 아님, 정책 0개 | ✅ |
 | 테이블·뷰 권한 | `anon`·`authenticated` 회수. `relacl`은 `postgres`, `service_role`만 | ✅ |
 | 시퀀스 권한 | `collection_logs_id_seq`, `champion_rune_id_seq` 회수 | ✅ |
-| 함수 권한 | 4개 모두 `proacl = {postgres=X, service_role=X}` (`PUBLIC`·`anon`·`authenticated` 없음) | ✅ |
+| 함수 권한 | 5개(`search_rag_chunks` 포함) 모두 `proacl = {postgres=X, service_role=X}` (`PUBLIC`·`anon`·`authenticated` 없음) | ✅ |
 | 뷰 | `security_invoker = true` | ✅ |
 | 주인 | 모든 객체 `postgres` | ✅ |
+| `rag_chunk` 실제 거부 | 테스트 013이 `SET LOCAL ROLE anon`/`authenticated`로 조회·`search_rag_chunks` 실행을 시도해 public에서 42501 확인 (임시 스키마에서는 스키마 USAGE가 없어 42P01/42883로 먼저 막힘) | ✅ |
 | pg_cron 권한 | 확장 기본 `PUBLIC` EXECUTE(`cron` 함수 7개 중 `schedule` 2개·`unschedule` 2개·`job_cache_invalidate`)와 `cron.job` PUBLIC 읽기는 그대로 둠 (결정 사항). `anon`·`authenticated`는 `cron` 스키마 USAGE가 없어 호출·조회 모두 42501 | ✅ |
 
 ---
@@ -118,6 +126,7 @@
 | `patch_sort_key(text) → int[]` | SQL, IMMUTABLE | ✅ |
 | `tier_from_score(numeric) → smallint` | SQL, IMMUTABLE. 53.0 / 51.5 / 50.0 / 48.5, NULL → NULL | ✅ |
 | `champion_tier_view` | 컬럼 12개(`champion_id`, `position`, `pick`, `win`, `ban`, `games`, `win_rate`, `pick_rate`, `ban_rate`, `adjusted_win_rate`, `tier_score`, `tier`). 분모 `stats_window.games`, 티어는 반올림 전 점수, 50판 미만 NULL | ✅ |
+| `search_rag_chunks(p_embedding extensions.vector, p_role, p_position, p_area, p_subjects text[], p_polarity, p_champion_id int, p_limit int) → TABLE(id, source, area, subject, polarity, content, distance float8)` | plpgsql `STABLE`, `#variable_conflict use_column`. `p_limit` NULL·1~20 밖이면 22023 → `role IN (p_role,'ALL')`, `position IN (p_position,'ALL')`, `area IN (p_area,'general')`, `p_subjects` NULL이 아니면 `subject = ANY OR subject IS NULL`, `polarity IN (p_polarity,'any')`, `source <> 'champion' OR champion_id = p_champion_id` → `ORDER BY embedding OPERATOR(extensions.<=>) p_embedding, id LIMIT p_limit` | ✅ |
 | 공통 | 모두 `SECURITY INVOKER`, `search_path=public, pg_catalog` | ✅ |
 | 016 함수 본문 | 013과 `diff`하면 룬 블록 주석 2줄 + `SELECT`의 보조 룬 2줄 + `WHERE` 1줄 + `GROUP BY` 1줄만 다름. 인자·기본값·반환·`VOLATILE`·`SECURITY INVOKER`·`search_path`·`proacl`(`postgres`, `service_role`)은 016 전과 같음. 실제 `prosrc` md5(`ad7de416...`) = 016 파일 본문 md5 | ✅ |
 
@@ -137,7 +146,7 @@
 
 ## 8. 테스트
 
-> 요약: 11개 파일이 실제 스키마(`verify`)와 임시 스키마(`verify:fresh`)에서 모두 통과한다. 모두 롤백된다.
+> 요약: 12개 파일이 실제 스키마(`verify`)와 임시 스키마(`verify:fresh`)에서 모두 통과한다. 모두 롤백된다.
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
@@ -145,13 +154,15 @@
 | `002_helper_functions.sql` | `patch_sort_key`, `tier_from_score` 경계 | ✅ |
 | `003_refresh_window_stats.sql` | 샘플 20게임(2021-01-10) 기대값, 멱등, P0002에 스냅숏 유지, 인자 오류 5건 | ✅ |
 | `004_champion_tier_view.sql` | 손 계산값, `pick` 49 → NULL, `stats_window` 0줄 → 뷰 0줄 | ✅ |
-| `006_security.sql` | 스키마 전체 자동 검사. 기대 개수 테이블 12, 뷰 1, 시퀀스 2, 함수 4 | ✅ |
+| `006_security.sql` | 스키마 전체 자동 검사. 기대 개수 테이블 12(+ public이면 `schema_migrations` = 13), 뷰 1, 시퀀스 2, 함수 5 (변경 05에서 11·4 → 12·5) | ✅ |
 | `007_skill_order.sql` | 앞 11글자, 상위 10개·동률, CHECK 거부, 구조 | ✅ |
 | `008_ranked_players_tier.sql` | 허용 6, 거부 6, CHECK 정의, `PLATINUM` 표본 참조 | ✅ |
 | `009_window_boundary.sql` | 창 경계 A~H, 패치 구성, 뷰 분모, `p_days = 1` 재집계 | ✅ |
 | `010_purge_old_games.sql` | 21일 경계, CASCADE, 집계 유지, 인자 오류 3건, 두 번째 0 | ✅ |
 | `011_daily_refresh_job.sql` | 확장, 작업 1개, 일정, 명령, 계정·DB, `cron` USAGE 없음, `cron` 스키마 **모든 함수**(지금 7개) 직접 부여 없음(결정 04-D). `PUBLIC`으로 열린 함수 이름은 `[주의]` NOTICE | ✅ |
 | `012_rune_sub_perk_order.sql` | 실제 데이터(롤백, `stats_window`가 있을 때만): 같은 창 재집계 결과 ↔ 원본에서 `least`/`greatest`로 따로 계산한 상위 10개 `EXCEPT` 양방향 0줄, 1순위 = 2순위 0개, 순서만 다른 쌍 0개. 샘플 11게임: 두 순서 합침 7/3, 다른 조합 2/1, 핵심 룬 칸 바뀐 페이지 별도 1/0, 같은 보조 룬 줄 제외(`champion` pick 11), 1순위, CHECK 거부 2건·통과 1건(제약 이름 확인), 제약 정의·`convalidated`. `verify:fresh`에서는 실제 데이터 부분 `[건너뜀]` | ✅ |
+
+| `013_rag_chunk.sql` (변경 05) | 처음에 `rag_chunk`를 비우고(롤백) 시작. ① 컬럼 14개 타입·NOT NULL·기본값 문자열 비교, CHECK 13개 이름, PK, 인덱스 2개(벡터 인덱스 없음), `vector` 확장 스키마 `extensions` ② RLS·정책 0·권한 + `SET LOCAL ROLE`로 실제 거부 ③ CHECK 위반 12건 23514, 3차원 벡터 22000 계열, `embedding` NULL 23502, 정상 경계값 1건 ④ 검색: 가짜 벡터 `[cos θ, sin θ, 0…]` 12줄로 유형·`ALL`·포지션·영역 `general`·과목(1개·2개·NULL, 과목 NULL 조각)·방향(`any`)·챔피언(43·99·NULL) 필터, 거리 순서와 값(`1 − cos 0.1`, 오차 1e-5), `p_limit` 2, 0·21·NULL → 22023, 1·20 허용 ⑤ 1,000행 시간·크기 `[기록]` | ✅ |
 
 - 테스트 번호 005는 비어 있다 (옛 패치 정리 테스트를 지우고 010으로 대체).
 
@@ -161,6 +172,8 @@
 
 | 기능 | 구현 내용 | 상태 |
 |------|-----------|------|
+| `db_contract.md` v9 (변경 05) | v8 내용 + 머리말 v9·"v8 → v9 변경" 표, 2장 테이블 12개·AI 묶음, 4장 ERD 요약에 `rag_chunk`는 관계 없어 12장으로, 8장 인덱스 2줄, 9-1 함수 표에 `search_rag_chunks`, 10장 #7 dbml v9·#16 추가, 11장 pgvector 권한, **12장 신설**(12-1 컬럼 표·CHECK, 12-2 검색 규칙, 12-3 1,000행 측정). 기존 테이블·함수 정의 변경 없음 | ✅ |
+| `db_contract.dbml` v9 (변경 05) | 머리 주석 v9, TableGroup `AI`, `Table rag_chunk`(14컬럼, `embedding "extensions.vector(1024)"`, 인덱스 `(area, role)`), `search_rag_chunks` 주석 블록. 기존 테이블·Ref 변경 없음. dbml 파서로 다시 파싱하지는 않음 (도구 설치 없음) | ✅ |
 | `db_contract.md` v8 | v7 내용 + "v7 → v8 변경" 표, 1장 수집 범위(티어당 250명, 4 : 4 : 2 계획 삭제, 마스터 이상 허용만, 1-2 상한 계산, 1-3 실제 규모), 2장·5장 ① 문구, ERD `sub_perk1 < sub_perk2`, 7장 룬 저장 규칙, 9-2 `champion_rune` 정렬·CHECK, 9-4 `ANALYZE` 5,000게임 근거, 10장 #2 수정·#15 추가, 11장 pg_cron 권한 문장. 티어 기준값 변경 없음 | ✅ (변경 04 반영) |
 | `db_contract.dbml` v8 | 테이블 11개, Ref 6개, TableGroup 원본 3·집계 7·운영 1. 변경 04: 머리 주석 v8, `ranked_players` note(티어당 250명), `champion_rune` note·`sub_perk1`·`sub_perk2` note(CHECK), `match_players.sub_perk1`·`2` note(누른 순서 그대로), 집계 호출 규칙 주석(`ANALYZE` 항상). 구조(컬럼·타입·키) 변경 없음. note 문자열만 바뀌어 파서로 다시 파싱하지는 않음 | ✅ |
 | `.md` ↔ `.dbml` | 컬럼·타입·NOT NULL·기본값·PK·UNIQUE가 서로, 그리고 실제 DB와 같음 | ✅ |
@@ -187,11 +200,19 @@
 
 ## 11. 현재 검증 결과
 
-> 요약: 변경 04 Build(2026-10-16) 결과에 변경 04 Review(2026-10-16)가 다시 잰 동시 호출·성능·예약 작업 값을 반영했다.
+> 요약: 맨 위 5줄은 변경 05 Build(2026-11-04) 결과다. 그 아래는 변경 04 Build·Review(2026-10-16) 값이다.
 
-| 항목 | 결과 |
+| 항목 (변경 05) | 결과 |
 |------|------|
-| `migrate:status` | 001~016 적용됨 (016은 2026-10-16 11:13 UTC), 체크섬 불일치 없음. 다시 `migrate` → "적용할 파일 없음". `git status`에 001~015 변경 없음 |
+| 적용 순서 | `migrate:fresh-check`(17개 통과, 임시 스키마 테이블 12·뷰 1·함수 5) → `verify:fresh`(12개 통과) → `migrate`(017 적용 2026-11-04 13:28 UTC) → `verify`(12개 통과, 006 public 테이블 13·뷰 1·시퀀스 2·함수 5) → 적용 뒤 `migrate:fresh-check` 다시 17개 통과, `migrate` "적용할 파일 없음". 전후 줄 수 같음 |
+| `rag_chunk` 실제 상태 | 0줄. `vector` 0.8.2 (`extensions`) |
+| 1,000행 검색 시간 (롤백) | 필터 질의 `search_rag_chunks(…, 'SUPPORT_DAMAGE','UTILITY','fight', {2과목}, 'bad', 5, 8)` 50회 평균 **0.43ms**(fresh) / **0.48ms**(public), 결과 8줄. 필터 없이 1,000행 전체 거리 정렬 상위 20 `EXPLAIN ANALYZE` **5.7ms / 6.0ms** (순차 스캔 + Sort) |
+| 1,000행 크기 (롤백) | 본문 약 275자 기준 테이블 전체 **6,512kB** (TOAST 5,408kB). 계획 추정 약 4MB + 본문보다 조금 큼 (벡터 1개 4KB가 TOAST로 감) |
+| DB 크기 | 103MB(017 전) → 테스트 뒤 114MB → `VACUUM rag_chunk` 뒤 **108MB** / 500MB (`rag_chunk` 빈 테이블 192kB) |
+
+| 항목 (변경 04 때) | 결과 |
+|------|------|
+| `migrate:status` (변경 04 때) | 001~016 적용됨 (016은 2026-10-16 11:13 UTC), 체크섬 불일치 없음. 다시 `migrate` → "적용할 파일 없음". `git status`에 001~015 변경 없음 |
 | `migrate:fresh-check` | 적용 전·후 모두 16개 파일 통과 (빈 스키마라 016 재집계 단계는 건너뜀), 임시 스키마 테이블 11·뷰 1·함수 4, `migration_check` 남지 않음 |
 | `verify` / `verify:fresh` | 11개 파일 모두 통과, 전후 줄 수 같음. 006 검사 개수 테이블 12·뷰 1·시퀀스 2·함수 4 그대로 |
 | 함수·뷰 본문 | `refresh_window_stats` 실제 md5 = 016 파일 본문. 나머지는 변경 03 Review 확인값 그대로 |
@@ -224,6 +245,9 @@
 | 7 | 성능 측정 스크립트는 scratchpad에만 둔다 | 저장소에 측정용 코드를 남기지 않음 |
 | 8 | 테스트 012는 실제 데이터 검사를 샘플 집계보다 **먼저** 한다 | 샘플 집계가 `stats_window`를 2021년 창으로 바꾸므로 실제 창을 먼저 읽어야 함 |
 | 9 | 016은 기존 스냅숏을 같은 창으로 재집계한 **뒤** CHECK를 건다 | 재집계 전에는 `sub_perk1 > sub_perk2`가 2,064줄이라 CHECK가 바로 실패함 |
+| 10 | 017은 `vector` 타입과 `<=>`를 `extensions.vector`·`OPERATOR(extensions.<=>)`로 적는다. 계획 05-1의 "실행기가 `public, extensions`로 search_path를 잡는다" 대신 | 실행기를 바꾸면 fresh-check의 임시 스키마 규칙과 001~016 체크섬 환경이 달라짐. 접두사면 실행기 수정 없이 실제·임시 스키마와 `SET search_path FROM CURRENT` 함수에서 모두 찾음. 백엔드도 `$1::extensions.vector`로 넘긴다 (계약 12-1) |
+| 11 | 테스트 013은 시작할 때 `rag_chunk`를 비운다 (롤백) | 나중에 실제 조각이 적재돼도 필터 기대값이 섞이지 않게 |
+| 12 | 테스트 013의 `SET ROLE` 거부는 public에서만 42501을 요구한다 | 임시 스키마는 `anon`에게 스키마 USAGE가 없어 42P01/42883로 먼저 막힘 |
 
 ---
 
@@ -235,3 +259,5 @@
 |---|------|------|
 | 1 | 016 이후 첫 05:00 KST 예약 작업(2026-10-16 20:00 UTC) 성공과 그 뒤 중복 0개 확인. 성능·동시 호출은 변경 04 Review에서 확인함 | ⏸️ (다음 실행 뒤 확인) |
 | 2 | 프론트 전달 사항(결정 04-E): `champion_rune` 보조 룬 2개 값이 번호순이 됨. 화면 순서는 Data Dragon 줄 순서로 | ⏸️ (메인 에이전트) |
+| 3 | `verify` 한 번마다 `rag_chunk`에 롤백된 1,000행(약 6.5MB)의 빈 공간이 남는다. autovacuum이 정리하며, Build 뒤에는 `VACUUM`으로 정리함. `verify.mjs`의 `TABLES`에 `rag_chunk`가 없어 전후 줄 수 비교 대상이 아님 (실행기 수정은 범위 밖이라 하지 않음) | ⚠️ (작음) |
+| 4 | 변경 05 독립 Review (Sonnet, diff·계약 변경 절) | ⏸️ (메인 에이전트) |

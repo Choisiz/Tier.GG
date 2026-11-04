@@ -4,7 +4,7 @@
 --   뷰: anon·authenticated 권한 없음, security_invoker = true
 --   시퀀스: anon·authenticated USAGE/SELECT/UPDATE 없음
 --   함수: anon·authenticated·PUBLIC EXECUTE 없음
--- 기대 개수 (변경 03 뒤): 테이블 11 (+ public이면 schema_migrations), 뷰 1, 시퀀스 2, 함수 4
+-- 기대 개수 (변경 05 뒤): 테이블 12 (+ public이면 schema_migrations), 뷰 1, 시퀀스 2, 함수 5 (rag_chunk, search_rag_chunks 추가)
 DO $$
 DECLARE
   v_schema text := current_schema();
@@ -103,11 +103,11 @@ BEGIN
       AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e'));
 
   -- 기대 개수 (객체가 빠지거나 몰래 늘지 않았는지)
-  v_n := 11;
-  IF v_public AND to_regclass('public.schema_migrations') IS NOT NULL THEN v_n := 12; END IF;
+  v_n := 12;
+  IF v_public AND to_regclass('public.schema_migrations') IS NOT NULL THEN v_n := 13; END IF;
   IF v_tables <> v_n
-     OR v_views <> 1 OR v_seqs <> 2 OR v_funcs <> 4 THEN
-    RAISE EXCEPTION '객체 개수 불일치: 테이블 %, 뷰 %, 시퀀스 %, 함수 % (기대 11(+schema_migrations), 1, 2, 4)',
+     OR v_views <> 1 OR v_seqs <> 2 OR v_funcs <> 5 THEN
+    RAISE EXCEPTION '객체 개수 불일치: 테이블 %, 뷰 %, 시퀀스 %, 함수 % (기대 12(+schema_migrations), 1, 2, 5)',
       v_tables, v_views, v_seqs, v_funcs;
   END IF;
   RAISE NOTICE '[통과] 테이블: RLS 켜짐·FORCE 아님·정책 0개·주인 = 실행 역할. anon·authenticated: 테이블·뷰·시퀀스·함수 권한 없음. PUBLIC: 함수 EXECUTE 없음. 뷰 security_invoker = true';

@@ -1,4 +1,5 @@
 // Tier.GG DB 계약 (DB ↔ 백엔드) - dbdiagram.io용 DBML
+// v9 (2026-11-04) - 변경 05: RAG 벡터 저장소 rag_chunk, search_rag_chunks, vector 확장(extensions 스키마)
 // v8 (2026-10-16) - 변경 04: 룬 보조 정렬, 수집 범위 티어당 250명
 // v7 (2026-10-14) - 변경 03: 패치 기준 → 최근 14일 창. game_start_at, stats_window, stats_window_patch
 // 원칙
@@ -33,6 +34,10 @@ TableGroup "집계" [color: #534AB7, note: '최근 14일 원본을 챔피언 x �
 
 TableGroup "운영" [color: #5F5E5A, note: '수집이 언제 돌았고 결과가 어땠는지. 통계와 무관'] {
   collection_logs
+}
+
+TableGroup "AI" [color: #B5573B, note: 'RAG 해석 문서 조각과 임베딩 (v9). 플레이어 성적 지표는 저장하지 않음. 다른 테이블과 관계 없음'] {
+  rag_chunk
 }
 
 
@@ -264,6 +269,45 @@ Table collection_logs [headercolor: #5F5E5A, note: '''
   matches_saved int [note: '새로 저장한 게임 수']
   error_message text [note: '실패했을 때 오류 내용']
 }
+
+
+// ───────────── AI (v9, 변경 05, 마이그레이션 017) ─────────────
+// 확장: CREATE EXTENSION vector WITH SCHEMA extensions (pgvector 0.8.2). 타입은 extensions.vector(1024)
+// 벡터 인덱스(HNSW)는 만들지 않음 (1,000행 필터 질의 약 0.5ms, db_contract.md 12-3)
+
+Table rag_chunk [headercolor: #B5573B, note: '''
+RAG 해석 문서 조각 1개 = 1줄
+- 쓰기: 백엔드 적재기가 INSERT … ON CONFLICT (id) DO UPDATE / DELETE (쓰기 함수 없음)
+- 읽기: search_rag_chunks
+- CHECK: source = champion 이면 champion_id NOT NULL (rag_chunk_champion_source_check)
+'''] {
+  id text [pk, note: '조각 ID (예: fight.damage.SUPPORT_DAMAGE.bad.01). 빈 문자열 금지']
+  source text [not null, note: 'perspective | champion']
+  position text [not null, note: 'TOP | JUNGLE | MIDDLE | BOTTOM | UTILITY | ALL']
+  role text [not null, note: 'TOP_TANK | TOP_DAMAGE | JUNGLE_TANK | JUNGLE_DAMAGE | MID_TANK | MID_DAMAGE | ADC | SUPPORT_TANK | SUPPORT_DAMAGE | SUPPORT_UTILITY | ALL']
+  area text [not null, note: 'laning | fight | macro | general']
+  subject text [note: '엔진 과목 ID (예: fight.damage). null = 과목 무관. 빈 문자열 금지']
+  polarity text [not null, note: 'good | bad | any']
+  champion_id int [note: 'Riot championId > 0. source = champion 이면 not null']
+  patch text [note: '숫자.숫자 형식 CHECK (예: 16.21). null = 패치 무관']
+  content text [not null, note: '조각 본문. 빈 문자열 금지']
+  content_hash text [not null, note: 'content의 sha256, 소문자 16진수 64자']
+  embedding "extensions.vector(1024)" [not null, note: '임베딩 1,024차원 (Voyage AI voyage-4). 코사인 거리 <=>']
+  embedding_model text [not null, note: '예: voyage-4. 빈 문자열 금지']
+  updated_at timestamptz [not null, default: `now()`, note: '마지막 적재 시각']
+
+  indexes {
+    (area, role) [name: 'rag_chunk_area_role_idx', note: '검색 필터']
+  }
+}
+
+// search_rag_chunks(p_embedding extensions.vector(1024), p_role text, p_position text, p_area text,
+//                   p_subjects text[], p_polarity text, p_champion_id int, p_limit int)
+//   RETURNS TABLE (id, source, area, subject, polarity, content, distance double precision)
+//   role IN (p_role, ALL), position IN (p_position, ALL), area IN (p_area, general),
+//   p_subjects가 null이 아니면 subject = ANY(p_subjects) OR subject IS NULL, polarity IN (p_polarity, any),
+//   champion 조각은 champion_id = p_champion_id일 때만. 코사인 거리 오름차순(같으면 id), p_limit 1~20 (아니면 22023)
+//   SECURITY INVOKER, PUBLIC·anon·authenticated 실행 권한 회수. 자세한 규칙은 db_contract.md 12-2
 
 
 // ───────────── 관계 ─────────────

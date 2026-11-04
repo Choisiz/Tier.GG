@@ -2,11 +2,22 @@
 
 > 이 문서는 `!db`가 작성하고 `!백엔드`가 읽는 계약 문서다. 테이블 구조, 수집 범위, 집계 함수, 저장 규칙을 정한다. (CLAUDE.md 9장)
 
-- 상태: **v8 승인됨 (2026-10-16, 변경 04)**
-- 기준: `docs/contracts/db_contract.dbml` (v8, 2026-10-16 변경 04). 이 문서와 dbml이 다르면 dbml이 우선이다.
+- 상태: **v9 승인됨 (2026-11-04, 변경 05)**
+- 기준: `docs/contracts/db_contract.dbml` (v9, 2026-11-04 변경 05). 이 문서와 dbml이 다르면 dbml이 우선이다.
 - DB: Supabase 무료 플랜 (PostgreSQL 17, 500MB)
 - 범위: 챔피언 티어리스트(포지션별 1~5티어) + 챔피언 상세 추천(아이템, 룬, 스펠, 스킬) 통계는 최근 14일 게임 기준.
-- 전적 검색과 AI 피드백용 테이블은 이번 범위에 포함하지 않는다.
+- 전적 검색용 테이블은 이번 범위에 포함하지 않는다. AI 피드백은 RAG 해석 문서 저장소 `rag_chunk`만 둔다 (v9, 12장). 플레이어 성적 지표는 저장하지 않는다.
+
+### v8 → v9 변경 (변경 05, 2026-11-04)
+
+| 변경 | 이유 |
+|------|------|
+| 확장 `vector`(pgvector 0.8.2)를 `extensions` 스키마에 켬 (마이그레이션 `017_create_rag_chunk.sql`) | 임베딩 저장·코사인 거리 계산. Supabase 권장 위치 |
+| 테이블 `rag_chunk` 추가 (해석 문서 조각 + 1,024차원 임베딩, CHECK 13개, 인덱스 `(area, role)`) | `!ai` 3단계 RAG 계약 변경 요청 E1~E6. 임베딩 Voyage AI `voyage-4` 1,024차원 (사용자 결정) |
+| 검색 함수 `search_rag_chunks(…)` 추가 | 백엔드가 벡터 SQL을 직접 짜지 않게 (기존 집계 함수 방식과 같음) |
+| 벡터 인덱스(HNSW)는 만들지 않음 | 조각 1,000개에서 필터 질의 약 0.5ms, 필터 없는 전체 정렬 약 6ms. 근사 인덱스는 필터와 같이 쓰면 결과가 빠질 수 있음 |
+
+- 기존 테이블·함수·뷰와 API 응답 모양은 바뀌지 않는다.
 
 ### v7 → v8 변경 (변경 04, 2026-10-16)
 
@@ -116,7 +127,7 @@
 
 ## 2. 테이블 목록
 
-> 요약: 테이블 11개를 세 묶음으로 나눈다. **원본**(Riot 값 그대로), **집계**(원본을 센 개수, 화면이 읽음), **운영**(수집 기록)이다.
+> 요약: 테이블 12개를 네 묶음으로 나눈다. **원본**(Riot 값 그대로), **집계**(원본을 센 개수, 화면이 읽음), **운영**(수집 기록), **AI**(RAG 해석 문서, v9)이다.
 
 | 묶음 | 테이블 | 한 줄의 의미 | 설명 |
 |------|--------|--------------|------|
@@ -131,6 +142,7 @@
 | 집계 | `champion_spell` | 소환사 주문 조합 1개 | 작은 번호 + 큰 번호. **상세 화면** |
 | 집계 | `champion_skill` | 스킬 찍은 순서 앞 11레벨 1개 | `EQQWQRQEQER` 형식. **상세 화면** |
 | 운영 | `collection_logs` | 수집 실행 1회 | 언제 돌았고 몇 게임 저장했는지, 키 만료로 멈췄는지 |
+| AI | `rag_chunk` | 해석 문서 조각 1개 | 문구 + 1,024차원 임베딩 + 필터용 메타데이터. 다른 테이블과 관계 없음 (12장) |
 
 - 이 밖에 마이그레이션 실행기가 쓰는 메타 테이블 `schema_migrations`(적용한 SQL 파일 기록)가 있다. 수집·집계와 관계없다.
 - 챔피언·아이템·룬·스펠 이름과 이미지는 저장하지 않는다. 모든 ID는 Data Dragon 값이고, 프론트가 Data Dragon으로 표시한다.
@@ -155,7 +167,7 @@
 
 ## 4. ERD
 
-> 요약: dbml v8을 Mermaid로 옮긴 그림이다. 각 테이블 이름 옆에 설명을 붙였다.
+> 요약: dbml v8을 Mermaid로 옮긴 그림이다. 각 테이블 이름 옆에 설명을 붙였다. v9의 `rag_chunk`는 다른 테이블과 관계가 없어 그림에 넣지 않고 12장에 적는다.
 
 ```mermaid
 erDiagram
@@ -387,7 +399,7 @@ erDiagram
 
 ## 8. 인덱스
 
-> 요약: PK·유니크 키 외에 dbml에 있는 인덱스 1개만 만든다.
+> 요약: PK·유니크 키 외에 dbml에 있는 인덱스 2개(`match_players`, `rag_chunk`)만 만든다.
 
 | 테이블 | 인덱스 | 종류 | 용도 |
 |--------|--------|------|------|
@@ -397,6 +409,8 @@ erDiagram
 | `champion_rune` | `(champion_id, position, 룬 11개)` | 유니크 | 같은 룬 페이지는 1줄 |
 | `stats_window` | `(id)` | PK | 항상 1줄 (`id = 1`) |
 | `stats_window_patch` | `(patch)` | PK | 창 안 패치 1개 = 1줄 |
+| `rag_chunk` | `(id)` | PK | 적재기 upsert 기준 |
+| `rag_chunk` | `(area, role)` | 일반 (B-tree) | 검색 필터 (v9). 벡터 인덱스(HNSW)는 없음 (12-3) |
 
 - 만들지 않는 인덱스: `matches.patch`, `matches.game_start_at`, `matches.puuid`, `match_players.puuid`. `matches`는 최대 약 3만 7천 줄이라 순차 스캔이 빠르고 (D21), 나머지는 이번 범위에 조회가 없다. 전적 검색을 만들 때 추가한다.
 
@@ -414,6 +428,7 @@ erDiagram
 | `purge_old_games(p_keep_days int DEFAULT 21)` | int (삭제한 게임 수) | `game_start_at < now() − p_keep_days일`인 `matches` 삭제(`match_players` CASCADE). 집계는 남김. `p_keep_days`가 14 미만이거나 현재 창의 `days`보다 작으면 오류 |
 | `patch_sort_key(p_patch text)` | int[] | `'16.9'` → `{16,9}`. 패치 구성 정렬에 쓴다 |
 | `tier_from_score(p_score numeric)` | smallint | 점수로 1~5티어 (9-3) |
+| `search_rag_chunks(…)` | 표 (`id, source, area, subject, polarity, content, distance`) | RAG 조각 검색 (v9, 12-2) |
 
 - 모든 함수와 뷰는 DB 주인 계정(백엔드)만 실행·조회할 수 있다 (11장).
 
@@ -500,7 +515,7 @@ erDiagram
 | 4 | 통계 기준 | 최근 14일에 시작한 게임 (변경 03). 패치 대체 규칙 없음. 패치 구성을 함께 표시 |
 | 5 | 추천 개수 | 화면에는 카테고리별 상위 2개 (프론트 작업 때 조정 가능) |
 | 6 | 원본 보관 | 시작 시각 기준 21일 (변경 03) |
-| 7 | 스키마 | dbml v8 (원본 3, 집계 7, 운영 1). 집계는 개수만, 비율·티어는 조회할 때 계산 |
+| 7 | 스키마 | dbml v9 (원본 3, 집계 7, 운영 1, AI 1). 집계는 개수만, 비율·티어는 조회할 때 계산 |
 | 8 | 아이템 | `item0~5` 모든 아이템을 센다. 하위 재료는 프론트가 Data Dragon으로 거른다. 아이템 테이블 없음 |
 | 9 | 주 포지션 | 최대 2개, 2순위는 10% 이상일 때만 (백엔드) |
 | 10 | 운영 | 개발 키 24시간마다 수동 재발급, 수집은 수동 실행 |
@@ -509,6 +524,7 @@ erDiagram
 | 13 | 집계 보관 | 현재 14일 창 스냅숏 1개만 (D13) |
 | 14 | 집계 시점 | 매일 05:00 KST(20:00 UTC) pg_cron 작업 `tiergg_daily_refresh` (D23). 수집 뒤 자동 집계 없음 |
 | 15 | 룬 조합 | 보조 룬 2개는 순서와 관계없이 같은 조합 (변경 04) |
+| 16 | RAG 저장소 | `rag_chunk` 1개 + `search_rag_chunks`. 임베딩 Voyage AI `voyage-4` 1,024차원, 코사인 거리, 벡터 인덱스 없음. 플레이어 성적 지표는 저장하지 않음 (변경 05) |
 
 ---
 
@@ -523,3 +539,64 @@ erDiagram
 - Riot API 키와 DB 접속 정보는 루트 `.env`에만 둔다. 값은 문서·로그·커밋에 출력하지 않는다.
 - Supabase 기본 권한(`pg_default_acl`)이 새 객체에 `anon`·`authenticated` 권한을 주므로, 새 테이블·시퀀스·뷰·함수는 만들 때마다 이름을 적어 `REVOKE`한다. 보안 테스트는 스키마의 모든 객체를 자동으로 검사한다 (db_review L2).
 - pg_cron: `cron.schedule` 등에 확장 기본 `PUBLIC` EXECUTE가 있지만 `anon`·`authenticated`는 `cron` 스키마 USAGE가 없어 부를 수 없다(42501 확인). 기본값을 유지하고 USAGE를 주지 않는다. 테스트 011이 USAGE·직접 부여를 검사한다.
+- pgvector: `vector` 확장은 `extensions` 스키마에 있다. `rag_chunk`는 RLS 켜짐·정책 0, `anon`·`authenticated` 권한 회수, `search_rag_chunks`는 `PUBLIC`·`anon`·`authenticated` 실행 권한 회수 (v9). 테스트 006·013이 검사한다.
+
+---
+
+## 12. RAG 저장소 (v9)
+
+> 요약: `!ai`의 RAG 해석 문서 조각과 임베딩을 담는 테이블 1개와 검색 함수 1개다. 백엔드 적재기가 서비스 연결로 쓰고, 분석 코드가 `search_rag_chunks`로 읽는다. 플레이어 성적 지표는 저장하지 않는다.
+
+### 12-1. `rag_chunk`
+
+| 컬럼 | 타입 | NULL | 설명 / 허용 값 (CHECK) |
+|------|------|------|------------------------|
+| `id` | text | NOT NULL, PK | 조각 ID (예: `fight.damage.SUPPORT_DAMAGE.bad.01`). 빈 문자열 금지 |
+| `source` | text | NOT NULL | `perspective` \| `champion` |
+| `position` | text | NOT NULL | `TOP` \| `JUNGLE` \| `MIDDLE` \| `BOTTOM` \| `UTILITY` \| `ALL` |
+| `role` | text | NOT NULL | 엔진 유형 10개 `TOP_TANK` `TOP_DAMAGE` `JUNGLE_TANK` `JUNGLE_DAMAGE` `MID_TANK` `MID_DAMAGE` `ADC` `SUPPORT_TANK` `SUPPORT_DAMAGE` `SUPPORT_UTILITY` 또는 `ALL` |
+| `area` | text | NOT NULL | `laning` \| `fight` \| `macro` \| `general` |
+| `subject` | text | NULL 가능 | 엔진 과목 ID (예: `fight.damage`). NULL = 과목 무관. 빈 문자열 금지 |
+| `polarity` | text | NOT NULL | `good` \| `bad` \| `any` |
+| `champion_id` | int | NULL 가능 | Riot championId, `> 0`. **`source = 'champion'`이면 NOT NULL** (`rag_chunk_champion_source_check`) |
+| `patch` | text | NULL 가능 | `^[0-9]+\.[0-9]+$` (예: `16.21`). NULL = 패치 무관 |
+| `content` | text | NOT NULL | 조각 본문. 빈 문자열 금지 |
+| `content_hash` | text | NOT NULL | 본문 sha256, **소문자 16진수 64자** (`^[0-9a-f]{64}$`). 바뀐 조각만 다시 임베딩 |
+| `embedding` | `extensions.vector(1024)` | NOT NULL | 임베딩. 차원이 다르면 저장 오류 |
+| `embedding_model` | text | NOT NULL | 예: `voyage-4`. 빈 문자열 금지 |
+| `updated_at` | timestamptz | NOT NULL, 기본 `now()` | 마지막 적재 시각 (upsert 때 적재기가 `now()`로 갱신) |
+
+- 쓰기 함수는 없다. 백엔드 적재기가 `INSERT … ON CONFLICT (id) DO UPDATE`와 `DELETE`로 쓴다. 지우기는 적재기가 미리보기 후 확인한다.
+- 벡터 리터럴은 `'[0.1,0.2,…]'` 문자열을 `$1::extensions.vector`로 넘긴다 (실행기·함수의 search_path에 `extensions`가 없으므로 접두사를 붙인다).
+
+### 12-2. `search_rag_chunks`
+
+```
+search_rag_chunks(p_embedding extensions.vector(1024), p_role text, p_position text, p_area text,
+                  p_subjects text[], p_polarity text, p_champion_id int, p_limit int)
+RETURNS TABLE (id text, source text, area text, subject text, polarity text, content text, distance double precision)
+```
+
+| 조건 | 규칙 |
+|------|------|
+| 유형 | `role IN (p_role, 'ALL')` |
+| 포지션 | `position IN (p_position, 'ALL')` |
+| 영역 | `area IN (p_area, 'general')` |
+| 과목 | `p_subjects`가 NULL이면 거르지 않음. 아니면 `subject = ANY(p_subjects) OR subject IS NULL` |
+| 방향 | `polarity IN (p_polarity, 'any')` |
+| 챔피언 | `source = 'champion'` 조각은 `champion_id = p_champion_id`일 때만 (`p_champion_id`가 NULL이면 챔피언 조각 없음) |
+| 정렬 | 코사인 거리 `embedding <=> p_embedding` 오름차순, 같으면 `id` 순 |
+| 개수 | `p_limit` 1~20. 벗어나거나 NULL이면 오류 `22023` |
+
+- `distance`는 코사인 거리(0 = 같은 방향, 1 = 직교, 2 = 반대).
+- `SECURITY INVOKER`, `STABLE`. 백엔드(테이블 주인)만 실행할 수 있다.
+
+### 12-3. 용량과 성능 (변경 05 Build 측정, 롤백)
+
+| 항목 | 값 |
+|------|-----|
+| 가짜 1,000행 (본문 약 275자) 크기 | 6.4MB (그중 TOAST 5.3MB, 벡터 1개 약 4KB) |
+| 필터 질의 (`search_rag_chunks`, 결과 8줄) | 50회 평균 0.43~0.48ms |
+| 필터 없는 1,000행 전체 거리 정렬 상위 20 | 5.7~6.0ms (순차 스캔 + Sort) |
+
+- 조각이 수만 개로 늘어 필터 질의가 수십 ms를 넘으면 그때 HNSW 등 벡터 인덱스를 다시 검토한다.

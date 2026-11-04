@@ -1,6 +1,6 @@
 # DB 계획 (`!db`)
 
-- 상태: **현재 계획** (계약 v8, 마이그레이션 001~016 적용됨, 2026-10-16 승인분(변경 04)까지 반영)
+- 상태: **현재 계획** (계약 v9, 마이그레이션 001~017 적용됨, 2026-11-04 승인분(변경 05)까지 반영)
 - 기준 계약: `docs/contracts/db_contract.dbml` (우선), `docs/contracts/db_contract.md`
 - 대상: Supabase 무료 플랜, PostgreSQL 17, Session pooler 접속
 - 이 문서는 **지금 유효한 계획만** 둔다. 바뀐 계획은 덮어쓴다. v1과 변경 01~03의 원문은 git 커밋 `24918eb`의 `db/docs/db_spec.md`에 있다 (CLAUDE.md 6장 "영역 문서 관리").
@@ -33,11 +33,12 @@
 
 | 항목 | 내용 |
 |------|------|
-| 테이블 | 원본 3 (`ranked_players`, `matches`, `match_players`), 집계 7 (`stats_window`, `stats_window_patch`, `champion`, `champion_item`, `champion_rune`, `champion_spell`, `champion_skill`), 운영 1 (`collection_logs`) + 실행기 메타 `schema_migrations` |
+| 테이블 | 원본 3 (`ranked_players`, `matches`, `match_players`), 집계 7 (`stats_window`, `stats_window_patch`, `champion`, `champion_item`, `champion_rune`, `champion_spell`, `champion_skill`), 운영 1 (`collection_logs`), AI 1 (`rag_chunk`, 변경 05) + 실행기 메타 `schema_migrations` |
 | 제약 조건 | PK, FK(삭제 동작 포함), 유니크, NOT NULL, 기본값, CHECK(허용 값, 범위, 형식, 정렬 순서) |
-| 인덱스 | PK·유니크 + `match_players (champion_id, team_position)` 1개 |
+| 인덱스 | PK·유니크 + `match_players (champion_id, team_position)`, `rag_chunk (area, role)` 2개 |
 | 보안 | 모든 테이블 RLS 켜기, 정책 없음, `anon`·`authenticated` 권한 회수 |
-| 함수 | `refresh_window_stats`, `purge_old_games`, 보조 `patch_sort_key`, `tier_from_score` |
+| 함수 | `refresh_window_stats`, `purge_old_games`, 보조 `patch_sort_key`, `tier_from_score`, RAG 검색 `search_rag_chunks` |
+| 확장 | `pg_cron`(`pg_catalog`), `vector`(pgvector, `extensions`) |
 | 뷰 | `champion_tier_view` |
 | 예약 작업 | `pg_cron` 작업 `tiergg_daily_refresh` (매일 05:00 KST) |
 | 도구 | Node 마이그레이션 실행기, 롤백되는 검증 SQL |
@@ -50,6 +51,7 @@
 | `purge_old_games` 실행 (사용자 확인 뒤), 시험용 `aggregate` 명령, 읽기 API | `!백엔드` |
 | 상세 조합 비율, 패치 구성 비율(%) 계산, 주 포지션 규칙 | `!백엔드` |
 | 이름·이미지, 하위 재료 아이템 거르기 | `!프론트` (Data Dragon) |
+| RAG 조각 문구·임베딩 생성, `rag_chunk` 적재(upsert·삭제), 검색 결과 사용 | `!ai` (백엔드 적재기 `cli/rag.ts`) |
 
 ---
 
@@ -105,7 +107,7 @@
 
 ## 3. 마이그레이션 파일 목록
 
-> 요약: 001~016이 적용되어 있다. 앞 파일 중 일부(002, 005~008, 013)가 만든 객체는 뒤 파일(009, 012, 016)이 바꾸거나 지웠다. 지금 DB의 모양은 4~8장이 기준이다.
+> 요약: 001~017이 적용되어 있다. 앞 파일 중 일부(002, 005~008, 013)가 만든 객체는 뒤 파일(009, 012, 016)이 바꾸거나 지웠다. 지금 DB의 모양은 4~8장이 기준이다.
 
 | 파일 | 하는 일 | 지금 남은 결과 |
 |------|---------|----------------|
@@ -126,7 +128,9 @@
 | `015_schedule_daily_refresh.sql` | `pg_cron` 켜기, 작업 `tiergg_daily_refresh` 등록 | 그대로 |
 | `016_rune_sub_perk_sorted.sql` | `refresh_window_stats` 다시 만듦(룬 보조 정렬, 나머지 본문은 013과 같음), 함수 주석·`REVOKE`, `ANALYZE` 뒤 현재 창 그대로 재집계, CHECK `champion_rune_sub_perk_order_check`, 오래된 주석 수정 (7-3) | 그대로 |
 
-- 다음 파일은 `017_….sql`이다.
+| `017_create_rag_chunk.sql` | `vector` 확장(`extensions`), `rag_chunk`·CHECK·`(area, role)` 인덱스·주석, RLS·`REVOKE`, `search_rag_chunks`·`REVOKE EXECUTE` (변경 05) | 그대로 |
+
+- 다음 파일은 `018_….sql`이다.
 - 테이블·컬럼에 `COMMENT ON`을 단다. 원본 컬럼 주석에는 Riot JSON 경로를 적는다 (계약 6장).
 
 ---
@@ -173,15 +177,28 @@
 - `window_end − window_start = days × 24시간`은 CHECK로 걸지 않는다 (`timestamptz + interval`이 IMMUTABLE이 아님). 함수가 계산하고 테스트로 확인한다.
 - 원본과 집계는 FK로 잇지 않는다. 비율(%)은 저장하지 않는다.
 
+### 4-4. AI (변경 05)
+
+> 요약: RAG 해석 문서 조각과 그 벡터만 담는다. 플레이어 성적 지표는 저장하지 않는다. 다른 테이블과 관계가 없다. 근거: `docs/ai/ai_spec.md` 5장 E1~E6. 임베딩은 Voyage AI `voyage-4` 1,024차원 (2026-11-04 사용자 결정).
+
+| 테이블 | 컬럼 | 키와 제약 |
+|--------|------|-----------|
+| `rag_chunk` | `id`, `source`, `position`, `role`, `area`, `subject`(NULL 가능), `polarity`, `champion_id`(NULL 가능), `patch`(NULL 가능), `content`, `content_hash`, `embedding extensions.vector(1024)`, `embedding_model`, `updated_at DEFAULT now()` (표시 없는 것은 NOT NULL) | PK `id`. CHECK 13개: `source` in (`perspective`, `champion`), `position` 5개 + `ALL`, `role` 엔진 유형 10개(`TOP_TANK`·`TOP_DAMAGE`·`JUNGLE_TANK`·`JUNGLE_DAMAGE`·`MID_TANK`·`MID_DAMAGE`·`ADC`·`SUPPORT_TANK`·`SUPPORT_DAMAGE`·`SUPPORT_UTILITY`) + `ALL`, `area` in (`laning`, `fight`, `macro`, `general`), `polarity` in (`good`, `bad`, `any`), `champion_id > 0`, `source = 'champion'`이면 `champion_id` NOT NULL, `patch` 형식, `content_hash ~ '^[0-9a-f]{64}$'`, `id`·`subject`·`content`·`embedding_model` 빈 문자열 금지 |
+
+- 쓰기 함수는 없다. 백엔드(`!ai` 적재기)가 서비스 연결로 `INSERT … ON CONFLICT (id) DO UPDATE`·`DELETE`한다. 지우기는 적재기가 미리보기 후 확인한다.
+- `vector` 타입과 `<=>` 연산자는 `extensions.` 접두사로 적는다. 실행기의 search_path(`public, pg_catalog` / fresh는 `migration_check, pg_catalog`)는 바꾸지 않는다 (결정 05-A).
+- 용량: 1,000행(본문 약 275자) 실측 6.4MB (TOAST 5.3MB). 지금 DB 108MB / 500MB.
+
 ---
 
 ## 5. 인덱스
 
-> 요약: PK·유니크 말고는 1개만 있다. 테이블이 작아 순차 스캔으로 충분하다.
+> 요약: PK·유니크 말고는 2개만 있다. 테이블이 작아 순차 스캔으로 충분하다.
 
 | 인덱스 | 이유 |
 |--------|------|
 | `match_players_champion_id_team_position_idx (champion_id, team_position)` | dbml 확정. 지금 집계 함수는 거의 쓰지 않는다. 본 수집 뒤에도 안 쓰이면 새 마이그레이션으로 삭제를 제안한다 |
+| `rag_chunk_area_role_idx (area, role)` | RAG 검색 필터 (변경 05). 조각이 적어 지금은 거의 순차 스캔이지만 늘어날 때를 대비 |
 
 | 만들지 않는 인덱스 | 이유 |
 |--------------------|------|
@@ -189,6 +206,7 @@
 | `matches (patch)` | 같은 이유 |
 | `matches (puuid)` | `ranked_players` 삭제 기능이 없다. 그 기능을 만들면 추가 (FK 삭제 때 순차 스캔 방지) |
 | `match_players (puuid)` | 전적 검색을 만들 때 추가 |
+| `rag_chunk (embedding)` HNSW 등 벡터 인덱스 | 1,000행에서 필터 질의 0.43~0.48ms, 필터 없는 전체 정렬 5.7~6.0ms로 충분. 근사 인덱스는 필터와 같이 쓰면 결과가 빠질 수 있음 (결정 05-B). 조각이 수만 개가 되면 다시 검토 |
 
 ---
 
@@ -226,6 +244,7 @@
 | `purge_old_games(p_keep_days int DEFAULT 21)` | int | PL/pgSQL, VOLATILE | `game_start_at < now() − p_keep_days × 24시간`인 게임 삭제, 지운 게임 수 반환 |
 | `patch_sort_key(p_patch text)` | int[] | SQL, IMMUTABLE | `'16.9'` → `{16,9}`. 패치를 숫자 순으로 정렬 |
 | `tier_from_score(p_score numeric)` | smallint | SQL, IMMUTABLE | 점수 → 1~5티어 (7-5) |
+| `search_rag_chunks(p_embedding extensions.vector(1024), p_role text, p_position text, p_area text, p_subjects text[], p_polarity text, p_champion_id int, p_limit int)` | TABLE (`id, source, area, subject, polarity, content, distance`) | PL/pgSQL, STABLE | RAG 조각 검색 (7-6, 변경 05) |
 
 ### 7-2. `refresh_window_stats` 처리 순서
 
@@ -317,6 +336,20 @@
 - 백엔드 사용 예: `SELECT * FROM champion_tier_view WHERE position = $1 ORDER BY tier NULLS LAST, tier_score DESC`.
 - 패치 구성: `SELECT patch, games FROM stats_window_patch ORDER BY patch_sort_key(patch) DESC`. 비율은 백엔드가 `100 × games / stats_window.games`로 계산한다.
 
+### 7-6. `search_rag_chunks` (변경 05)
+
+> 요약: 필터로 조각을 거른 뒤 질의 벡터와의 코사인 거리(`<=>`)가 가까운 순으로 최대 20개를 돌려준다.
+
+| 조건 | 규칙 |
+|------|------|
+| 유형 | `role IN (p_role, 'ALL')` |
+| 포지션 | `position IN (p_position, 'ALL')` |
+| 영역 | `area IN (p_area, 'general')` |
+| 과목 | `p_subjects`가 NULL이면 거르지 않음. 아니면 `subject = ANY(p_subjects) OR subject IS NULL` |
+| 방향 | `polarity IN (p_polarity, 'any')` |
+| 챔피언 | `source = 'champion'` 조각은 `champion_id = p_champion_id`일 때만 |
+| 정렬·개수 | 거리 오름차순, 같으면 `id`. `p_limit` 1~20, 벗어나거나 NULL이면 22023 |
+
 ---
 
 ## 8. 매일 자동 집계 (pg_cron)
@@ -399,13 +432,14 @@ ORDER BY start_time DESC LIMIT 7;
 | `002_helper_functions.sql` | `patch_sort_key`, `tier_from_score` 경계값 (53.0 → 1, 52.999 → 2, 48.5 → 4, 48.499 → 5, NULL) |
 | `003_refresh_window_stats.sql` | 샘플 20게임 집계 기대값(챔피언·아이템·룬·스펠·스킬, 밴 중복, 포지션 NULL, 9줄 게임 제외), 멱등, 0게임 P0002에 기존 스냅숏 유지, 인자 오류 22023 |
 | `004_champion_tier_view.sql` | `stats_window`(games 1000) + `champion` 6줄로 비율·보정 승률·점수·티어 손 계산값, `pick` 49 → NULL, `stats_window` 0줄 → 뷰 0줄 |
-| `006_security.sql` | `current_schema()`의 모든 테이블·뷰·시퀀스·함수(확장 소속 제외)를 자동 검사: RLS 켜짐·FORCE 아님·정책 0·주인, `anon`·`authenticated` 권한 없음, `PUBLIC` EXECUTE 없음, 뷰 `security_invoker`. 지금 기대 개수: 테이블 12, 뷰 1, 시퀀스 2, 함수 4 |
+| `006_security.sql` | `current_schema()`의 모든 테이블·뷰·시퀀스·함수(확장 소속 제외)를 자동 검사: RLS 켜짐·FORCE 아님·정책 0·주인, `anon`·`authenticated` 권한 없음, `PUBLIC` EXECUTE 없음, 뷰 `security_invoker`. 지금 기대 개수: 테이블 12(+ public이면 `schema_migrations`), 뷰 1, 시퀀스 2, 함수 5 (변경 05) |
 | `007_skill_order.sql` | 앞 11글자 묶기, 10자·`''`·NULL·포지션 NULL 제외, 상위 10개·동률 순서, CHECK 거부, 컬럼·PK 구조 |
 | `008_ranked_players_tier.sql` | 허용 6개, 거부 6개(`IRON`~`GOLD`, `platinum`, `''`), CHECK 정의 |
 | `009_window_boundary.sql` | 창 경계 (정확히 14일 전 포함, 1µs 더 이전 제외, 끝 제외, 미래 제외, 9줄 제외), 패치 구성 합계 = games, 반환 `patches` 순서, `p_days = 1` 재집계 |
 | `010_purge_old_games.sql` | 정확히 21일은 남음, 21일 + 1초 삭제, CASCADE, 집계 유지, 인자 오류(13, NULL, 현재 창보다 짧음), 두 번째 호출 0 |
 | `011_daily_refresh_job.sql` | `pg_cron` 있음, 작업 1개, 일정 `0 20 * * *`·`active`, 명령 문자열, 실행 계정·DB, `anon`·`authenticated`의 `cron` 스키마 USAGE 없음, **`cron` 스키마 모든 함수**에 직접 부여 없음 (결정 04-D. `PUBLIC` 기본값은 `[주의]` NOTICE). 작업을 실행하지 않는다 |
 | `012_rune_sub_perk_order.sql` | 실제 데이터(롤백, `stats_window`가 있을 때만): 같은 창 재집계 결과와 원본에서 `least`/`greatest`로 따로 계산한 상위 10개의 `EXCEPT` 양방향 0줄, 1순위 = 2순위 0개, 순서만 다른 쌍 0개. 샘플 11게임(`KR_91…`, 패치 `0.9`): 두 순서 `(8453, 8473)`·`(8473, 8453)` → 1줄 7/3, 다른 조합 2/1, 핵심 룬 칸만 바꾼 페이지는 별도 1/0, 같은 보조 룬 줄 제외(`champion` pick에는 포함), 1순위. CHECK 거부 2건(`(8473, 8453)`, `(8453, 8453)`, 23514)·통과 1건, 제약 정의 `convalidated` |
+| `013_rag_chunk.sql` | (변경 05) 시작 때 `rag_chunk`를 비움(롤백). 컬럼·타입·CHECK 13개·인덱스(벡터 인덱스 없음)·확장 위치, RLS·정책 0·`SET ROLE` 실제 거부, CHECK 위반, 가짜 벡터 `[cos θ, sin θ, 0…]`로 필터(유형·`ALL`·포지션·영역 `general`·과목·과목 NULL·방향 `any`·챔피언)·거리 순서·`p_limit` 오류, 1,000행 시간·크기 기록 |
 
 - 새 테스트는 번호를 붙여 넣기만 하면 `verify.mjs`가 이름순으로 돈다. 새 테이블을 만들면 `verify.mjs`의 `TABLES` 목록(전후 줄 수 비교)에도 넣어야 한다 (`db/scripts/` 수정이라 승인 필요).
 - `refresh_window_stats`를 부르는 테스트는 롤백 안에서 실제 스냅숏을 지웠다 되돌리므로 실행마다 죽은 줄이 생긴다 (autovacuum이 정리).
@@ -499,6 +533,12 @@ ORDER BY start_time DESC LIMIT 7;
 | 보조 룬 값 순서는 DB가 번호순만 보장, 화면 순서는 프론트가 Data Dragon 줄 순서로 (04-E) | 이름·이미지·룬 구조를 DB에 두지 않는 원칙. API 계약 변경 없음 | 2026-10-16 |
 | 계약 v8 (04-F) | CHECK가 하나 늘고 집계 규칙이 바뀜. 수집 범위 문구(티어당 250명)도 실제와 맞춤 | 2026-10-16 |
 | 실행기(`migrate.mjs`)의 작은 번호 경고는 넣지 않음 (04-G) | 범위를 작게. "새 번호는 항상 마지막보다 크게" 규칙으로 충분 | 2026-10-16 |
+| RAG 저장소는 `rag_chunk` 1개 + `search_rag_chunks`, 성적 지표는 저장하지 않음 (변경 05) | `!ai` 계약 변경 요청 E1~E6. 백엔드가 벡터 SQL을 직접 짜지 않게 기존 함수 방식과 같게 | 2026-11-04 |
+| 임베딩 Voyage AI `voyage-4` 1,024차원, 코사인 거리 | 사용자 결정 (키 확인 완료) | 2026-11-04 |
+| `vector` 확장은 `extensions` 스키마, 타입·연산자는 `extensions.` 접두사 (05-A) | Supabase 권장 위치. 계획은 "실행기가 `public, extensions`로 search_path를 잡음"이었으나, 실행기를 바꾸지 않고 접두사로 같은 결과(실제·임시 스키마·`SET search_path FROM CURRENT` 함수 모두 해결) | 2026-11-04 |
+| 벡터 인덱스(HNSW) 만들지 않음 (05-B) | 1,000행 필터 질의 약 0.5ms, 전체 정렬 약 6ms. 근사 인덱스는 필터와 같이 쓰면 결과가 빠질 수 있음 | 2026-11-04 |
+| `rag_chunk` 값 목록·형식은 CHECK로 (`content_hash` 소문자 16진수 64자, `source = 'champion'`이면 `champion_id` 필수) (05-C) | 적재기 실수를 저장 단계에서 막는 기존 원칙(C1)과 같음 | 2026-11-04 |
+| 계약 v9 (05-D) | 테이블·함수·확장 추가. 기존 정의는 바꾸지 않음 | 2026-11-04 |
 
 ---
 
@@ -509,7 +549,7 @@ ORDER BY start_time DESC LIMIT 7;
 | 단계 | 수정 가능 경로 | 비고 |
 |------|----------------|------|
 | Plan | `db/docs/db_spec.md` | 맨 아래 `## 이번 변경 (승인 대기)` 절만 |
-| Build | `db/migrations/` | **새 번호 파일만** (017~). 적용된 001~016 수정 금지 |
+| Build | `db/migrations/` | **새 번호 파일만** (018~). 적용된 001~017 수정 금지 |
 | Build | `db/tests/` | 검증 SQL 수정·추가 |
 | Build | `db/docs/db_build.md` | 기능별 상태 갱신 |
 | Build | `db/docs/db_spec.md` | 구현 뒤 이번 변경을 본문에 합치고 임시 절 삭제, 결정 사항 표 갱신 |
@@ -537,3 +577,4 @@ ORDER BY start_time DESC LIMIT 7;
 - `matches.puuid`는 "처음 찾은 표본 1명"이라, 다른 티어 표본이 같은 게임에 나오면 먼저 찾은 쪽만 남는다.
 - `champion_rune`의 보조 룬 2개는 번호순으로 저장된다. 룬 줄 순서(위 줄 → 아래 줄)는 DB가 모른다 (Data Dragon을 DB에 두지 않는 원칙). 화면 순서는 프론트가 정한다.
 - 시퀀스는 롤백되지 않아 검증 실행마다 `collection_logs_id_seq`, `champion_rune_id_seq`가 올라간다. 백엔드는 id를 순서 번호로 가정하지 않는다.
+- `verify`를 돌릴 때마다 테스트 013의 롤백된 1,000행(약 6.5MB)이 `rag_chunk`에 빈 공간으로 남는다. autovacuum이 정리한다.
