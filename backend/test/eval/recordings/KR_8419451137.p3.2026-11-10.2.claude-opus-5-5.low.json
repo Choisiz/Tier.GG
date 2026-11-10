@@ -1,0 +1,101 @@
+{
+  "matchId": "KR_8419451137",
+  "participantId": 3,
+  "engineVersion": "2026-11-10.1",
+  "promptVersion": "2026-11-10.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-10T14:28:53.156Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "e560e2b9fadc883f57d070e13bcfad888c0c1ec544129646e6143a26a5cc9e73",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"라인전은 다이애나 상대로 우세했고, 오브젝트 싸움은 부족했으며, 그 밖의 운영은 잘했습니다. 16.2분 싸움에서 우리 팀 4킬, 상대 팀 0킬로 골드 격차가 약 4,000 벌어졌습니다.\",\"factIds\":[\"laning.opponent\",\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\"]},\"sections\":{\"laning\":{\"good\":[{\"subjectId\":\"laning.gold\",\"text\":\"15분 골드가 6,006으로 상대 다이애나의 5,958보다 48 많았습니다. 14.5분 미드 라인 우리 포탑 쪽에서 상대 2명에게 죽었지만 골드는 앞섰습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.gold.me\",\"laning.gold.enemy\",\"laning.gold.diffAbs\",\"laning.opponent\",\"laning.deathsBefore.0.min\",\"laning.deathsBefore.0.region\",\"laning.deathsBefore.0.enemies\"]}],\"bad\":[]},\"fight\":{\"good\":[{\"subjectId\":\"fight.advantage\",\"text\":\"오브젝트를 잡은 시각 앞뒤 40초 안에 내가 참여한 싸움 4번에서 우리 팀 몫이 78.1%였습니다. 16.2분 미드 라인 우리 포탑 쪽에서 상대가 먼저 죽으며 우리 팀 5킬, 상대 팀 1킬로 전령을 잡았습니다. 다음 판에도 전령 전에 미드 라인을 정리하고 위쪽 강 입구에 먼저 도착하세요.\",\"factIds\":[\"fight.windowSec\",\"fight.advantage.fights\",\"fight.advantage.sharePct\",\"scene.fight.advantage.0.min\",\"scene.fight.advantage.0.region\",\"scene.fight.advantage.0.firstDeath\",\"scene.fight.advantage.0.killsOurs\",\"scene.fight.advantage.0.killsTheirs\",\"scene.fight.advantage.0.objectives\"]}],\"bad\":[{\"subjectId\":\"fight.damage\",\"text\":\"0~15분 챔피언 딜 비중이 16.1%로 기대 20%보다 3.9%p 낮았습니다. 15분 이후에는 6.9%로 기대 22%보다 15.1%p 낮았습니다.\",\"factIds\":[\"fight.damage.phase0StartMin\",\"fight.damage.phase0EndMin\",\"fight.damage.share0\",\"fight.damage.expected0\",\"fight.damage.diff0Abs\",\"fight.damage.phase1StartMin\",\"fight.damage.share1\",\"fight.damage.expected1\",\"fight.damage.diff1Abs\"]},{\"subjectId\":\"fight.vision\",\"text\":\"오브젝트를 잡기 전 60초 동안의 시야 점수가 오브젝트당 0.33으로 낮았습니다. 7.6분 상대 팀이 잡은 용 전 60초 동안 내 와드는 0개였습니다. 다음 판에는 용을 잡기 전 60초가 시작되기 전에 아래쪽 강 입구에 제어 와드를 먼저 두세요.\",\"factIds\":[\"fight.vision.windowSec\",\"fight.vision.perObjective\",\"scene.fight.vision.0.min\",\"scene.fight.vision.0.taken\",\"scene.fight.vision.0.objective\",\"scene.fight.vision.0.wardsPlaced\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.advantage\",\"text\":\"오브젝트를 잡은 시각 앞뒤 40초 밖에서 내가 참여한 싸움 2번의 우리 팀 몫이 83.3%였습니다. 11.1분 미드 라인 우리 포탑 쪽에서 상대가 먼저 죽으며 우리 팀 6킬, 상대 팀 2킬이 났습니다. 다음 판에도 미드 라인에서 싸움을 이긴 직후 상대가 부활하기 전에 상대 미드 포탑을 치세요.\",\"factIds\":[\"fight.windowSec\",\"macro.advantage.fights\",\"macro.advantage.sharePct\",\"scene.macro.advantage.0.min\",\"scene.macro.advantage.0.region\",\"scene.macro.advantage.0.firstDeath\",\"scene.macro.advantage.0.killsOurs\",\"scene.macro.advantage.0.killsTheirs\"]},{\"subjectId\":\"macro.side\",\"text\":\"포탑 피해량이 13,705, 분당 709.5로 상대 포탑을 꾸준히 압박했습니다.\",\"factIds\":[\"macro.side.turretDamage\",\"macro.side.perMinute\"]}],\"bad\":[]}},\"keyMoments\":[{\"index\":0,\"text\":\"16.2분 싸움에서 우리 팀 4킬, 상대 팀 0킬로 골드 격차가 약 4,000 벌어졌고, 이어 상대 미드 1차 포탑을 깼습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},{\"index\":1,\"text\":\"11.1분 싸움에서 우리 팀 6킬, 상대 팀 2킬로 골드 격차가 약 3,500 벌어졌습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.gapChangeAbs\"]},{\"index\":2,\"text\":\"14.2분 싸움에서 우리 팀 3킬, 상대 팀 3킬로 골드 격차가 약 1,700 좁혀졌고, 이어 우리 탑 1차 포탑을 잃었습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.killsTheirs\",\"keyMoment.2.gapChangeAbs\",\"keyMoment.2.followUp.0\"]}],\"chunkUse\":[{\"slot\":\"fight.good.0\",\"chunkIds\":[\"fight.advantage.ALL.good.01\"]},{\"slot\":\"fight.bad.1\",\"chunkIds\":[\"fight.vision.ALL.bad.01\"]},{\"slot\":\"macro.good.0\",\"chunkIds\":[\"macro.advantage.ALL.good.01\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 12031,
+          "cacheWrite": 0,
+          "cacheRead": 8217,
+          "output": 2257
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 15586
+    },
+    {
+      "attempt": 2,
+      "kind": "retry",
+      "requestHash": "7689f47956adc4c4cb03538118c425dad601185ae9536978b883ee0dca440b3c",
+      "response": {
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "",
+            "signature": "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"
+          },
+          {
+            "type": "text",
+            "text": "{\"fixes\":[{\"slot\":\"laning.good.1\",\"text\":\"15분 레벨이 11로 상대 다이애나의 9보다 2레벨 높았습니다. 14.5분 미드 라인 우리 포탑 쪽에서 죽었지만 레벨은 앞섰습니다. 다음 판에도 미드 라인 우리 포탑 쪽에서 먼저 레벨이 오른 순간 상대 정글이 반대편에 보이면 짧은 교환을 거세요.\",\"factIds\":[\"laning.referenceMin\",\"laning.level.me\",\"laning.opponent\",\"laning.level.enemy\",\"laning.level.diffAbs\",\"laning.deathsBefore.0.min\",\"laning.deathsBefore.0.region\"],\"chunkIds\":[\"laning.level.ALL.good.01\"]},{\"slot\":\"fight.good.0\",\"text\":\"오브젝트를 잡은 시각 앞뒤 40초 안에 내가 참여한 싸움 4번에서 우리 팀 몫이 78.1%였습니다. 16.2분 미드 라인 우리 포탑 쪽에서 상대가 먼저 죽으며 우리 팀 5킬, 상대 팀 1킬이 났습니다. 다음 판에도 전령 전에 미드 라인 우리 포탑 쪽 라인을 정리하고 위쪽 강 입구에 먼저 가세요.\",\"factIds\":[\"fight.windowSec\",\"fight.advantage.fights\",\"fight.advantage.sharePct\",\"scene.fight.advantage.0.min\",\"scene.fight.advantage.0.region\",\"scene.fight.advantage.0.firstDeath\",\"scene.fight.advantage.0.killsOurs\",\"scene.fight.advantage.0.killsTheirs\"],\"chunkIds\":[\"fight.advantage.ALL.good.01\"]},{\"slot\":\"macro.good.0\",\"text\":\"오브젝트를 잡은 시각 앞뒤 40초 밖에서 내가 참여한 싸움 2번의 우리 팀 몫이 83.3%였습니다. 11.1분 미드 라인 우리 포탑 쪽에서 상대가 먼저 죽으며 우리 팀 6킬, 상대 팀 2킬이 났습니다. 다음 판에도 미드 라인 우리 포탑 쪽에서 싸움을 이긴 직후 상대가 부활하기 전에 상대 미드 포탑을 치세요.\",\"factIds\":[\"fight.windowSec\",\"macro.advantage.fights\",\"macro.advantage.sharePct\",\"scene.macro.advantage.0.min\",\"scene.macro.advantage.0.region\",\"scene.macro.advantage.0.firstDeath\",\"scene.macro.advantage.0.killsOurs\",\"scene.macro.advantage.0.killsTheirs\"],\"chunkIds\":[\"macro.advantage.ALL.good.01\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 15299,
+          "cacheWrite": 0,
+          "cacheRead": 6698,
+          "output": 1629
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 13808
+    }
+  ],
+  "knowledge": {
+    "version": "c91d410c750d",
+    "chunks": [
+      {
+        "id": "fight.damage.MID_DAMAGE.bad.01",
+        "content": "딜미드의 교전 딜이 낮을 때\n딜미드의 딜 비중이 기대보다 낮으면 싸움이 시작될 때 먼저 잡혔거나 사거리 밖에서 기다리다 싸움이 끝났을 수 있다. 내가 참여한 싸움에서 내가 먼저 죽었다면, 다음 판에는 아군 앞라인 뒤에 서서 가장 가까운 상대에게 먼저 스킬을 넣는다."
+      },
+      {
+        "id": "fight.vision.ALL.bad.01",
+        "content": "오브젝트 전 시야가 낮을 때\n오브젝트를 잡기 전 기준 시간 동안 내 와드가 없었고 그 오브젝트를 상대 팀이 잡았다면, 팀이 싸움 자리를 모른 채 들어갔을 수 있다. 다음 판에는 용이면 아래쪽 강 입구에, 바론이나 전령이면 위쪽 강 입구에 그 기준 시간이 시작되기 전에 제어 와드를 먼저 둔다."
+      },
+      {
+        "id": "fight.advantage.ALL.good.01",
+        "content": "오브젝트 싸움 득실이 높을 때\n내가 참여한 오브젝트 싸움에서 우리 팀 몫이 높았다면 싸움 전에 아군과 함께 먼저 자리를 잡은 것일 수 있다. 그 싸움에서 상대가 먼저 죽었다면, 다음 판에도 같은 오브젝트 전에 라인을 정리하고 오브젝트 쪽 강 입구에 먼저 도착해 상대가 들어오는 길을 막는다."
+      },
+      {
+        "id": "macro.advantage.ALL.good.01",
+        "content": "오브젝트 밖 싸움에서 팀이 앞섰을 때\n오브젝트 싸움 밖에서 내가 참여한 싸움의 우리 팀 몫이 높았다면 숫자가 맞는 싸움을 골라 들어간 것일 수 있다. 다음 판에도 그런 싸움에서 이긴 직후 상대가 부활하기 전에 가장 가까운 상대 포탑을 치거나, 다음 오브젝트 쪽 강에 와드를 둔다."
+      },
+      {
+        "id": "macro.side.ALL.good.01",
+        "content": "사이드 압박이 좋았을 때\n포탑 피해가 포지션 기대보다 높았다면 라인을 밀며 상대 포탑을 꾸준히 압박한 것일 수 있다. 다음 판에도 사이드를 밀다가 상대 정글과 미드가 함께 지도에서 사라지면 그 라인의 우리 포탑 쪽으로 바로 물러선다."
+      },
+      {
+        "id": "laning.gold.ALL.good.01",
+        "content": "라인전 골드가 앞섰을 때\n라인전 골드가 앞섰다면 라인에서 손해 없이 자원을 챙겼다는 뜻일 수 있다. 골드가 앞선 채 귀환했다면, 다음 판에도 귀환 뒤 다음 오브젝트가 나오기 전에 그 오브젝트 쪽 강 입구로 먼저 가서 아군 정글과 함께 자리를 잡는다."
+      },
+      {
+        "id": "laning.level.ALL.good.01",
+        "content": "라인전 레벨이 앞섰을 때\n레벨이 앞섰다면 라인을 오래 지키며 경험치를 꾸준히 받았다는 뜻일 수 있다. 다음 판에도 상대보다 먼저 레벨이 오른 순간에 상대 정글이 반대편 라인에서 보였다면 그때 바로 짧은 교환을 건다."
+      },
+      {
+        "id": "fight.damage.ALL.bad.01",
+        "content": "교전 딜 비중이 기대보다 낮을 때\n교전 딜 비중이 유형의 기대보다 낮으면 싸움에 늦게 들어갔거나 싸움 초반에 먼저 쓰러졌을 수 있다. 내가 참여한 싸움에서 내가 먼저 죽었다면 다음 판에는 싸움이 열릴 때 아군 앞라인보다 뒤에 선다. 싸움에 늦었다면 오브젝트가 나오기 전에 근처 라인을 먼저 정리하고 합류한다."
+      }
+    ]
+  }
+}

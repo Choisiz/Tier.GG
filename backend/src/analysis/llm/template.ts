@@ -30,8 +30,41 @@ export function ro(num: string): string {
   return last === '3' || last === '6' || last === '0' ? '으로' : '로';
 }
 
+/** 첫 장면 문장 (Q2). 장면이 없으면 빈 문자열. 방향 단어를 쓰지 않는 중립 문장 */
+function sceneSentence(sheet: FactSheet, subjectId: string, good: boolean, p: Pick): string {
+  const k = `scene.${subjectId}.0`;
+  if (!has(sheet, `${k}.min`)) {
+    // 라인전: 부족한 점(골드·KDA)이면 비교 시점 전 첫 데스 장면
+    if (!good && (subjectId === 'laning.gold' || subjectId === 'laning.kda') && has(sheet, 'laning.deathsBefore.0.min')) {
+      const where = has(sheet, 'laning.deathsBefore.0.region') ? ` ${p('laning.deathsBefore.0.region')}에서` : '';
+      return ` ${p('laning.deathsBefore.0.min')}분${where} 데스가 있었습니다.`;
+    }
+    return '';
+  }
+  const where = has(sheet, `${k}.region`) ? ` ${p(`${k}.region`)}에서` : '';
+  switch (subjectId) {
+    case 'fight.vision':
+      return ` ${p(`${k}.min`)}분 ${p(`${k}.objective`)}을 잡기 전 ${p('fight.vision.windowSec')}초 동안 내가 설치한 와드는 ${p(`${k}.wardsPlaced`)}개였습니다.`;
+    case 'fight.objective':
+      return good && sheet.byId.get(`${k}.lastHit`)?.value === '내가 막타를 침'
+        ? ` ${p(`${k}.min`)}분 ${p(`${k}.objective`)} 막타를 직접 쳤습니다.`
+        : ` ${p(`${k}.min`)}분 ${p(`${k}.objective`)}은 ${p(`${k}.taken`).replace('잡음', '잡았습니다')}.`;
+    case 'fight.advantage':
+    case 'macro.advantage':
+      return ` ${p(`${k}.min`)}분${where} 난 싸움은 우리 팀 ${p(`${k}.killsOurs`)}킬, 상대 팀 ${p(`${k}.killsTheirs`)}킬이었습니다.`;
+    case 'macro.solo':
+      return ` ${p(`${k}.min`)}분${where} ${p(`${k}.what`)} 장면이 있었습니다.`;
+    default:
+      return '';
+  }
+}
+
 /** 과목 × 방향 템플릿. 쓸 fact가 없으면 숫자 없는 문장 */
 function subjectText(sheet: FactSheet, subjectId: string, good: boolean, p: Pick): string {
+  return subjectMain(sheet, subjectId, good, p) + sceneSentence(sheet, subjectId, good, p);
+}
+
+function subjectMain(sheet: FactSheet, subjectId: string, good: boolean, p: Pick): string {
   const opp = () => p('laning.opponent');
   const ref = () => p('laning.referenceMin');
   switch (subjectId) {
@@ -44,7 +77,7 @@ function subjectText(sheet: FactSheet, subjectId: string, good: boolean, p: Pick
     case 'laning.cs':
       return `${ref()}분 CS가 상대 ${opp()}보다 ${p('laning.cs.diffAbs')}개 ${good ? '많았습니다' : '적었습니다'}.`;
     case 'fight.advantage':
-      return `낀 오브젝트 싸움의 득실에서 우리 팀 몫이 ${p('fight.advantage.sharePct')}%${good ? '로 컸습니다' : '에 그쳤습니다'}.`;
+      return `오브젝트를 잡은 시각 앞뒤 ${p('fight.windowSec')}초 동안 내가 참여한 싸움의 득실에서 우리 팀 몫이 ${p('fight.advantage.sharePct')}%${good ? '로 컸습니다' : '에 그쳤습니다'}.`;
     case 'fight.damage': {
       const d0 = has(sheet, 'fight.damage.diff0Abs') ? Number(sheet.byId.get('fight.damage.diff0Abs')!.value) : -1;
       const d1 = has(sheet, 'fight.damage.diff1Abs') ? Number(sheet.byId.get('fight.damage.diff1Abs')!.value) : -1;
@@ -58,13 +91,13 @@ function subjectText(sheet: FactSheet, subjectId: string, good: boolean, p: Pick
       return `챔피언 딜 비중이 이 유형의 기대치보다 ${word}.`;
     }
     case 'fight.vision':
-      return `오브젝트 싸움 직전 시야 점수가 오브젝트당 ${p('fight.vision.perObjective')}${ro(p('fight.vision.perObjective'))} ${good ? '높았습니다' : '낮았습니다'}.`;
+      return `오브젝트를 잡기 전 ${p('fight.vision.windowSec')}초 동안의 시야 점수가 오브젝트당 ${p('fight.vision.perObjective')}${ro(p('fight.vision.perObjective'))} ${good ? '높았습니다' : '낮았습니다'}.`;
     case 'fight.objective':
       return good
         ? `오브젝트 막타를 ${p('fight.objective.lastHits')}번 챙겼습니다.`
         : `오브젝트 막타를 거의 챙기지 못했습니다.`;
     case 'macro.advantage':
-      return `오브젝트 밖 싸움의 득실에서 우리 팀 몫이 ${p('macro.advantage.sharePct')}%${good ? '로 컸습니다' : '에 그쳤습니다'}.`;
+      return `오브젝트를 잡은 시각 앞뒤 ${p('fight.windowSec')}초 밖에서 내가 참여한 싸움의 득실에서 우리 팀 몫이 ${p('macro.advantage.sharePct')}%${good ? '로 컸습니다' : '에 그쳤습니다'}.`;
     case 'macro.solo':
       return `단독 킬 ${p('macro.solo.kills')}번, 단독 데스 ${p('macro.solo.deaths')}번으로 혼자 싸운 결과가 ${good ? '좋았습니다' : '나빴습니다'}.`;
     case 'macro.side':
@@ -72,7 +105,7 @@ function subjectText(sheet: FactSheet, subjectId: string, good: boolean, p: Pick
     case 'macro.farm':
       return `중후반 분당 CS가 ${p('macro.farm.perMinute')}개로 ${good ? '많았습니다' : '적었습니다'}.`;
     case 'macro.vision':
-      return `분당 시야 점수가 ${p('macro.vision.perMinute')}${ro(p('macro.vision.perMinute'))} ${good ? '높았습니다' : '낮았습니다'}.`;
+      return `오브젝트를 잡기 전 ${p('fight.vision.windowSec')}초를 뺀 나머지 시간의 분당 시야 점수가 ${p('macro.vision.perMinute')}${ro(p('macro.vision.perMinute'))} ${good ? '높았습니다' : '낮았습니다'}.`;
     default:
       return good ? '이 부분은 잘했습니다.' : '이 부분은 아쉬웠습니다.';
   }

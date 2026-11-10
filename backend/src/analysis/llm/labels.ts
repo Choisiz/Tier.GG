@@ -29,7 +29,7 @@ export const SUBJECT_LABEL: Readonly<Record<string, string>> = {
 
 /** 과목 facts 키 → [이름, 단위]. 여기 없는 키는 LLM에 넘기지 않는다 (등급·내부 점수 차단) */
 export const SUBJECT_FACT_LABEL: Readonly<Record<string, readonly [string, string]>> = {
-  'fight.advantage.fights': ['낀 오브젝트 싸움 수', '번'],
+  'fight.advantage.fights': ['내가 참여한 오브젝트 싸움 수', '번'],
   'fight.advantage.sharePct': ['오브젝트 싸움 득실 중 우리 팀 몫', '%'],
   'fight.damage.share0': ['0~15분 챔피언 딜 비중', '%'],
   'fight.damage.expected0': ['0~15분 이 유형의 기대 딜 비중', '%'],
@@ -41,7 +41,7 @@ export const SUBJECT_FACT_LABEL: Readonly<Record<string, readonly [string, strin
   'fight.vision.points': ['오브젝트 전 60초 시야 점수 합', ''],
   'fight.vision.perObjective': ['오브젝트당 시야 점수', ''],
   'fight.objective.lastHits': ['오브젝트 막타 수', '번'],
-  'macro.advantage.fights': ['낀 오브젝트 밖 싸움 수', '번'],
+  'macro.advantage.fights': ['내가 참여한 오브젝트 밖 싸움 수', '번'],
   'macro.advantage.sharePct': ['오브젝트 밖 싸움 득실 중 우리 팀 몫', '%'],
   'macro.solo.kills': ['단독 킬', '번'],
   'macro.solo.deaths': ['단독 데스', '번'],
@@ -140,6 +140,10 @@ const UNIT_BY_FACT: readonly { re: RegExp; units: readonly string[] }[] = [
   { re: /^macro\.solo\.kills$/, units: ['번', '회', '킬'] },
   { re: /^macro\.solo\.deaths$/, units: ['번', '회', '데스'] },
   { re: /^fight\.objective\.lastHits$/, units: ['번', '회', '개'] },
+  // 장면 (Q2)
+  { re: /^scene\.[a-z.]+\.\d+\.(killsOurs|killsTheirs)$/, units: ['킬', '개', '번'] },
+  { re: /^scene\.[a-z.]+\.\d+\.(wardsPlaced|controlWards)$/, units: ['개'] },
+  { re: /^scene\.[a-z.]+\.\d+\.wardKills$/, units: ['개', '번'] },
 ];
 const UNIT_DEFAULT: Readonly<Record<string, readonly string[]>> = {
   골드: ['골드'],
@@ -148,6 +152,7 @@ const UNIT_DEFAULT: Readonly<Record<string, readonly string[]>> = {
   '%p': ['%p', '%포인트'],
   개: ['개'],
   번: ['번', '회'],
+  초: ['초'],
 };
 
 /** 이 fact 숫자 바로 뒤에 써도 되는 단위어 (비어 있으면 단위어를 붙이지 않는다) */
@@ -161,8 +166,25 @@ export const INTERPRETIVE_WORDS: readonly string[] = ['이니시', '버스', '�
 /** 숫자 검사에서 빼는 이름 속 숫자 (예: "1차 포탑") */
 export const NUMBER_NAME_PATTERNS: readonly RegExp[] = [/[123]차\s*포탑/g, /1\s*[대:]\s*1/g];
 
-/** 금지 표현 (등급·점수·총점·반영 비율) */
+/**
+ * 은어·막연한 조언 표현 (Q2). LLM 문장과 지식 조각 모두에서 막는다.
+ * "낀"(싸움에 끼다)은 뜻이 모호해 "내가 참여한"으로 쓴다. "~해 볼 수 있습니다"·"이어 가 볼 수"는 할 일이 정해지지 않은 말이다.
+ */
+export const VAGUE_PATTERNS: readonly { re: RegExp; why: string }[] = [
+  { re: /(?<!느)(?:낀|꼈)/, why: '은어 "낀" (→ "내가 참여한")' },
+  { re: /볼\s*수\s*있/, why: '막연한 조언 "~해 볼 수 있습니다" (→ 언제·어디서·무엇을 하라고 쓴다)' },
+  { re: /이어\s*가/, why: '막연한 조언 "이어 가" (→ 구체 행동으로 쓴다)' },
+];
+
+/** 조언 문장 표시. 이 말이 있으면 장면 fact(시각·오브젝트·지역)를 하나 이상 짚어야 한다 (Q2) */
+export const ADVICE_MARKER = /다음\s*판/;
+
+/** 장면 fact ID (조언이 짚을 수 있는 것): scene.* 와 라인전 데스 시각·지역 */
+export const isSceneFactId = (id: string): boolean => id.startsWith('scene.') || /^laning\.deathsBefore\.\d+\./.test(id);
+
+/** 금지 표현 (등급·점수·총점·반영 비율 + Q2 은어·막연한 조언) */
 export const FORBIDDEN_PATTERNS: readonly { re: RegExp; why: string }[] = [
+  ...VAGUE_PATTERNS,
   { re: /등급/, why: '등급 언급' },
   { re: /총점/, why: '총점 언급' },
   { re: /(?<!시야\s?)점수/, why: '점수 언급 (시야 점수 제외)' },
@@ -197,3 +219,40 @@ export function followUpLabel(what: string, ours: boolean): string {
   const m = monster[kind ?? ''] ?? '오브젝트를';
   return ours ? `우리 팀이 ${m} 잡았습니다` : `상대 팀이 ${m} 잡았습니다`;
 }
+
+// ---------- 장면 (Q2) ----------
+
+/** 지도 지역 → 한국어 (내 팀 기준. 위 = 탑 쪽, 아래 = 바텀 쪽) */
+export const REGION_LABEL: Readonly<Record<string, string>> = {
+  OUR_BASE: '우리 기지 근처',
+  ENEMY_BASE: '상대 기지 근처',
+  TOP_LANE_OURS: '탑 라인 우리 포탑 쪽',
+  TOP_LANE_THEIRS: '탑 라인 상대 포탑 쪽',
+  MID_LANE_OURS: '미드 라인 우리 포탑 쪽',
+  MID_LANE_THEIRS: '미드 라인 상대 포탑 쪽',
+  BOT_LANE_OURS: '바텀 라인 우리 포탑 쪽',
+  BOT_LANE_THEIRS: '바텀 라인 상대 포탑 쪽',
+  RIVER_TOP: '위쪽 강(바론 쪽)',
+  RIVER_BOT: '아래쪽 강(용 쪽)',
+  OUR_JUNGLE_TOP: '우리 정글 위쪽(탑 쪽)',
+  OUR_JUNGLE_BOT: '우리 정글 아래쪽(바텀 쪽)',
+  ENEMY_JUNGLE_TOP: '상대 정글 위쪽(탑 쪽)',
+  ENEMY_JUNGLE_BOT: '상대 정글 아래쪽(바텀 쪽)',
+};
+
+/** 오브젝트 종류 → 한국어 */
+export const OBJECTIVE_LABEL: Readonly<Record<string, string>> = {
+  DRAGON: '용',
+  SOUL_DRAGON: '영혼 용',
+  ELDER_DRAGON: '장로 용',
+  BARON: '바론',
+  RIFTHERALD: '전령',
+  HORDE: '공허 유충',
+};
+
+export const FIRST_DEATH_LABEL: Readonly<Record<string, string>> = {
+  ME: '내가 먼저 죽음',
+  ALLY: '우리 팀 다른 사람이 먼저 죽음',
+  ENEMY: '상대가 먼저 죽음',
+  NONE: '죽은 사람 없음',
+};

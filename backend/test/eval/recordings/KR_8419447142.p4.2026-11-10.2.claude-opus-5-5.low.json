@@ -1,0 +1,101 @@
+{
+  "matchId": "KR_8419447142",
+  "participantId": 4,
+  "engineVersion": "2026-11-10.1",
+  "promptVersion": "2026-11-10.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-10T14:29:19.889Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "268389d727c8b889d2370cf762752a1749081db343f7ad964802af3733a52885",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"라인전은 상대 제리에게 밀렸고, 오브젝트 싸움은 잘했지만 그 밖의 운영은 부족했습니다. 23.6분 싸움에서 우리 팀 0킬, 상대 팀 3킬로 앞선 팀이 우리 팀에서 상대 팀으로 바뀌었고, 우리 팀은 골드 약 4,400 손해를 봤습니다.\",\"factIds\":[\"laning.opponent\",\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.leaderBefore\",\"keyMoment.0.leaderAfter\",\"keyMoment.0.swingAbs\",\"keyMoment.0.swingSide\"]},\"sections\":{\"laning\":{\"good\":[],\"bad\":[{\"subjectId\":\"laning.gold\",\"text\":\"15분 골드가 5,899로 상대 제리보다 871 적었습니다. 11.1분 바텀 라인 우리 포탑 쪽에서 상대 정글을 포함한 상대 4명에게 죽었습니다. 다음 판에는 라인전 중 상대 정글이 안 보일 때 바텀 라인 우리 포탑 쪽에서 막타만 챙기세요.\",\"factIds\":[\"laning.referenceMin\",\"laning.gold.me\",\"laning.opponent\",\"laning.gold.diffAbs\",\"laning.deathsBefore.0.min\",\"laning.deathsBefore.0.region\",\"laning.deathsBefore.0.jungler\",\"laning.deathsBefore.0.enemies\"]},{\"subjectId\":\"laning.level\",\"text\":\"15분 레벨이 8로 상대 제리의 9보다 1 낮았습니다. 11.1분 바텀 라인 우리 포탑 쪽에서 죽었습니다. 다음 판에는 바텀 라인을 비우기 전에 미니언 웨이브를 상대 포탑까지 밀어 두세요.\",\"factIds\":[\"laning.referenceMin\",\"laning.level.me\",\"laning.opponent\",\"laning.level.enemy\",\"laning.level.diffAbs\",\"laning.deathsBefore.0.min\",\"laning.deathsBefore.0.region\"]}]},\"fight\":{\"good\":[{\"subjectId\":\"fight.damage\",\"text\":\"0~15분 챔피언 딜 비중이 26.3%로 원딜 기대 22%보다 4.3%p 높았고, 15분 이후에도 28.7%로 기대 23%보다 5.7%p 높았습니다.\",\"factIds\":[\"fight.damage.phase0StartMin\",\"fight.damage.phase0EndMin\",\"fight.damage.share0\",\"player.role\",\"fight.damage.expected0\",\"fight.damage.diff0Abs\",\"fight.damage.phase1StartMin\",\"fight.damage.share1\",\"fight.damage.expected1\",\"fight.damage.diff1Abs\"]}],\"bad\":[{\"subjectId\":\"fight.vision\",\"text\":\"오브젝트를 잡기 전 60초 동안의 시야 점수가 오브젝트당 0.5로 낮았습니다. 13.8분 상대 팀이 잡은 용 전 60초 동안 내 와드는 0개였습니다. 다음 판에는 용을 잡기 전 60초가 시작되기 전에 아래쪽 강 입구에 제어 와드를 먼저 두세요.\",\"factIds\":[\"fight.vision.windowSec\",\"fight.vision.perObjective\",\"scene.fight.vision.0.min\",\"scene.fight.vision.0.taken\",\"scene.fight.vision.0.objective\",\"scene.fight.vision.0.wardsPlaced\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.vision\",\"text\":\"오브젝트 싸움 밖 시야 점수가 18로, 분당 0.59를 기록했습니다.\",\"factIds\":[\"macro.vision.points\",\"macro.vision.perMinute\"]}],\"bad\":[{\"subjectId\":\"macro.farm\",\"text\":\"15분 이후 분당 CS가 7.4개로 낮았습니다. 15분 125 CS에서 게임 끝 242 CS였습니다.\",\"factIds\":[\"macro.farm.perMinute\",\"macro.farm.cs15\",\"macro.farm.csEnd\"]},{\"subjectId\":\"macro.advantage\",\"text\":\"오브젝트를 잡은 시각 앞뒤 40초 밖에서 내가 참여한 싸움의 득실 중 우리 팀 몫이 15.4%였습니다. 25.7분 미드 라인 상대 포탑 쪽에서 우리 팀 1킬, 상대 팀 5킬이 났습니다. 다음 판에는 미드 라인 상대 포탑 쪽에 들어가기 전에 가까운 아군과 함께 움직이세요.\",\"factIds\":[\"fight.windowSec\",\"macro.advantage.sharePct\",\"scene.macro.advantage.0.min\",\"scene.macro.advantage.0.region\",\"scene.macro.advantage.0.killsOurs\",\"scene.macro.advantage.0.killsTheirs\"]}]}},\"keyMoments\":[{\"index\":0,\"text\":\"23.6분 싸움에서 우리 팀 0킬, 상대 팀 3킬로 앞선 팀이 우리 팀에서 상대 팀으로 바뀌었고, 우리 팀은 골드 약 4,400 손해를 봤습니다. 이후 우리 미드 2차 포탑을 잃었습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.leaderBefore\",\"keyMoment.0.leaderAfter\",\"keyMoment.0.swingAbs\",\"keyMoment.0.swingSide\",\"keyMoment.0.followUp.0\"]},{\"index\":1,\"text\":\"25.7분 싸움에서 우리 팀 1킬, 상대 팀 5킬로 골드 격차가 약 3,700 벌어졌습니다. 이후 우리 미드 억제기를 잃었습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.gapChangeAbs\",\"keyMoment.1.followUp.1\"]},{\"index\":2,\"text\":\"16.6분 싸움에서 우리 팀 1킬, 상대 팀 3킬로 앞선 팀이 우리 팀에서 상대 팀으로 바뀌었고, 우리 팀은 골드 약 3,600 손해를 봤습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.killsTheirs\",\"keyMoment.2.leaderBefore\",\"keyMoment.2.leaderAfter\",\"keyMoment.2.swingAbs\",\"keyMoment.2.swingSide\"]}],\"chunkUse\":[{\"slot\":\"laning.bad.0\",\"chunkIds\":[\"laning.gold.ALL.bad.01\"]},{\"slot\":\"laning.bad.1\",\"chunkIds\":[\"laning.level.ALL.bad.01\"]},{\"slot\":\"fight.bad.0\",\"chunkIds\":[\"fight.vision.ALL.bad.01\"]},{\"slot\":\"macro.bad.1\",\"chunkIds\":[\"macro.advantage.ALL.bad.01\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 11389,
+          "cacheWrite": 0,
+          "cacheRead": 8217,
+          "output": 2521
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 18433
+    },
+    {
+      "attempt": 2,
+      "kind": "retry",
+      "requestHash": "c7b21fd1fdd05835b55a2b29ecbdd473b0f13b6e69366a092b07292ce57d8919",
+      "response": {
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "",
+            "signature": "CAQSsQsKEAgTGAI4AUIIdGhpbmtpbmcSDIIOLbls9uhyMQEkeRoMnB7cYS37dY4bsSJGIjCcNpvPO6aN9orCHo2I1R/3K5hjKdV+W4+i5v85noUVtpSgTRnDXArDyQgxlpUXeHEqzgoIpsYhN1aqQbYyf+mFdTjvCRpnlSwt6IZnQmnp9l2kb2+hsa70nvhc3XhqX/cTDNxO6eJKkBDccfc/9dW+afpmq5XjMxGT5oQaKc9Mt9TIweytC5tsz+ntVs9bDfjoi7xZEs5jW07ru3Sl81SMemJwy+yjEOdljKXNLmlIcNBe+hPxnBzXNFvVAtveTDVBc8vpnX1IWH63Qd57qyNHcXK1z3IdqitQCgfRPxJ2T5p7queOq4w0xWbYZm5KwdFuvk5ny/wmxf3WF8XBv6YhxrAPn5+vzYHw+H2eDqttQDmBRJdIiPUhTSnxj8jVsfGZQ3s3rVNVJDjF0Df60Qgx5/SwW6MWLKtLiVMES54tkd88TPD7Q4Y27GSsx8xRQUBGKDvZ427tXPkDXMPqLZUDlEKlw+Kjn00KxPNQOv4Adabf8MATA06kZrfkfsjqibMemuVG/rxoBDmmuAx/ehFzaO7uUfUsnEN35/jw5PENbyx3VQKdoWhy9XURR1jEIzCS7tJ21xiL/fbCCiiTZD5j3kJyDig8boWAifjNoyztlC6smb/R3MB4TlD9pDrvB864idpMyHI3ZuCCo6snfo23FL17fjBksxYVACv+W4DE05zmBf8JqJGJBUXQ6fosm/R1FL09YCR2NpM67qYhT7D9N+lNVO/Ianldk/Uf5beLWruyu6i2N56w4z5aJUu4boyuh07B5AtSj/BPOsBRxKQkWmmjkZOU0epA+erEvlI30PduVljK0qMpxQmNgEKs2d1doH7Zy1IxkNPjk5YKlIvxI81FWaKyrqvM5QtL6BvZThUBeWgTL0ku+y8hqXfuL4msBIRQWoEvw0Gjs4As6IMSit98UoUOirq4RWNCWszH7QLAS194l1STPrsW30rbNzufjKaxn4JeJhC/6aCXT6JxmeQlpsveFEDuQ1afQGHWsB5eoIAtemyOMOBUcsaexYMZCfrpcmTs0U+J4S7+azV4iX1dWX4YxchuQCYuYiP0Am1iyip/mScZFpf+dbRc+KvbM/i6LfCQ81kgTAPzmUwoZGTxncWTx1vVm+xwSyPNHLTlo0iMMuCRkQChhapy98xW8ovFoz5IR1NdCZ1mRMVy3u9URRM4CYP6i0OK5ecrWxVp41I8c0fqTEaHgoziuB5gyIqp1LyGFRz5X046ZMjOXNGyN/B+egSw2j9gb8cbkBcnpKja9EUe574YyKBRLf5rR2wRBW7WdDGyZLPElaMSIyHIx+IzpQM8zJTLRJcdKQKfbnTo2kZ1zrGEBVRgwXW0YjnMrl75KMm72AYVAW0+0tyEFDhrMTEV1nfXGtXXxrjZwHAK7Kfmvy6yXP6H/grQ3RB7nGfGObtY7EHHD+qxrSt7OhMjaWUVFQDis9vBP+9GHn5k3LXSj0LVa6EXb2QyWtyV0JA53AJLtyTeegYQHUSXt8ZxAbBPSTg8/O8F+jcM4e63UEvNwZe7bBVWfDMJAu1GSD87OvSu+3i1ihF7OwJDeV4KY6fkMBR5IGmB6SanjyDTqdODh9Mu+Oo1zvWe2aBlmSxESgMzkhtOmnuhEdybsdi+6Vt26VQw1r/yLnL9VKr7ppPB2C61cE5A2hTT+fDCkodXprDMkLjF5EHvfOzAeGg85rw6dUVTPuyn3vcLjkMDJu49vfE61OwLWelPQM+Hg1gyK+bTZVPP10MY9myoIQxq6w8TO1BJTHJ+2H2lphrS8iOhc0PqkHPQ/eth1sfo48cmwMpvAtAc1EkxzuLSFje28Xerwz2i+dWqWBTpjbmIehy+C/7iMVt+fOEKVu3Uwsl6O7U6Cgu1Vf1YpRgB"
+          },
+          {
+            "type": "text",
+            "text": "{\"fixes\":[{\"slot\":\"laning.bad.1\",\"text\":\"15분 레벨이 8로 상대 제리의 9보다 1 낮았습니다. 11.1분 바텀 라인 우리 포탑 쪽에서 죽었습니다. 다음 판에는 바텀 라인 우리 포탑 쪽을 비우기 전에 미니언 웨이브를 상대 포탑까지 밀어 두세요.\",\"factIds\":[\"laning.referenceMin\",\"laning.level.me\",\"laning.opponent\",\"laning.level.enemy\",\"laning.level.diffAbs\",\"laning.deathsBefore.0.min\",\"laning.deathsBefore.0.region\"],\"chunkIds\":[\"laning.level.ALL.bad.01\"]},{\"slot\":\"macro.bad.0\",\"text\":\"게임 마지막 15.7분 동안 분당 CS가 7.4개로 낮았습니다. 게임 끝 CS는 242개였습니다.\",\"factIds\":[\"macro.farm.minutes\",\"macro.farm.perMinute\",\"macro.farm.csEnd\"],\"chunkIds\":[]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 14578,
+          "cacheWrite": 0,
+          "cacheRead": 6698,
+          "output": 753
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 8271
+    }
+  ],
+  "knowledge": {
+    "version": "c91d410c750d",
+    "chunks": [
+      {
+        "id": "fight.vision.ALL.bad.01",
+        "content": "오브젝트 전 시야가 낮을 때\n오브젝트를 잡기 전 기준 시간 동안 내 와드가 없었고 그 오브젝트를 상대 팀이 잡았다면, 팀이 싸움 자리를 모른 채 들어갔을 수 있다. 다음 판에는 용이면 아래쪽 강 입구에, 바론이나 전령이면 위쪽 강 입구에 그 기준 시간이 시작되기 전에 제어 와드를 먼저 둔다."
+      },
+      {
+        "id": "fight.damage.ADC.good.01",
+        "content": "원딜의 교전 딜이 높았을 때\n원딜의 딜 비중이 기대보다 높았다면 싸움 내내 살아남아 꾸준히 공격한 것일 수 있다. 원딜은 싸움에 오래 남을수록 딜이 쌓이는 유형이다. 다음 판에도 오브젝트 싸움이 열리면 아군 앞라인 바로 뒤에서 가장 가까운 상대부터 친다."
+      },
+      {
+        "id": "macro.farm.ADC.bad.01",
+        "content": "원딜의 중후반 파밍이 낮을 때\n원딜의 중후반 분당 CS가 낮으면 팀과 함께 다니느라 사이드 라인 미니언을 놓친 시간이 길었을 수 있다. 다음 판에는 오브젝트 싸움이 끝나고 다음 오브젝트가 나오기 전까지 아군이 가까운 쪽 사이드 라인의 미니언을 먼저 정리한다."
+      },
+      {
+        "id": "macro.advantage.ALL.bad.01",
+        "content": "오브젝트 밖 싸움에서 팀이 밀렸을 때\n오브젝트 싸움 밖에서 내가 참여한 싸움의 우리 팀 몫이 낮으면 숫자가 맞지 않는 싸움에 휘말렸을 수 있다. 그 싸움이 상대 정글이나 강에서 났고 내가 먼저 죽었다면, 다음 판에는 그 지역에 들어가기 전에 입구에 와드를 두고 가장 가까운 아군과 함께 들어간다. 우리 정글에서 났다면 강 쪽 입구에 와드를 먼저 두고 아군 쪽으로 물러서며 싸운다."
+      },
+      {
+        "id": "macro.vision.ALL.good.01",
+        "content": "평소 시야가 좋았을 때\n오브젝트 시간 밖의 시야 점수가 포지션 기대보다 높았다면 지도에 정보를 꾸준히 깔아 팀이 안전하게 움직이도록 도운 것일 수 있다. 다음 판에도 다음 오브젝트가 나오기 전에 그 오브젝트 쪽 강 입구와 상대 정글 입구에 와드를 둔다."
+      },
+      {
+        "id": "laning.gold.ALL.bad.01",
+        "content": "라인전 골드가 뒤졌을 때\n라인전 골드가 상대 라이너보다 적으면 CS를 놓쳤거나 데스로 골드를 내준 경우가 많을 수 있다. 비교 시점 전 데스가 그 라인의 상대 포탑 쪽에서 났다면, 다음 판에는 상대 정글이 지도에 보이지 않는 동안 라인 가운데를 넘지 않고 우리 포탑 쪽에서 막타만 챙긴다. 데스 없이 골드가 뒤졌다면 상대와 교환하기보다 미니언 막타를 먼저 친다."
+      },
+      {
+        "id": "laning.level.ALL.bad.01",
+        "content": "라인전 레벨이 뒤졌을 때\n레벨이 상대 라이너보다 낮으면 경험치를 받지 못한 시간이 길었다는 뜻일 수 있다. 비교 시점 전에 데스가 있었다면 그 데스 뒤 라인으로 돌아오는 동안 경험치가 빠졌을 수 있다. 다음 판에는 라인을 비우기 전에 미니언 웨이브를 상대 포탑까지 밀어 두고 움직인다."
+      },
+      {
+        "id": "fight.damage.ALL.good.01",
+        "content": "교전 딜 비중이 기대보다 높을 때\n교전 딜 비중이 유형의 기대보다 높았다면 싸움에 오래 머물며 꾸준히 피해를 넣은 것일 수 있다. 다음 판에도 오브젝트 싸움이 열리면 아군 앞라인 바로 뒤에 서서 가장 가까운 상대부터 공격한다."
+      }
+    ]
+  }
+}

@@ -114,9 +114,11 @@ describe('검사 4: 금지어', () => {
 });
 
 describe('검사 5·6: 길이와 이름', () => {
-  it('120자 넘거나 3문장이면 실패', () => {
-    assert.ok(rules('fight.bad.0', '가'.repeat(121), []).includes('length'));
-    assert.ok(rules('fight.bad.0', '낮았습니다. 낮았습니다. 낮았습니다.', []).includes('length'));
+  it('170자 넘거나 4문장이면 실패 (Q2: 2문장 120자 → 3문장 170자)', () => {
+    assert.ok(rules('fight.bad.0', '가'.repeat(171), []).includes('length'));
+    assert.ok(!rules('fight.bad.0', '가'.repeat(170), []).includes('length'));
+    assert.ok(rules('fight.bad.0', '낮았습니다. 낮았습니다. 낮았습니다. 낮았습니다.', []).includes('length'));
+    assert.ok(!rules('fight.bad.0', '낮았습니다. 낮았습니다. 낮았습니다.', []).includes('length'));
   });
   it('판에 없는 챔피언 이름은 실패, 상대 라이너 이름은 통과', () => {
     assert.deepEqual(rules('laning.bad.0', '15분 골드가 이즈리얼보다 703 적었습니다.', GOLD), ['name']);

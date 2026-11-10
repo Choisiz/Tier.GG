@@ -15,7 +15,7 @@ import { buildFacts, type FactSheet } from '../analysis/llm/facts.js';
 import { MAX_TOKENS } from '../analysis/llm/generate.js';
 import { calibration, fileLedger, memoryLedger, type Ledger } from '../analysis/llm/ledger.js';
 import { estimateTokens, priceOf, worstCallCost } from '../analysis/llm/pricing.js';
-import { buildUserMessage, promptVersionFor, PROMPT_VERSION_NO_RAG, SYSTEM_PROMPT, systemPromptFor, type KnowledgeChunkInput } from '../analysis/llm/prompt.js';
+import { buildUserMessage, PREVIOUS_PROMPT_VERSIONS, promptVersionFor, PROMPT_VERSION_NO_RAG, SYSTEM_PROMPT, systemPromptFor, type KnowledgeChunkInput } from '../analysis/llm/prompt.js';
 import { knowledgeVersion, loadKnowledgeDir } from '../analysis/rag/chunks.js';
 import { pgSearch, retrieveKnowledge, type RetrieveOutcome } from '../analysis/rag/retrieve.js';
 import { createVoyageEmbed } from '../analysis/rag/voyage.js';
@@ -39,6 +39,8 @@ export const DEFAULTS = {
 const RETRY_MSG_TOKENS = 1500;
 /** 실측이 없을 때 첫 호출 예상 출력 토큰 (문장 JSON 약 1,500 + thinking) */
 const DEFAULT_EXPECTED_OUTPUT = 2500;
+/** 지난 버전 실측을 빌릴 때 출력 토큰 배수 (Q2: 칸 길이 120자 → 170자, 장면·조언 문장 추가) */
+const BORROWED_OUTPUT_FACTOR = 1.5;
 
 const USAGE = `사용법:
   npm run feedback -- --match <match.json> --timeline <timeline.json> (--participant N | --puuid P)   # 미리보기 (0원)
@@ -143,6 +145,15 @@ export function estimateCost(sheet: FactSheet, model: string, ledger: Ledger, kn
   const withKnowledge = knowledge !== null && knowledge.length > 0;
   let cal = calibration(ledger.entries(), model, promptVersionFor(withKnowledge));
   if (withKnowledge && cal.samples === 0) cal = calibration(ledger.entries(), model, PROMPT_VERSION_NO_RAG);
+  // 새 버전 실측이 없으면 지난 버전(최신 먼저)의 보정을 빌리고, 출력은 Q2 문장이 길어진 만큼 늘려 어림한다
+  if (cal.samples === 0) {
+    for (const v of PREVIOUS_PROMPT_VERSIONS) {
+      const old = calibration(ledger.entries(), model, v);
+      if (old.samples === 0) continue;
+      cal = { ...old, avgOutput: old.avgOutput === null ? null : old.avgOutput * BORROWED_OUTPUT_FACTOR };
+      break;
+    }
+  }
   const user = buildUserMessage(sheet, knowledge);
   const systemTokens = estimateTokens(systemPromptFor(withKnowledge), cal.inputFactor);
   const userTokens = estimateTokens(JSON.stringify([{ role: 'user', content: user }]), cal.inputFactor);

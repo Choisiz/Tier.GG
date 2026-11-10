@@ -278,7 +278,7 @@ describe('피드백 서비스: 예산', () => {
   it('동시 2요청이 같이 통과해 상한을 넘지 않는다 (예약)', async () => {
     const client = new ScriptClient();
     client.hold();
-    const h = harness({ client, budgetUsd: 0.3 });
+    const h = harness({ client, budgetUsd: 0.45 });
     const p1 = h.feedback('KR_1', SENA_PUUID);
     await tick();
     await tick();

@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { FORBIDDEN_PATTERNS, INTERPRETIVE_WORDS, SUBJECT_LABEL } from '../llm/labels.js';
+import { FORBIDDEN_PATTERNS, INTERPRETIVE_WORDS, SUBJECT_LABEL, VAGUE_PATTERNS } from '../llm/labels.js';
 import type { Position, Role } from '../types.js';
 
 export const ROLES: readonly Role[] = [
@@ -188,7 +188,9 @@ export function parseKnowledgeFile(text: string, file: string): ParseResult {
     if (body.length > 0 && (sc < CHUNK_SENTENCES.min || sc > CHUNK_SENTENCES.max)) warn(`${sc}문장 (권장 ${CHUNK_SENTENCES.min}~${CHUNK_SENTENCES.max}문장)`);
     const interp = INTERPRETIVE_WORDS.filter((w) => content.includes(w));
     if (interp.length > 0) warn(`해석어 ${interp.map((w) => `"${w}"`).join(', ')}: LLM 문장 검증기가 "~것으로 보입니다" 없이 막는 말`);
-    for (const { re, why } of FORBIDDEN_PATTERNS) if (re.test(content)) warn(`금지 표현(${why}): LLM 문장에서 막히는 말`);
+    // Q2: 은어("낀")·막연한 조언("~볼 수 있다", "이어 가")은 조각에서도 오류. 조각은 "조건 + 구체 행동" 꼴로 쓴다
+    for (const { re, why } of VAGUE_PATTERNS) if (re.test(content)) err(`${why}: 조각은 "조건 + 구체 행동"으로 쓴다`);
+    for (const { re, why } of FORBIDDEN_PATTERNS) if (!VAGUE_PATTERNS.some((v) => v.re === re) && re.test(content)) warn(`금지 표현(${why}): LLM 문장에서 막히는 말`);
 
     if (validRole && area && polarity && (POLARITIES as readonly string[]).includes(polarity)) {
       const prefix = expectedIdPrefix({ area: area as ChunkArea, subject, role: validRole, polarity: polarity as ChunkPolarity });

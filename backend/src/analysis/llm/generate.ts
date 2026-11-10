@@ -11,7 +11,8 @@ import { firstSchemaFor, parseFirstAnswer, parseRetryAnswer, retrySchemaFor } fr
 import { templateFor } from './template.js';
 import { checkFirstAnswer, checkRetryAnswer, type SlotText, type VerifyContext, type VerifyFailure } from './verify.js';
 
-export const MAX_TOKENS = { first: 3000, retry: 1500 } as const;
+// Q2: 칸마다 장면·조언 문장이 늘어 1차 3000 → 4500, 재시도 1500 → 2000
+export const MAX_TOKENS = { first: 4500, retry: 2000 } as const;
 
 export type FallbackReason =
   | 'no_key'

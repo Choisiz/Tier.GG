@@ -2,8 +2,8 @@
 // 엔진 결과(AnalysisResult)만 입력으로 하는 순수 함수. 엔진을 고치지 않고 파생값(차이 절댓값, 분 단위 시각)을 여기서 만든다.
 // 등급·등급 점수·과목 점수·impact·반영 비율·총점은 넣지 않는다.
 import { ROLE_LABEL } from '../role.js';
-import type { AnalysisResult, FactValue } from '../types.js';
-import { AREA_LABEL, followUpLabel, SUBJECT_FACT_LABEL, SUBJECT_LABEL, type Area } from './labels.js';
+import type { AnalysisResult, FactValue, FightScene, ObjectiveScene, PlayScene, Scenes } from '../types.js';
+import { AREA_LABEL, FIRST_DEATH_LABEL, followUpLabel, OBJECTIVE_LABEL, REGION_LABEL, SUBJECT_FACT_LABEL, SUBJECT_LABEL, type Area } from './labels.js';
 
 export interface Fact {
   id: string;
@@ -153,6 +153,13 @@ export function buildFacts(result: AnalysisResult, championNames: ReadonlyMap<nu
     if (laning.deathsBeforeReferenceSec.length > 0) {
       laneCommon.push(b.num('laning.deathsBefore.count', '비교 시점 전 내 데스 수', laning.deathsBeforeReferenceSec.length, '번'));
       laning.deathsBeforeReferenceSec.forEach((s, i) => laneCommon.push(b.min(`laning.deathsBefore.${i}.min`, `비교 시점 전 ${i + 1}번째 데스 시각`, s)));
+      // 장면 (Q2): 데스 지역·관여한 상대 (최대 3개, 시각 순)
+      (result.scenes?.laningDeaths ?? []).forEach((d, i) => {
+        const p = `laning.deathsBefore.${i}`;
+        if (d.region) laneCommon.push(b.text(`${p}.region`, `라인전 데스${i + 1} 지역`, REGION_LABEL[d.region] ?? d.region));
+        laneCommon.push(b.num(`${p}.enemies`, `라인전 데스${i + 1} 관여한 상대 수`, d.enemies, '명'));
+        laneCommon.push(b.text(`${p}.jungler`, `라인전 데스${i + 1} 상대 정글`, d.enemyJungler ? '관여함' : '관여 안 함'));
+      });
     }
     for (const kind of ['good', 'bad'] as const) {
       result.speakOrder.laning[kind].slice(0, MAX_PER_KIND).forEach((subjectId, i) => {
@@ -174,6 +181,7 @@ export function buildFacts(result: AnalysisResult, championNames: ReadonlyMap<nu
       result.speakOrder[area][kind].slice(0, MAX_PER_KIND).forEach((subjectId, i) => {
         const subject = result[area].subjects.find((s) => s.id === subjectId);
         const ids = subject ? subjectFacts(b, subjectId, subject.facts) : [];
+        if (result.scenes) ids.push(...sceneFacts(b, subjectId, result.scenes));
         slots.push({ slot: `${area}.${kind}.${i}`, area, kind, subjectId, index: null, factIds: [...common, ...ids] });
       });
     }
@@ -252,6 +260,115 @@ function leader(diff: number): string {
   if (diff > 0) return '우리 팀';
   if (diff < 0) return '상대 팀';
   return '같음';
+}
+
+// ---------- 장면 facts (Q2) ----------
+
+/** 과목마다 쓰는 기준 시간 fact */
+const WINDOW_FACTS: Readonly<Record<string, readonly ('fight' | 'vision')[]>> = {
+  'fight.advantage': ['fight'],
+  'fight.vision': ['vision'],
+  'fight.objective': ['vision'],
+  'macro.advantage': ['fight'],
+  'macro.solo': ['fight'],
+  'macro.vision': ['vision'],
+};
+
+/** 장면 facts의 과목별 출처 */
+const SCENE_SOURCE: Readonly<Record<string, keyof Scenes>> = {
+  'fight.vision': 'fightVision',
+  'fight.objective': 'fightObjective',
+  'fight.advantage': 'fightAdvantage',
+  'macro.advantage': 'macroAdvantage',
+  'macro.solo': 'macroSolo',
+};
+
+function windowFacts(b: Builder, which: 'fight' | 'vision', scenes: Scenes): string {
+  return which === 'fight'
+    ? b.num('fight.windowSec', '오브젝트 싸움 기준: 처치 시각 앞뒤 N초', scenes.fightWindowSec, '초')
+    : b.num('fight.vision.windowSec', '오브젝트 전 시야 기준: 처치 전 N초', scenes.visionWindowSec, '초');
+}
+
+const takenText = (ours: boolean) => (ours ? '우리 팀이 잡음' : '상대 팀이 잡음');
+
+function objectiveSceneFacts(b: Builder, p: string, n: number, s: ObjectiveScene, withWards: boolean): string[] {
+  const ids = [
+    b.min(`${p}.min`, `장면${n} 처치 시각`, s.sec),
+    b.text(`${p}.objective`, `장면${n} 오브젝트`, OBJECTIVE_LABEL[s.kind] ?? s.kind),
+    b.text(`${p}.taken`, `장면${n} 잡은 팀`, takenText(s.ours)),
+  ];
+  if (withWards) {
+    ids.push(
+      b.num(`${p}.wardsPlaced`, `장면${n} 처치 전 60초 내 와드 설치(제어 와드 포함)`, s.wardsPlaced, '개'),
+      b.num(`${p}.controlWards`, `장면${n} 그중 제어 와드`, s.controlWards, '개'),
+      b.num(`${p}.wardKills`, `장면${n} 처치 전 60초 내 와드 제거`, s.wardKills, '개'),
+    );
+  } else {
+    ids.push(b.text(`${p}.lastHit`, `장면${n} 막타`, s.lastHitByMe ? '내가 막타를 침' : '내가 막타를 치지 않음'));
+  }
+  return ids;
+}
+
+function outcomeText(f: FightScene): string {
+  if (f.pointsOurs > f.pointsTheirs) return '우리 팀이 더 얻음';
+  if (f.pointsOurs < f.pointsTheirs) return '상대 팀이 더 얻음';
+  return '비슷함';
+}
+
+function objectivesText(f: FightScene): string | null {
+  if (f.objectives.length === 0) return null;
+  const by = (ours: boolean) => [...new Set(f.objectives.filter((o) => o.ours === ours).map((o) => OBJECTIVE_LABEL[o.kind] ?? o.kind))];
+  const parts: string[] = [];
+  const o = by(true);
+  const t = by(false);
+  if (o.length) parts.push(`우리 팀이 ${o.join('·')} 잡음`);
+  if (t.length) parts.push(`상대 팀이 ${t.join('·')} 잡음`);
+  return parts.join(', ');
+}
+
+function fightSceneFacts(b: Builder, p: string, n: number, f: FightScene): string[] {
+  const ids = [
+    b.min(`${p}.min`, `장면${n} 싸움 시각`, f.startSec),
+    b.num(`${p}.killsOurs`, `장면${n} 우리 팀 킬`, f.killsOurs, '개'),
+    b.num(`${p}.killsTheirs`, `장면${n} 상대 팀 킬`, f.killsTheirs, '개'),
+    b.text(`${p}.outcome`, `장면${n} 득실`, outcomeText(f)),
+    // 처음 죽은 사람 + 내 데스를 한 값으로 (토큰 절약)
+    b.text(`${p}.firstDeath`, `장면${n} 처음 죽은 사람`, `${FIRST_DEATH_LABEL[f.firstDeath] ?? f.firstDeath}${f.firstDeath !== 'ME' ? (f.iDied ? ', 나도 죽음' : ', 나는 살아남음') : ''}`),
+  ];
+  const objs = objectivesText(f);
+  if (objs) ids.push(b.text(`${p}.objectives`, `장면${n} 잡힌 오브젝트`, objs));
+  if (f.region) ids.push(b.text(`${p}.region`, `장면${n} 지역`, REGION_LABEL[f.region] ?? f.region));
+  return ids;
+}
+
+function playSceneFacts(b: Builder, p: string, n: number, s: PlayScene): string[] {
+  const ids = [
+    b.min(`${p}.min`, `장면${n} 시각`, s.sec),
+    b.text(`${p}.what`, `장면${n} 무엇`, s.kind === 'KILL' ? '단독 킬' : '단독 데스'),
+  ];
+  if (s.region) ids.push(b.text(`${p}.region`, `장면${n} 지역`, REGION_LABEL[s.region] ?? s.region));
+  if (s.kind === 'DEATH') {
+    ids.push(b.num(`${p}.enemies`, `장면${n} 관여한 상대 수`, s.enemies, '명'));
+    ids.push(b.text(`${p}.jungler`, `장면${n} 상대 정글`, s.enemyJungler ? '관여함' : '관여 안 함'));
+  }
+  return ids;
+}
+
+/** 과목 칸에 붙는 기준 시간 + 장면 facts (과목마다 최대 3개, 엔진이 정한 중요한 순) */
+function sceneFacts(b: Builder, subjectId: string, scenes: Scenes): string[] {
+  const ids = (WINDOW_FACTS[subjectId] ?? []).map((w) => windowFacts(b, w, scenes));
+  const key = SCENE_SOURCE[subjectId];
+  if (!key) return ids;
+  const list = scenes[key] as readonly (ObjectiveScene | FightScene | PlayScene)[];
+  list.forEach((x, i) => {
+    const p = `scene.${subjectId}.${i}`;
+    const n = i + 1;
+    if (key === 'fightVision') ids.push(...objectiveSceneFacts(b, p, n, x as ObjectiveScene, true));
+    else if (key === 'fightObjective') ids.push(...objectiveSceneFacts(b, p, n, x as ObjectiveScene, false));
+    else if (key === 'macroSolo') ids.push(...playSceneFacts(b, p, n, x as PlayScene));
+    else ids.push(...fightSceneFacts(b, p, n, x as FightScene));
+  });
+  return ids;
 }
 
 /** 과목 facts를 평평하게. 배열 구간 [시작분, 끝분]은 phaseNStartMin/EndMin, 음수 diff·net은 절댓값 fact로. SUBJECT_FACT_LABEL에 없는 키는 버린다 */

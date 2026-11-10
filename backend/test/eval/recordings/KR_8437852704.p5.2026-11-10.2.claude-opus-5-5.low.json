@@ -1,0 +1,101 @@
+{
+  "matchId": "KR_8437852704",
+  "participantId": 5,
+  "engineVersion": "2026-11-10.1",
+  "promptVersion": "2026-11-10.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-10T14:27:41.670Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "59f2a7182891eb17a6e0ce8b5a70c9548fc2f657a65bed1ea05cff68db211ee5",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"라인전은 애쉬에게 밀렸고, 오브젝트 싸움과 그 밖의 운영은 부족했습니다. 15.1분 싸움에서 우리 팀 1킬, 상대 팀 4킬로 골드 격차가 약 3,900 벌어졌습니다.\",\"factIds\":[\"laning.opponent\",\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\"]},\"sections\":{\"laning\":{\"good\":[],\"bad\":[{\"subjectId\":\"laning.gold\",\"text\":\"15분 골드가 상대 애쉬보다 703 적었습니다. 2.5분 바텀 라인 우리 포탑 쪽에서 상대 1명에게 죽었고, 상대 정글은 관여 안 함이었습니다. 다음 판에는 바텀 라인 우리 포탑 쪽에서 상대와 교환하기보다 미니언 막타를 먼저 챙기세요.\",\"factIds\":[\"laning.referenceMin\",\"laning.opponent\",\"laning.gold.diffAbs\",\"laning.deathsBefore.0.min\",\"laning.deathsBefore.0.region\",\"laning.deathsBefore.0.enemies\",\"laning.deathsBefore.0.jungler\"]},{\"subjectId\":\"laning.kda\",\"text\":\"15분까지 0킬 2데스 3어시스트로, 애쉬의 2킬 1데스 4어시스트보다 낮았습니다. 8.5분 바텀 라인 우리 포탑 쪽에서 상대 2명에게 죽었습니다. 다음 판에는 바텀 라인에서 상대의 주요 스킬이 빠진 것을 본 뒤에만 교환을 거세요.\",\"factIds\":[\"laning.referenceMin\",\"laning.kda.me.kills\",\"laning.kda.me.deaths\",\"laning.kda.me.assists\",\"laning.opponent\",\"laning.kda.enemy.kills\",\"laning.kda.enemy.deaths\",\"laning.kda.enemy.assists\",\"laning.deathsBefore.1.min\",\"laning.deathsBefore.1.region\",\"laning.deathsBefore.1.enemies\"]}]},\"fight\":{\"good\":[],\"bad\":[{\"subjectId\":\"fight.vision\",\"text\":\"오브젝트를 잡기 전 60초 동안의 시야 점수가 오브젝트당 0.5로 낮았습니다. 6.6분 상대 팀이 잡은 용 전 60초 동안 내 와드는 0개였습니다. 다음 판에는 용을 잡기 전 60초 안에 아군 앞라인과 함께 아래쪽 강 입구에 제어 와드를 먼저 두세요.\",\"factIds\":[\"fight.vision.windowSec\",\"fight.vision.perObjective\",\"scene.fight.vision.0.min\",\"scene.fight.vision.0.taken\",\"scene.fight.vision.0.objective\",\"scene.fight.vision.0.wardsPlaced\"]},{\"subjectId\":\"fight.advantage\",\"text\":\"오브젝트를 잡은 시각 앞뒤 40초 안에 내가 참여한 싸움에서 우리 팀 몫이 4.5%였습니다. 16.7분 탑 라인 상대 포탑 쪽에서 우리 팀 1킬, 상대 팀 7킬이 났고 아군이 먼저 죽었습니다. 다음 판에는 탑 라인 상대 포탑 쪽에서 먼저 잡힌 아군 곁에 미리 붙어 숫자를 맞추세요.\",\"factIds\":[\"fight.windowSec\",\"fight.advantage.sharePct\",\"scene.fight.advantage.0.min\",\"scene.fight.advantage.0.region\",\"scene.fight.advantage.0.killsOurs\",\"scene.fight.advantage.0.killsTheirs\",\"scene.fight.advantage.0.firstDeath\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.side\",\"text\":\"포탑 피해량이 2,017, 분당 87.4로 상대 포탑을 꾸준히 압박했습니다.\",\"factIds\":[\"macro.side.turretDamage\",\"macro.side.perMinute\"]}],\"bad\":[{\"subjectId\":\"macro.vision\",\"text\":\"오브젝트 싸움 밖 시야 점수는 23.1분 동안 21로, 분당 0.91에 그쳤습니다.\",\"factIds\":[\"macro.vision.points\",\"macro.vision.minutes\",\"macro.vision.perMinute\"]},{\"subjectId\":\"macro.advantage\",\"text\":\"오브젝트를 잡은 시각 앞뒤 40초 밖에서 내가 참여한 싸움의 우리 팀 몫이 25.4%였습니다. 22.2분 우리 기지 근처에서 내가 먼저 죽으며 우리 팀 4킬, 상대 팀 4킬이 났습니다. 다음 판에는 우리 기지 근처 싸움에서 아군 쪽으로 물러서며 싸우세요.\",\"factIds\":[\"fight.windowSec\",\"macro.advantage.sharePct\",\"scene.macro.advantage.0.min\",\"scene.macro.advantage.0.region\",\"scene.macro.advantage.0.firstDeath\",\"scene.macro.advantage.0.killsOurs\",\"scene.macro.advantage.0.killsTheirs\"]}]}},\"keyMoments\":[{\"index\":0,\"text\":\"15.1분 싸움에서 우리 팀 1킬, 상대 팀 4킬로 골드 격차가 약 3,900 벌어졌고, 우리 바텀 1차 포탑을 잃었습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},{\"index\":1,\"text\":\"16.7분 싸움에서 우리 팀 0킬, 상대 팀 3킬로 골드 격차가 약 3,900 벌어졌고, 상대 팀이 전령을 잡았습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.gapChangeAbs\",\"keyMoment.1.followUp.1\"]},{\"index\":2,\"text\":\"22.2분 싸움에서 우리 팀 4킬, 상대 팀 4킬로 골드 격차가 465 좁혀졌지만, 우리 미드 억제기를 잃었습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.killsTheirs\",\"keyMoment.2.gapChangeAbs\",\"keyMoment.2.followUp.1\"]}],\"chunkUse\":[{\"slot\":\"laning.bad.0\",\"chunkIds\":[\"laning.gold.ALL.bad.01\"]},{\"slot\":\"laning.bad.1\",\"chunkIds\":[\"laning.kda.ALL.bad.01\"]},{\"slot\":\"fight.bad.0\",\"chunkIds\":[\"fight.vision.SUPPORT_DAMAGE.bad.01\"]},{\"slot\":\"fight.bad.1\",\"chunkIds\":[\"fight.advantage.ALL.bad.01\"]},{\"slot\":\"macro.bad.1\",\"chunkIds\":[\"macro.advantage.ALL.bad.01\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 13009,
+          "cacheWrite": 8217,
+          "cacheRead": 0,
+          "output": 2555
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 22611
+    },
+    {
+      "attempt": 2,
+      "kind": "retry",
+      "requestHash": "dd9bb367306545469eb8c1a0398b05e7efbd54742a3eef9f35dda434fe456d8c",
+      "response": {
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "",
+            "signature": "CAQSowoKEAgTGAI4AUIIdGhpbmtpbmcSDELnLcVC+Opy0UH3axoMdnh30xpu+DAeVjZSIjBmoEypVTddCWmZ+h3OZzK2IR+KWWA4tFdCCORMTLAFamGx7+2fcrqisD/rdI7gKh4qwAmNK0AzlpHBtVc342mq8DJygcUSZuYEI7aXVCRzKre+GQYlc6RY/F3Sk8tSSWgdfNLnvJQL06ZhSid5x65NhJkEKrlSJqDZtX/RkwWZRJBCsk1oHlzgi24DUWMqZyWxtopOE+eeu+zsaupe6DJe6NyVWWY4JsCIq777xYRiLu1W6cAGKisb0hHSVdfKPF1Qu6MoYht2oG2x4sG496YnEuaxIiS6MOIeSqyMuaPxIhP+g5kqsjrg5HgWF72zKcT5nfxv7kUyCvuaqPnjaKH+iyzRs/Ssb4Nmh15JdYwHwiRTipyDdwN9d/lwzA7MDdlmSfToaleNY75Sk5EKzukYJkuhlBTTzvqCTtWwwGjZzM5A10dejoH+DmdTey/Hs7CaXQRl3wXS3cqOCwhzcvrT1QeFinXv9MnKH8OwoyDOlGWDuux0tVqx3uphYvuLN1Tptm4N1JgmvpeAjnevHn3efV71OTa1jbpEy7lUmpMVB9Yp7Qe85MfCVp6HU7ShipFsu1Ur7NRmH1e54N6GOjhAxjfkMv6WRxbXeeyuEBxX3RS029+2TlHVw1Ys/wGPnlXoOHwkYsbTmPcIt7/wIsxaWZ5b3eZLB7BFCcTB0c2OPWprpyAwih698z+6m9GNmdTfS4dGtQKzxns6rcqy4+yg22j6a+vJZdCT0l2+ZFn4wepS9fpBgRSlPczw/O1rfRPPVtTdH909YDhZveRvn16wDiCAUqABmuh7754cVzRJI046r6ARd9wgwbw6KEFnf7nrYiM4XF4dWurdvWgxYauaULCHadj246g/Uz6k6T/Mq9dEsAl34DdnhB/+kJTr9dq7h8A1v/+/oaWOWcyXT1fgRXIyrIOJvDJBO4FURLliqauf6I8Lq8cjzZcZXLSKfS2kN/wBzM1t2P6X/DmGPEe43GK1D9qi3SW5llzUd5juW9D48L1CiTEHMUUxPMiTfX2nptzm9XPAHtwvXw3XsfvO8kXh8gF70zcumRDyHvgEbN68Ea6Kfj0oj+qo5X8MdaA6P59gqf8QJDvbgshDu3CU+SIXy70oGb6lSkRPcTO4mTJePrVNHjfzHGLXhRE0fiJLSzFrRzibayE+qLJvB2f2FqYRAXh4D1K8QyDHg8cz4umcRcGV4LBPlrVMfDRH5qZiNll36wNmvIETrtHjPN6gQwTPqHj3it958mmBLxfHZoV781ovmn5zeSykpV6jiXMDLX3ijqlwJKTxnK83fV/+0+mxEZ2O4MST154e235mpH0v71FEwGvS4PbSjDiwDNejVKmR1AIFxCYZuV8OQGV4AYOFApBMyoUNaDw3YU5su9PsaAbYGuTKA2420RHf67YAR6cXBxzA7bs9SODZDL8G9nJ2ceFWTiG1w2GURlLdmuHXb17qDqXAWBwLXJdjURIFst2J6VFVzqe8B/LRyE5HteOeRLjc6e7LG5pa4icJdv/q8iREbwNsSHIH9BKhpKFTqDzVKGCG3wAIGc2dUE97T+7FU+Stewqy12MsC3P/FaB5XN/UDV4Bvn0nNS/6D+tBXh58ckoM/seMzAlxd7b9yaz7K8YH+45tMhZWWLSJX4mnDIU1zBANCxJrU5X2UQj2pwL9naKVLjy361SY2B9XCvjyGAE="
+          },
+          {
+            "type": "text",
+            "text": "{\"fixes\":[{\"slot\":\"laning.bad.1\",\"text\":\"15분까지 0킬 2데스 3어시스트로, 애쉬의 2킬 1데스 4어시스트보다 낮았습니다. 8.5분 바텀 라인 우리 포탑 쪽에서 상대 2명에게 죽었습니다. 다음 판에는 바텀 라인 우리 포탑 쪽에서 상대의 주요 스킬이 빠진 것을 본 뒤에만 교환을 거세요.\",\"factIds\":[\"laning.referenceMin\",\"laning.kda.me.kills\",\"laning.kda.me.deaths\",\"laning.kda.me.assists\",\"laning.opponent\",\"laning.kda.enemy.kills\",\"laning.kda.enemy.deaths\",\"laning.kda.enemy.assists\",\"laning.deathsBefore.1.min\",\"laning.deathsBefore.1.region\",\"laning.deathsBefore.1.enemies\"],\"chunkIds\":[\"laning.kda.ALL.bad.01\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 16090,
+          "cacheWrite": 6698,
+          "cacheRead": 0,
+          "output": 679
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 9794
+    }
+  ],
+  "knowledge": {
+    "version": "c91d410c750d",
+    "chunks": [
+      {
+        "id": "fight.vision.SUPPORT_DAMAGE.bad.01",
+        "content": "딜서폿의 오브젝트 전 시야가 낮을 때\n딜서폿의 오브젝트 전 시야가 낮고 그 오브젝트를 상대 팀이 잡았다면, 싸움이 열릴 자리의 정보가 없었을 수 있다. 딜서폿은 몸이 약해 시야 없이 앞으로 나가면 먼저 잡힌다. 다음 판에는 그 오브젝트를 잡기 전 시야 기준 시간 안에 아군 앞라인과 함께 강 입구로 들어가 제어 와드를 먼저 둔다."
+      },
+      {
+        "id": "fight.advantage.ALL.bad.01",
+        "content": "오브젝트 싸움 득실이 낮을 때\n오브젝트를 잡은 시각 앞뒤 기준 시간 안에 내가 참여한 싸움에서 우리 팀 몫이 낮으면, 싸움이 열리기 전부터 숫자나 위치에서 밀렸을 수 있다. 그 싸움에서 내가 먼저 죽었다면, 다음 판에는 같은 오브젝트가 나오기 전 아군이 모일 때까지 오브젝트 쪽 강 입구 앞에서 기다렸다가 함께 들어간다. 우리 팀 다른 사람이 먼저 죽었다면 그 아군 곁으로 미리 붙어 숫자를 맞춘다."
+      },
+      {
+        "id": "macro.vision.SUPPORT_DAMAGE.bad.01",
+        "content": "딜서폿의 평소 시야가 낮을 때\n딜서폿의 평소 시야가 낮으면 딜에 집중하느라 와드 관리가 뒤로 밀렸을 수 있다. 다음 판에는 귀환할 때마다 제어 와드를 사서 바텀 쪽 강 입구에 두고, 와드 충전이 다 차면 바로 우리 정글 아래쪽 입구에 쓴다."
+      },
+      {
+        "id": "macro.advantage.ALL.bad.01",
+        "content": "오브젝트 밖 싸움에서 팀이 밀렸을 때\n오브젝트 싸움 밖에서 내가 참여한 싸움의 우리 팀 몫이 낮으면 숫자가 맞지 않는 싸움에 휘말렸을 수 있다. 그 싸움이 상대 정글이나 강에서 났고 내가 먼저 죽었다면, 다음 판에는 그 지역에 들어가기 전에 입구에 와드를 두고 가장 가까운 아군과 함께 들어간다. 우리 정글에서 났다면 강 쪽 입구에 와드를 먼저 두고 아군 쪽으로 물러서며 싸운다."
+      },
+      {
+        "id": "macro.side.ALL.good.01",
+        "content": "사이드 압박이 좋았을 때\n포탑 피해가 포지션 기대보다 높았다면 라인을 밀며 상대 포탑을 꾸준히 압박한 것일 수 있다. 다음 판에도 사이드를 밀다가 상대 정글과 미드가 함께 지도에서 사라지면 그 라인의 우리 포탑 쪽으로 바로 물러선다."
+      },
+      {
+        "id": "laning.gold.ALL.bad.01",
+        "content": "라인전 골드가 뒤졌을 때\n라인전 골드가 상대 라이너보다 적으면 CS를 놓쳤거나 데스로 골드를 내준 경우가 많을 수 있다. 비교 시점 전 데스가 그 라인의 상대 포탑 쪽에서 났다면, 다음 판에는 상대 정글이 지도에 보이지 않는 동안 라인 가운데를 넘지 않고 우리 포탑 쪽에서 막타만 챙긴다. 데스 없이 골드가 뒤졌다면 상대와 교환하기보다 미니언 막타를 먼저 친다."
+      },
+      {
+        "id": "laning.kda.ALL.bad.01",
+        "content": "라인전에서 데스가 많았을 때\n라인전 데스가 킬보다 많으면 라인전의 다른 손해도 여기서 시작됐을 수 있다. 데스 지역이 그 라인의 상대 포탑 쪽이고 상대 정글이 관여했다면, 다음 판에는 상대 정글이 보이지 않는 동안 라인 가운데를 넘지 않고 우리 포탑 쪽에서 미니언을 받는다. 상대 정글 없이 잡혔다면 상대의 주요 스킬이 빠진 것을 본 뒤에만 교환을 건다."
+      },
+      {
+        "id": "fight.vision.ALL.bad.01",
+        "content": "오브젝트 전 시야가 낮을 때\n오브젝트를 잡기 전 기준 시간 동안 내 와드가 없었고 그 오브젝트를 상대 팀이 잡았다면, 팀이 싸움 자리를 모른 채 들어갔을 수 있다. 다음 판에는 용이면 아래쪽 강 입구에, 바론이나 전령이면 위쪽 강 입구에 그 기준 시간이 시작되기 전에 제어 와드를 먼저 둔다."
+      }
+    ]
+  }
+}

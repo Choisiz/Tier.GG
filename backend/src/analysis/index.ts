@@ -6,6 +6,7 @@ import { analyzeLaning } from './laning.js';
 import { analyzeMacro } from './macro.js';
 import { determineRole, isPosition } from './role.js';
 import { ENGINE_VERSION } from './rules.js';
+import { buildScenes } from './scenes.js';
 import { areaSpeakList, buildSummary, laningSpeakList } from './summary.js';
 import { flattenEvents, type MatchContext, type Player } from './timeline.js';
 import type { AnalysisInput, AnalysisResult } from './types.js';
@@ -77,6 +78,11 @@ export function analyzeMatch(input: AnalysisInput): AnalysisResult {
   const macro = analyzeMacro(ctx, objectives);
   const keyMoments = analyzeKeyMoments(ctx, objectives);
   const me = ctx.me;
+  const speakOrder = {
+    laning: laningSpeakList(laning.result),
+    fight: areaSpeakList(fight.area),
+    macro: areaSpeakList(macro),
+  };
   return {
     engineVersion: ENGINE_VERSION,
     matchId: ctx.matchId,
@@ -94,12 +100,10 @@ export function analyzeMatch(input: AnalysisInput): AnalysisResult {
     macro,
     keyMoments,
     summary: buildSummary(laning.result, fight.area, macro, keyMoments),
-    speakOrder: {
-      laning: laningSpeakList(laning.result),
-      fight: areaSpeakList(fight.area),
-      macro: areaSpeakList(macro),
-    },
+    speakOrder,
     notes: fight.notes,
+    // 장면(Q2): 판정이 끝난 뒤 문장 재료만 모은다. 점수·등급·말할 순서에 영향 없음
+    scenes: buildScenes(ctx, objectives, laning.result, speakOrder),
     warnings: ctx.warnings,
   };
 }

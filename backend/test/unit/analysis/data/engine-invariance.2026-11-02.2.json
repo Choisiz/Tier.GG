@@ -1,0 +1,2730 @@
+{
+ "engineVersion": "2026-11-02.2",
+ "note": "Q2 전 엔진(2026-11-02.2)의 판정 부분 해시. scenes·engineVersion 제외",
+ "games": {
+  "KR_8437852704.p1": {
+   "sha256": "1b85228f6914d86dd8929b7093a39855cef854a91f6e454e4137ede3955d8aec",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "B",
+    "fight.vision": "C",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "D",
+    "macro.side": "E",
+    "macro.farm": "E",
+    "macro.vision": "E",
+    "laning.gold": "-1",
+    "laning.level": "0",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 50,
+    "macro": 5
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.damage"
+     ],
+     "bad": [
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.side",
+      "macro.farm",
+      "macro.advantage",
+      "macro.solo",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "보통",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8437852704.p2": {
+   "sha256": "71f05a1a14498152fa8bdf13460f741943b767271b9f5fd5cdfe2b29da38799c",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "B",
+    "fight.vision": "C",
+    "fight.objective": "E",
+    "macro.advantage": "E",
+    "macro.solo": "C",
+    "macro.side": "E",
+    "macro.farm": "E",
+    "macro.vision": "B",
+    "laning.gold": "-1",
+    "laning.level": "0",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 23.75,
+    "macro": 26.25
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.damage"
+     ],
+     "bad": [
+      "fight.objective",
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.vision"
+     ],
+     "bad": [
+      "macro.farm",
+      "macro.advantage",
+      "macro.side"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "부족",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8437852704.p3": {
+   "sha256": "5546a65b0dbf3d4ced90277295de124a85ba9e6bca767ed07aac662aa3d22839",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "B",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "C",
+    "macro.side": "E",
+    "macro.farm": "C",
+    "macro.vision": "E",
+    "laning.gold": "1",
+    "laning.level": "0",
+    "laning.kda": "1",
+    "laning.cs": "1"
+   },
+   "totals": {
+    "fight": 52.5,
+    "macro": 27.5
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.kda",
+      "laning.cs"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.damage"
+     ],
+     "bad": [
+      "fight.advantage",
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.advantage",
+      "macro.side",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "보통",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8437852704.p4": {
+   "sha256": "7804f274b2e2a5138e4cd1043e49c05b63691108c49bed164b330a05ff43ddd1",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "E",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "D",
+    "macro.side": "D",
+    "macro.farm": "D",
+    "macro.vision": "D",
+    "laning.gold": "-1",
+    "laning.level": "0",
+    "laning.kda": "-1",
+    "laning.cs": "-1"
+   },
+   "totals": {
+    "fight": 3.75,
+    "macro": 21.25
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.kda",
+      "laning.cs"
+     ]
+    },
+    "fight": {
+     "good": [],
+     "bad": [
+      "fight.damage",
+      "fight.advantage",
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.farm",
+      "macro.advantage",
+      "macro.solo",
+      "macro.side",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "부족",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8437852704.p5": {
+   "sha256": "ade3789be813c9b53c3c5afbb080fc4b5cf676b72776d853451cec436ed766ac",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "C",
+    "fight.vision": "E",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "C",
+    "macro.side": "B",
+    "macro.farm": null,
+    "macro.vision": "E",
+    "laning.gold": "-1",
+    "laning.level": "0",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 25,
+    "macro": 16.25
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [],
+     "bad": [
+      "fight.vision",
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.side"
+     ],
+     "bad": [
+      "macro.vision",
+      "macro.advantage"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "부족",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8437852704.p6": {
+   "sha256": "2adbab3c38fcf26c427201604d6e95605d72135bbbbb5e37f0c6b59db13168ad",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "B",
+    "fight.vision": "C",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "B",
+    "macro.side": "A",
+    "macro.farm": "D",
+    "macro.vision": "E",
+    "laning.gold": "1",
+    "laning.level": "0",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 80,
+    "macro": 66.25
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.kda"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.damage",
+      "fight.advantage"
+     ],
+     "bad": []
+    },
+    "macro": {
+     "good": [
+      "macro.side",
+      "macro.advantage",
+      "macro.solo"
+     ],
+     "bad": [
+      "macro.farm",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "잘함",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8437852704.p7": {
+   "sha256": "e321987aa4839f312bad4db963d1de5d86ee673d6cc701577ceab3d2350fc77e",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "C",
+    "fight.vision": "B",
+    "fight.objective": "B",
+    "macro.advantage": "B",
+    "macro.solo": "D",
+    "macro.side": "C",
+    "macro.farm": "A",
+    "macro.vision": "C",
+    "laning.gold": "1",
+    "laning.level": "0",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 68.75,
+    "macro": 67.5
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.kda"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.objective",
+      "fight.advantage",
+      "fight.vision"
+     ],
+     "bad": []
+    },
+    "macro": {
+     "good": [
+      "macro.farm",
+      "macro.advantage"
+     ],
+     "bad": [
+      "macro.solo"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "보통",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8437852704.p8": {
+   "sha256": "faea0f6d72b0598b641979d90bd7ed3e5ac6494ba2a664a6acc7e424753fc551",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "C",
+    "fight.vision": "C",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "B",
+    "macro.side": "C",
+    "macro.farm": "C",
+    "macro.vision": "C",
+    "laning.gold": "-1",
+    "laning.level": "0",
+    "laning.kda": "-1",
+    "laning.cs": "-1"
+   },
+   "totals": {
+    "fight": 52.5,
+    "macro": 65
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.kda",
+      "laning.cs"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.advantage"
+     ],
+     "bad": []
+    },
+    "macro": {
+     "good": [
+      "macro.advantage",
+      "macro.solo"
+     ],
+     "bad": []
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "보통",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8437852704.p9": {
+   "sha256": "924b935580caf13493f85c309c12c5361e88364afe12398f994317aede6e7b95",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "C",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "B",
+    "macro.side": "A",
+    "macro.farm": "A",
+    "macro.vision": "C",
+    "laning.gold": "1",
+    "laning.level": "0",
+    "laning.kda": "1",
+    "laning.cs": "1"
+   },
+   "totals": {
+    "fight": 40.63,
+    "macro": 92.5
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.kda",
+      "laning.cs"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.advantage"
+     ],
+     "bad": [
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.farm",
+      "macro.side",
+      "macro.advantage",
+      "macro.solo"
+     ],
+     "bad": []
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "보통",
+    "macro": "잘함",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8437852704.p10": {
+   "sha256": "a70d9ab23d6f7196d0027d139a3b1a48e0f797c6c441950784062e4c1398d795",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "B",
+    "fight.vision": "E",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "C",
+    "macro.side": "A",
+    "macro.farm": null,
+    "macro.vision": "E",
+    "laning.gold": "1",
+    "laning.level": "0",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 52.5,
+    "macro": 47.5
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.kda"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.damage",
+      "fight.advantage"
+     ],
+     "bad": [
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.advantage",
+      "macro.side"
+     ],
+     "bad": [
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "보통",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419421568.p1": {
+   "sha256": "781a10b6791b04d4713c720100c974fb43ce6c9d6bb687d269fe951539d3f738",
+   "grades": {
+    "fight.advantage": "D",
+    "fight.damage": "B",
+    "fight.vision": "B",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "E",
+    "macro.side": "A",
+    "macro.farm": "A",
+    "macro.vision": "B",
+    "laning.gold": "-1",
+    "laning.level": "-1",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 58.75,
+    "macro": 62.5
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.damage",
+      "fight.vision"
+     ],
+     "bad": [
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.side",
+      "macro.farm",
+      "macro.vision"
+     ],
+     "bad": [
+      "macro.solo",
+      "macro.advantage"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "보통",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419421568.p2": {
+   "sha256": "505310112dc539636870cebc76eb5c6dcbfcacffd4e5086d5f9fcb5d94a4ad07",
+   "grades": {
+    "fight.advantage": "D",
+    "fight.damage": "E",
+    "fight.vision": "B",
+    "fight.objective": "D",
+    "macro.advantage": "E",
+    "macro.solo": "E",
+    "macro.side": "E",
+    "macro.farm": "E",
+    "macro.vision": "C",
+    "laning.gold": "-1",
+    "laning.level": "0",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 22.5,
+    "macro": 12.5
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.vision"
+     ],
+     "bad": [
+      "fight.damage",
+      "fight.objective",
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.farm",
+      "macro.advantage",
+      "macro.solo",
+      "macro.side"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "부족",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419421568.p3": {
+   "sha256": "df8eec84d68560bafb55816962269c3fcc33bf5dd1ba4e78565e0b252d6be37d",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "B",
+    "fight.vision": "B",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "C",
+    "macro.side": "E",
+    "macro.farm": "E",
+    "macro.vision": "E",
+    "laning.gold": "-1",
+    "laning.level": "-1",
+    "laning.kda": "-1",
+    "laning.cs": "-1"
+   },
+   "totals": {
+    "fight": 50,
+    "macro": 10
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda",
+      "laning.cs"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.damage",
+      "fight.vision"
+     ],
+     "bad": [
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.farm",
+      "macro.advantage",
+      "macro.side",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "보통",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419421568.p4": {
+   "sha256": "b89deaed9c6240b185ca296d42c0dadbba24da398aeb6c187e270490aab42472",
+   "grades": {
+    "fight.advantage": "D",
+    "fight.damage": "D",
+    "fight.vision": "C",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "C",
+    "macro.side": "E",
+    "macro.farm": "A",
+    "macro.vision": "C",
+    "laning.gold": "-1",
+    "laning.level": "0",
+    "laning.kda": "-1",
+    "laning.cs": "-1"
+   },
+   "totals": {
+    "fight": 27.5,
+    "macro": 52.5
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.kda",
+      "laning.cs"
+     ]
+    },
+    "fight": {
+     "good": [],
+     "bad": [
+      "fight.damage",
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.farm"
+     ],
+     "bad": [
+      "macro.side",
+      "macro.advantage"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "부족",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419421568.p5": {
+   "sha256": "e696b1cabe1a0de1c7090e877656d25fec372ce0ec3f538b8d8edf72cc9565c7",
+   "grades": {
+    "fight.advantage": "D",
+    "fight.damage": "B",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "D",
+    "macro.side": "E",
+    "macro.farm": null,
+    "macro.vision": "D",
+    "laning.gold": "1",
+    "laning.level": "0",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 56.25,
+    "macro": 16.25
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold"
+     ],
+     "bad": [
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.damage"
+     ],
+     "bad": [
+      "fight.vision",
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.advantage",
+      "macro.vision",
+      "macro.solo",
+      "macro.side"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "비슷",
+    "fight": "보통",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419421568.p6": {
+   "sha256": "97a07718b5bfbcb3d2ef7b1b54260b46d45452c5d157e4acbf66659c3fda0bce",
+   "grades": {
+    "fight.advantage": "B",
+    "fight.damage": "B",
+    "fight.vision": "B",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "A",
+    "macro.side": "E",
+    "macro.farm": "D",
+    "macro.vision": "B",
+    "laning.gold": "1",
+    "laning.level": "1",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 73.75,
+    "macro": 48.75
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.advantage",
+      "fight.damage",
+      "fight.vision"
+     ],
+     "bad": []
+    },
+    "macro": {
+     "good": [
+      "macro.advantage",
+      "macro.solo",
+      "macro.vision"
+     ],
+     "bad": [
+      "macro.side",
+      "macro.farm"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "잘함",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419421568.p7": {
+   "sha256": "8744451cfc362e64173b614264f84f5dca864cd676a94b634156a735db3edc4d",
+   "grades": {
+    "fight.advantage": "C",
+    "fight.damage": "C",
+    "fight.vision": "A",
+    "fight.objective": "A",
+    "macro.advantage": "A",
+    "macro.solo": "C",
+    "macro.side": "A",
+    "macro.farm": "B",
+    "macro.vision": "C",
+    "laning.gold": "1",
+    "laning.level": "0",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 80,
+    "macro": 73.75
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.kda"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.objective",
+      "fight.vision"
+     ],
+     "bad": []
+    },
+    "macro": {
+     "good": [
+      "macro.advantage",
+      "macro.farm",
+      "macro.side"
+     ],
+     "bad": []
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "잘함",
+    "macro": "잘함",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419421568.p8": {
+   "sha256": "479fe35ca869d91ce9d6fefd1ffe0b9e66c5bc741b895378f7c9c68f7aad541f",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "B",
+    "fight.vision": "A",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "A",
+    "macro.side": "A",
+    "macro.farm": "A",
+    "macro.vision": "A",
+    "laning.gold": "1",
+    "laning.level": "1",
+    "laning.kda": "1",
+    "laning.cs": "1"
+   },
+   "totals": {
+    "fight": 80,
+    "macro": 100
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda",
+      "laning.cs"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.damage",
+      "fight.advantage",
+      "fight.vision"
+     ],
+     "bad": []
+    },
+    "macro": {
+     "good": [
+      "macro.farm",
+      "macro.advantage",
+      "macro.solo",
+      "macro.side",
+      "macro.vision"
+     ],
+     "bad": []
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "잘함",
+    "macro": "잘함",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419421568.p9": {
+   "sha256": "3be3e960ca39c1db807a4af6d1ce2d857134810acbf8a75fe6b572a46740c419",
+   "grades": {
+    "fight.advantage": "B",
+    "fight.damage": "A",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "A",
+    "macro.side": "A",
+    "macro.farm": "B",
+    "macro.vision": "C",
+    "laning.gold": "1",
+    "laning.level": "0",
+    "laning.kda": "1",
+    "laning.cs": "1"
+   },
+   "totals": {
+    "fight": 92.5,
+    "macro": 87.5
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.kda",
+      "laning.cs"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.damage",
+      "fight.advantage"
+     ],
+     "bad": [
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.farm",
+      "macro.solo",
+      "macro.side",
+      "macro.advantage"
+     ],
+     "bad": []
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "잘함",
+    "macro": "잘함",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419421568.p10": {
+   "sha256": "b45d0fe3837603ea5b5b77a5607167035be2602cccbb0498137e120aef1b87ab",
+   "grades": {
+    "fight.advantage": "C",
+    "fight.damage": "D",
+    "fight.vision": "B",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "D",
+    "macro.side": null,
+    "macro.farm": null,
+    "macro.vision": "A",
+    "laning.gold": "-1",
+    "laning.level": "0",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 58.75,
+    "macro": 85
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.kda"
+     ],
+     "bad": [
+      "laning.gold"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.vision"
+     ],
+     "bad": [
+      "fight.damage"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.vision",
+      "macro.advantage"
+     ],
+     "bad": [
+      "macro.solo"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "비슷",
+    "fight": "보통",
+    "macro": "잘함",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419458143.p1": {
+   "sha256": "52603a4a0fb966d4704af9a56a64dab7586725e9e1214bceb33ac253f17d5670",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "A",
+    "fight.vision": "A",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "E",
+    "macro.side": "E",
+    "macro.farm": null,
+    "macro.vision": "D",
+    "laning.gold": "-1",
+    "laning.level": "-1",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 67.5,
+    "macro": 3.33
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.damage",
+      "fight.vision"
+     ],
+     "bad": [
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.side",
+      "macro.solo",
+      "macro.advantage",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "보통",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419458143.p2": {
+   "sha256": "aaf7c5b0155549229c2320af5e28495a337a66a87768a609c146d661a88840b9",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "D",
+    "fight.vision": "E",
+    "fight.objective": "E",
+    "macro.advantage": "E",
+    "macro.solo": "C",
+    "macro.side": "E",
+    "macro.farm": null,
+    "macro.vision": "B",
+    "laning.gold": "-1",
+    "laning.level": "-1",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 7.5,
+    "macro": 37.5
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [],
+     "bad": [
+      "fight.objective",
+      "fight.advantage",
+      "fight.damage",
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.vision"
+     ],
+     "bad": [
+      "macro.advantage",
+      "macro.side"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "부족",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419458143.p3": {
+   "sha256": "6e54f0db52e67f52c1598a828ddb74de57fe538f0f584271ebc7acb95c0af3b4",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "A",
+    "fight.vision": "E",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "C",
+    "macro.side": "D",
+    "macro.farm": null,
+    "macro.vision": "E",
+    "laning.gold": "-1",
+    "laning.level": "-1",
+    "laning.kda": "-1",
+    "laning.cs": "-1"
+   },
+   "totals": {
+    "fight": 25,
+    "macro": 15
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda",
+      "laning.cs"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.damage"
+     ],
+     "bad": [
+      "fight.advantage",
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.advantage",
+      "macro.vision",
+      "macro.side"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "부족",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419458143.p4": {
+   "sha256": "b90c1697395328c365720356ab5fcb677fe9df2351c4d1dff0e1613932551e02",
+   "grades": {
+    "fight.advantage": "D",
+    "fight.damage": "C",
+    "fight.vision": "E",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "C",
+    "macro.side": "D",
+    "macro.farm": null,
+    "macro.vision": "D",
+    "laning.gold": "-1",
+    "laning.level": "-1",
+    "laning.kda": "-1",
+    "laning.cs": "1"
+   },
+   "totals": {
+    "fight": 46.25,
+    "macro": 27.08
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.cs"
+     ],
+     "bad": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [],
+     "bad": [
+      "fight.vision",
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.advantage",
+      "macro.side",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "보통",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419458143.p5": {
+   "sha256": "a5fc47042ffb9b65fdb0b1302d1da91b47403402cdce4434df43d9b714673cf9",
+   "grades": {
+    "fight.advantage": "D",
+    "fight.damage": "C",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "E",
+    "macro.side": null,
+    "macro.farm": null,
+    "macro.vision": "E",
+    "laning.gold": "1",
+    "laning.level": "0",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 30,
+    "macro": 0
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold"
+     ],
+     "bad": [
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [],
+     "bad": [
+      "fight.vision",
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.vision",
+      "macro.advantage",
+      "macro.solo"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "비슷",
+    "fight": "부족",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419458143.p6": {
+   "sha256": "89c17eb7f19834b5b22a672651d65b119166515423aa2a569f4ec8bfccdbfb76",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "A",
+    "fight.vision": "A",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "A",
+    "macro.side": "B",
+    "macro.farm": null,
+    "macro.vision": "A",
+    "laning.gold": "1",
+    "laning.level": "1",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 97.5,
+    "macro": 90
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.damage",
+      "fight.advantage",
+      "fight.vision"
+     ],
+     "bad": []
+    },
+    "macro": {
+     "good": [
+      "macro.solo",
+      "macro.side",
+      "macro.advantage",
+      "macro.vision"
+     ],
+     "bad": []
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "잘함",
+    "macro": "잘함",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419458143.p7": {
+   "sha256": "1c7c29b3af12b78c6c4542f38cf14fda23b246eaf03bfe7b8552797da200675a",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "D",
+    "fight.vision": "A",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "C",
+    "macro.side": "E",
+    "macro.farm": null,
+    "macro.vision": "B",
+    "laning.gold": "1",
+    "laning.level": "1",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 57.5,
+    "macro": 73.21
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.advantage",
+      "fight.vision"
+     ],
+     "bad": [
+      "fight.damage"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.advantage",
+      "macro.vision"
+     ],
+     "bad": [
+      "macro.side"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "보통",
+    "macro": "잘함",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419458143.p8": {
+   "sha256": "f1213329b7b60555e2e362b09dfc6dd6a06e5c82dada50e1ccf0fa2cf6d9cf38",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "B",
+    "fight.vision": "A",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "C",
+    "macro.side": "C",
+    "macro.farm": null,
+    "macro.vision": "B",
+    "laning.gold": "1",
+    "laning.level": "1",
+    "laning.kda": "1",
+    "laning.cs": "1"
+   },
+   "totals": {
+    "fight": 80,
+    "macro": 69.23
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda",
+      "laning.cs"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.damage",
+      "fight.advantage",
+      "fight.vision"
+     ],
+     "bad": []
+    },
+    "macro": {
+     "good": [
+      "macro.advantage",
+      "macro.vision"
+     ],
+     "bad": []
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "잘함",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419458143.p9": {
+   "sha256": "853f0d2fab0330a53f4b4d28933b1dc83623ee6c0de4fc8ebca3d05854b9de1f",
+   "grades": {
+    "fight.advantage": "B",
+    "fight.damage": "D",
+    "fight.vision": "E",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "A",
+    "macro.side": "D",
+    "macro.farm": null,
+    "macro.vision": "E",
+    "laning.gold": "1",
+    "laning.level": "1",
+    "laning.kda": "1",
+    "laning.cs": "-1"
+   },
+   "totals": {
+    "fight": 27.5,
+    "macro": 66.67
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda"
+     ],
+     "bad": [
+      "laning.cs"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.advantage"
+     ],
+     "bad": [
+      "fight.damage",
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.solo",
+      "macro.advantage"
+     ],
+     "bad": [
+      "macro.side",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "부족",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419458143.p10": {
+   "sha256": "909e41a1eb5b34dec85a30dfdfcbc45e072ddf388bbf6303cc1a963d15a31a7e",
+   "grades": {
+    "fight.advantage": "B",
+    "fight.damage": "D",
+    "fight.vision": "E",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "C",
+    "macro.side": "A",
+    "macro.farm": null,
+    "macro.vision": "E",
+    "laning.gold": "-1",
+    "laning.level": "0",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 21.25,
+    "macro": 47.5
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.kda"
+     ],
+     "bad": [
+      "laning.gold"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.advantage"
+     ],
+     "bad": [
+      "fight.damage",
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.advantage",
+      "macro.side"
+     ],
+     "bad": [
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "비슷",
+    "fight": "부족",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419451137.p1": {
+   "sha256": "15f5c7974d9650da06cd67a124cbe7506d9f712d588d1bc51aed3078a5cb5f37",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "C",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "D",
+    "macro.side": "A",
+    "macro.farm": null,
+    "macro.vision": "E",
+    "laning.gold": "-1",
+    "laning.level": "0",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 63.75,
+    "macro": 66.67
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.kda"
+     ],
+     "bad": [
+      "laning.gold"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.advantage"
+     ],
+     "bad": [
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.side",
+      "macro.advantage"
+     ],
+     "bad": [
+      "macro.solo",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "비슷",
+    "fight": "보통",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419451137.p2": {
+   "sha256": "0f07ae7a430ab3af4a4c6cb87024d6c06990fec77e672cbd5647cf210c1486d9",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "A",
+    "fight.vision": "B",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "A",
+    "macro.side": "B",
+    "macro.farm": null,
+    "macro.vision": "C",
+    "laning.gold": "1",
+    "laning.level": "1",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 77.5,
+    "macro": 80.36
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.damage",
+      "fight.advantage",
+      "fight.vision"
+     ],
+     "bad": []
+    },
+    "macro": {
+     "good": [
+      "macro.advantage",
+      "macro.solo",
+      "macro.side"
+     ],
+     "bad": []
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "잘함",
+    "macro": "잘함",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419451137.p3": {
+   "sha256": "bc2af1ccf4871fa17113521903c9c82c9677caef4fae420210e4b7fc6b667a07",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "D",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "C",
+    "macro.side": "A",
+    "macro.farm": null,
+    "macro.vision": "C",
+    "laning.gold": "1",
+    "laning.level": "1",
+    "laning.kda": "1",
+    "laning.cs": "1"
+   },
+   "totals": {
+    "fight": 35,
+    "macro": 76.92
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda",
+      "laning.cs"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.advantage"
+     ],
+     "bad": [
+      "fight.damage",
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.advantage",
+      "macro.side"
+     ],
+     "bad": []
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "부족",
+    "macro": "잘함",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419451137.p4": {
+   "sha256": "b549b9adfa51dd0fd9baa41aee9664893101bd0ad75fa69301fc90341f985f61",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "C",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "C",
+    "macro.side": "B",
+    "macro.farm": null,
+    "macro.vision": "E",
+    "laning.gold": "1",
+    "laning.level": "1",
+    "laning.kda": "1",
+    "laning.cs": "1"
+   },
+   "totals": {
+    "fight": 51.25,
+    "macro": 66.67
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda",
+      "laning.cs"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.advantage"
+     ],
+     "bad": [
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.advantage",
+      "macro.side"
+     ],
+     "bad": [
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "보통",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419451137.p5": {
+   "sha256": "0380d8386b9578eef55acb088e747b4ebb8b343e5e4e032701b9d2308fea68a6",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "D",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "C",
+    "macro.side": null,
+    "macro.farm": null,
+    "macro.vision": "E",
+    "laning.gold": "-1",
+    "laning.level": "-1",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 63.75,
+    "macro": 45
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.kda"
+     ],
+     "bad": [
+      "laning.gold",
+      "laning.level"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.advantage"
+     ],
+     "bad": [
+      "fight.vision",
+      "fight.damage"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.advantage"
+     ],
+     "bad": [
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "비슷",
+    "fight": "보통",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419451137.p6": {
+   "sha256": "527a45e45602a9bbafd5a392b895ed455b7b1bb168e1bfc55107d44183d261e1",
+   "grades": {
+    "fight.advantage": "D",
+    "fight.damage": "C",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "D",
+    "macro.side": "D",
+    "macro.farm": null,
+    "macro.vision": "D",
+    "laning.gold": "1",
+    "laning.level": "0",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 41.25,
+    "macro": 20
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold"
+     ],
+     "bad": [
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [],
+     "bad": [
+      "fight.advantage",
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.side",
+      "macro.advantage",
+      "macro.solo",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "비슷",
+    "fight": "보통",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419451137.p7": {
+   "sha256": "b3d8a30a6ae41afd4e4be80e6f2087b8bcbc995383a7c66d7f6c9b41efd0e44e",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "E",
+    "fight.vision": "C",
+    "fight.objective": "D",
+    "macro.advantage": "E",
+    "macro.solo": "D",
+    "macro.side": "E",
+    "macro.farm": null,
+    "macro.vision": "E",
+    "laning.gold": "-1",
+    "laning.level": "-1",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 15,
+    "macro": 5.36
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [],
+     "bad": [
+      "fight.damage",
+      "fight.objective",
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.advantage",
+      "macro.vision",
+      "macro.solo",
+      "macro.side"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "부족",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419451137.p8": {
+   "sha256": "01c1851c8b59accdfc9ed61011b292db7a1b19b5a05608be0a98f714228c98d5",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "D",
+    "fight.vision": "E",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "D",
+    "macro.side": "E",
+    "macro.farm": null,
+    "macro.vision": "D",
+    "laning.gold": "-1",
+    "laning.level": "-1",
+    "laning.kda": "-1",
+    "laning.cs": "-1"
+   },
+   "totals": {
+    "fight": 20,
+    "macro": 11.54
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda",
+      "laning.cs"
+     ]
+    },
+    "fight": {
+     "good": [],
+     "bad": [
+      "fight.damage",
+      "fight.advantage",
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.advantage",
+      "macro.side",
+      "macro.solo",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "부족",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419451137.p9": {
+   "sha256": "ef95597dbc56dfaa4b41db2faba022d5f834d8c2572cf549b2e627cdcb80f75f",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "D",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "D",
+    "macro.side": "C",
+    "macro.farm": null,
+    "macro.vision": "E",
+    "laning.gold": "-1",
+    "laning.level": "-1",
+    "laning.kda": "-1",
+    "laning.cs": "-1"
+   },
+   "totals": {
+    "fight": 25,
+    "macro": 25
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda",
+      "laning.cs"
+     ]
+    },
+    "fight": {
+     "good": [],
+     "bad": [
+      "fight.damage",
+      "fight.advantage",
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.advantage",
+      "macro.solo",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "부족",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419451137.p10": {
+   "sha256": "9fc513e37645890607ccad680f208f8d6079b8322b819d0e1b49f0ca851d8f50",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "A",
+    "fight.vision": "E",
+    "fight.objective": "C",
+    "macro.advantage": "D",
+    "macro.solo": "B",
+    "macro.side": "A",
+    "macro.farm": null,
+    "macro.vision": "E",
+    "laning.gold": "1",
+    "laning.level": "1",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 62.5,
+    "macro": 31.25
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.level"
+     ],
+     "bad": [
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.damage"
+     ],
+     "bad": [
+      "fight.vision",
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.solo",
+      "macro.side"
+     ],
+     "bad": [
+      "macro.vision",
+      "macro.advantage"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "비슷",
+    "fight": "보통",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419447142.p1": {
+   "sha256": "b3d769499c592ceb0a57bae8ebef1e2854523cd3dc6b94ca1d2399911529cb87",
+   "grades": {
+    "fight.advantage": "C",
+    "fight.damage": "B",
+    "fight.vision": "E",
+    "fight.objective": "C",
+    "macro.advantage": "D",
+    "macro.solo": "A",
+    "macro.side": "D",
+    "macro.farm": "B",
+    "macro.vision": "A",
+    "laning.gold": "1",
+    "laning.level": "1",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 62.5,
+    "macro": 60
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.damage"
+     ],
+     "bad": [
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.solo",
+      "macro.farm",
+      "macro.vision"
+     ],
+     "bad": [
+      "macro.side",
+      "macro.advantage"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "보통",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419447142.p2": {
+   "sha256": "d164752589d489c6c30dbdaa0f0ddcb24bd55b8b3c9049770f922b1cef7cae16",
+   "grades": {
+    "fight.advantage": "C",
+    "fight.damage": "C",
+    "fight.vision": "A",
+    "fight.objective": "B",
+    "macro.advantage": "D",
+    "macro.solo": "C",
+    "macro.side": "A",
+    "macro.farm": "B",
+    "macro.vision": "B",
+    "laning.gold": "1",
+    "laning.level": "0",
+    "laning.kda": "1"
+   },
+   "totals": {
+    "fight": 65,
+    "macro": 60
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.kda"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.objective",
+      "fight.vision"
+     ],
+     "bad": []
+    },
+    "macro": {
+     "good": [
+      "macro.farm",
+      "macro.vision",
+      "macro.side"
+     ],
+     "bad": [
+      "macro.advantage"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "보통",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419447142.p3": {
+   "sha256": "c712dadb88bf0c05f3fa8b9232e0eceaebf81f89af0dde9d7d867cdd22b8f295",
+   "grades": {
+    "fight.advantage": "E",
+    "fight.damage": "C",
+    "fight.vision": "B",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "C",
+    "macro.side": "E",
+    "macro.farm": "C",
+    "macro.vision": "D",
+    "laning.gold": "-1",
+    "laning.level": "0",
+    "laning.kda": "0",
+    "laning.cs": "-1"
+   },
+   "totals": {
+    "fight": 35,
+    "macro": 30
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.cs"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.vision"
+     ],
+     "bad": [
+      "fight.advantage"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.advantage",
+      "macro.side",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "부족",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419447142.p4": {
+   "sha256": "cf61ff8079b915ae24f05c2f9eaf46fb4cb1c4b560cb19d33cf43d89992098e9",
+   "grades": {
+    "fight.advantage": "C",
+    "fight.damage": "B",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "D",
+    "macro.side": "C",
+    "macro.farm": "D",
+    "macro.vision": "B",
+    "laning.gold": "-1",
+    "laning.level": "-1",
+    "laning.kda": "-1",
+    "laning.cs": "-1"
+   },
+   "totals": {
+    "fight": 70,
+    "macro": 28.75
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda",
+      "laning.cs"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.damage"
+     ],
+     "bad": [
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.vision"
+     ],
+     "bad": [
+      "macro.farm",
+      "macro.advantage",
+      "macro.solo"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "잘함",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419447142.p5": {
+   "sha256": "319432e1850c5b867132c959250b5d928a76f23f8141a6f781b9074a1da55339",
+   "grades": {
+    "fight.advantage": "C",
+    "fight.damage": "C",
+    "fight.vision": "E",
+    "fight.objective": "C",
+    "macro.advantage": "E",
+    "macro.solo": "C",
+    "macro.side": null,
+    "macro.farm": null,
+    "macro.vision": "E",
+    "laning.gold": "1",
+    "laning.level": "0",
+    "laning.kda": "0"
+   },
+   "totals": {
+    "fight": 20,
+    "macro": 7.5
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [],
+     "bad": [
+      "fight.vision"
+     ]
+    },
+    "macro": {
+     "good": [],
+     "bad": [
+      "macro.vision",
+      "macro.advantage"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "비슷",
+    "fight": "부족",
+    "macro": "부족",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419447142.p6": {
+   "sha256": "bf5ceac9f0b7e595a5dd0331277b2a2fbfc998749c3dd681362f35217986f1dc",
+   "grades": {
+    "fight.advantage": "C",
+    "fight.damage": "D",
+    "fight.vision": "B",
+    "fight.objective": "A",
+    "macro.advantage": "C",
+    "macro.solo": "E",
+    "macro.side": "A",
+    "macro.farm": "C",
+    "macro.vision": "E",
+    "laning.gold": "-1",
+    "laning.level": "-1",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 38.75,
+    "macro": 50
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.objective",
+      "fight.vision"
+     ],
+     "bad": [
+      "fight.damage"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.side"
+     ],
+     "bad": [
+      "macro.solo",
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "부족",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419447142.p7": {
+   "sha256": "3b917703d2fe3f7e215bd75dd7a2e6ae9884fcd5b9ea7b0e35703022b9927f7b",
+   "grades": {
+    "fight.advantage": "C",
+    "fight.damage": "B",
+    "fight.vision": "B",
+    "fight.objective": "D",
+    "macro.advantage": "A",
+    "macro.solo": "B",
+    "macro.side": "B",
+    "macro.farm": "C",
+    "macro.vision": "E",
+    "laning.gold": "-1",
+    "laning.level": "0",
+    "laning.kda": "-1"
+   },
+   "totals": {
+    "fight": 41.25,
+    "macro": 53.75
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold",
+      "laning.kda"
+     ]
+    },
+    "fight": {
+     "good": [
+      "fight.vision",
+      "fight.damage"
+     ],
+     "bad": [
+      "fight.objective"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.advantage",
+      "macro.solo",
+      "macro.side"
+     ],
+     "bad": [
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "열세",
+    "fight": "보통",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419447142.p8": {
+   "sha256": "b8721953b927795bf91b04d3b9a6fa8ea0e6e480b7d126cce853021bc19e1bcd",
+   "grades": {
+    "fight.advantage": "A",
+    "fight.damage": "A",
+    "fight.vision": "C",
+    "fight.objective": "A",
+    "macro.advantage": "A",
+    "macro.solo": "C",
+    "macro.side": "D",
+    "macro.farm": "B",
+    "macro.vision": "C",
+    "laning.gold": "1",
+    "laning.level": "0",
+    "laning.kda": "0",
+    "laning.cs": "1"
+   },
+   "totals": {
+    "fight": 95,
+    "macro": 65
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.cs"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.damage",
+      "fight.advantage",
+      "fight.objective"
+     ],
+     "bad": []
+    },
+    "macro": {
+     "good": [
+      "macro.advantage",
+      "macro.farm"
+     ],
+     "bad": [
+      "macro.side"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "잘함",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419447142.p9": {
+   "sha256": "917f491a2b7b9dc485a931b459fd8aa4148333b128f601ba4edf750ddea99aee",
+   "grades": {
+    "fight.advantage": "C",
+    "fight.damage": "B",
+    "fight.vision": "C",
+    "fight.objective": "A",
+    "macro.advantage": "A",
+    "macro.solo": "C",
+    "macro.side": "A",
+    "macro.farm": "C",
+    "macro.vision": "C",
+    "laning.gold": "1",
+    "laning.level": "1",
+    "laning.kda": "1",
+    "laning.cs": "1"
+   },
+   "totals": {
+    "fight": 73.75,
+    "macro": 67.5
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [
+      "laning.gold",
+      "laning.level",
+      "laning.kda",
+      "laning.cs"
+     ],
+     "bad": []
+    },
+    "fight": {
+     "good": [
+      "fight.damage",
+      "fight.objective"
+     ],
+     "bad": []
+    },
+    "macro": {
+     "good": [
+      "macro.side",
+      "macro.advantage"
+     ],
+     "bad": []
+    }
+   },
+   "summary": {
+    "laning": "우세",
+    "fight": "잘함",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  },
+  "KR_8419447142.p10": {
+   "sha256": "03014dfdb0852e647b5dfd613d3ea9467fd2b116e87006a4a3c40c06462feca8",
+   "grades": {
+    "fight.advantage": "C",
+    "fight.damage": "D",
+    "fight.vision": "D",
+    "fight.objective": "C",
+    "macro.advantage": "A",
+    "macro.solo": "C",
+    "macro.side": null,
+    "macro.farm": null,
+    "macro.vision": "D",
+    "laning.gold": "-1",
+    "laning.level": "0",
+    "laning.kda": "0"
+   },
+   "totals": {
+    "fight": 31.25,
+    "macro": 55
+   },
+   "speakOrder": {
+    "laning": {
+     "good": [],
+     "bad": [
+      "laning.gold"
+     ]
+    },
+    "fight": {
+     "good": [],
+     "bad": [
+      "fight.vision",
+      "fight.damage"
+     ]
+    },
+    "macro": {
+     "good": [
+      "macro.advantage"
+     ],
+     "bad": [
+      "macro.vision"
+     ]
+    }
+   },
+   "summary": {
+    "laning": "비슷",
+    "fight": "부족",
+    "macro": "보통",
+    "keyMomentIndex": 0
+   }
+  }
+ }
+}

@@ -71,6 +71,8 @@ export interface TimelineEvent {
   buildingType?: string;
   laneType?: string;
   towerType?: string;
+  /** 지도 좌표 (CHAMPION_KILL·ELITE_MONSTER_KILL 등). 장면 지역(Q2)에만 쓴다 */
+  position?: { x: number; y: number };
 }
 
 export interface TimelineFrame {
@@ -220,5 +222,91 @@ export interface AnalysisResult {
   };
   speakOrder: { laning: SpeakList; fight: SpeakList; macro: SpeakList };
   notes: Note[];
+  /** 장면 정보 (Q2). 점수·등급·말할 순서에 쓰지 않는 문장 재료 */
+  scenes: Scenes;
   warnings: string[];
+}
+
+// ---------- 장면 (Q2, 점수 밖) ----------
+
+/**
+ * 지도 지역. 내 팀 진영 기준(블루 100 = 왼쪽 아래, 레드 200 = 오른쪽 위).
+ * 위/아래는 화면 기준(위 = 탑 쪽, 아래 = 바텀 쪽). 라인은 가운데를 기준으로 우리 포탑 쪽/상대 포탑 쪽.
+ */
+export type MapRegion =
+  | 'OUR_BASE'
+  | 'ENEMY_BASE'
+  | 'TOP_LANE_OURS'
+  | 'TOP_LANE_THEIRS'
+  | 'MID_LANE_OURS'
+  | 'MID_LANE_THEIRS'
+  | 'BOT_LANE_OURS'
+  | 'BOT_LANE_THEIRS'
+  | 'RIVER_TOP'
+  | 'RIVER_BOT'
+  | 'OUR_JUNGLE_TOP'
+  | 'OUR_JUNGLE_BOT'
+  | 'ENEMY_JUNGLE_TOP'
+  | 'ENEMY_JUNGLE_BOT';
+
+/** 오브젝트 하나 (교전 시야·막타 과목 장면) */
+export interface ObjectiveScene {
+  /** 처치 시각(초) */
+  sec: number;
+  /** BARON | DRAGON | SOUL_DRAGON | ELDER_DRAGON | RIFTHERALD | HORDE */
+  kind: string;
+  /** 우리 팀이 잡았나 */
+  ours: boolean;
+  /** 내가 막타를 쳤나 */
+  lastHitByMe: boolean;
+  /** 처치 전 60초 동안 내가 설치한 와드(시야 점수가 있는 와드, 제어 와드 포함) */
+  wardsPlaced: number;
+  /** 그중 제어 와드 */
+  controlWards: number;
+  /** 처치 전 60초 동안 내가 없앤 상대 와드 */
+  wardKills: number;
+}
+
+/** 내가 참여한 싸움 하나 (교전·운영 득실 과목 장면) */
+export interface FightScene {
+  startSec: number;
+  endSec: number;
+  /** 싸움 창 안에서 잡힌 오브젝트 (오브젝트 밖 싸움은 빈 배열) */
+  objectives: { kind: string; ours: boolean }[];
+  killsOurs: number;
+  killsTheirs: number;
+  /** 득실 (킬·포탑·억제기·오브젝트 점수, 엔진 5-4와 같은 셈) */
+  pointsOurs: number;
+  pointsTheirs: number;
+  /** 이 싸움에서 처음 죽은 사람: 나 / 우리 팀 다른 사람 / 상대 / 없음 */
+  firstDeath: 'ME' | 'ALLY' | 'ENEMY' | 'NONE';
+  iDied: boolean;
+  /** 첫 킬 위치. 좌표가 없으면 null */
+  region: MapRegion | null;
+}
+
+/** 킬·데스 하나 (단독 킬·데스, 라인전 데스 장면) */
+export interface PlayScene {
+  sec: number;
+  kind: 'KILL' | 'DEATH';
+  region: MapRegion | null;
+  /** 데스: 나를 잡는 데 관여한 상대 수(킬러 + 어시스트), 킬: 내가 잡은 상대 1 */
+  enemies: number;
+  /** 데스에 상대 정글이 관여했나 (킬은 false) */
+  enemyJungler: boolean;
+}
+
+/** 과목별 장면. 과목마다 최대 3개, 그 과목을 말하는 방향(좋은 점/부족한 점)에서 중요한 순 */
+export interface Scenes {
+  /** 오브젝트 처치 앞뒤 40초 (교전 창 길이 설명용) */
+  fightWindowSec: number;
+  /** 오브젝트 전 시야 창 (60초) */
+  visionWindowSec: number;
+  fightVision: ObjectiveScene[];
+  fightObjective: ObjectiveScene[];
+  fightAdvantage: FightScene[];
+  macroAdvantage: FightScene[];
+  macroSolo: PlayScene[];
+  /** 라인전 비교 시점 전 내 데스 (시각 순) */
+  laningDeaths: PlayScene[];
 }

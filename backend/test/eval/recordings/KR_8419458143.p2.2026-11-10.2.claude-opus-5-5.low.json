@@ -1,0 +1,72 @@
+{
+  "matchId": "KR_8419458143",
+  "participantId": 2,
+  "engineVersion": "2026-11-10.1",
+  "promptVersion": "2026-11-10.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-10T14:28:23.739Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "3eeb73a8cf0903203cc3313ef3b266ea80993dce5ce4a9fc98537018ac3927a1",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"라인전은 렉사이에게 열세였고, 오브젝트 싸움과 그 밖의 운영도 부족했습니다. 8.2분 싸움에서 우리 팀 2킬, 상대 팀 3킬로 골드 격차가 795 벌어졌고 상대 팀이 공허 유충을 잡았습니다.\",\"factIds\":[\"laning.opponent\",\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},\"sections\":{\"laning\":{\"good\":[],\"bad\":[{\"subjectId\":\"laning.gold\",\"text\":\"15분 골드가 4,244로 상대 렉사이보다 1,512 적었습니다. 8.2분 탑 라인 상대 포탑 쪽에서 데스가 있었습니다. 다음 판에는 상대 정글이 안 보일 때 탑 라인 상대 포탑 쪽으로 깊이 들어가지 마세요.\",\"factIds\":[\"laning.referenceMin\",\"laning.gold.me\",\"laning.opponent\",\"laning.gold.diffAbs\",\"laning.deathsBefore.0.min\",\"laning.deathsBefore.0.region\"]},{\"subjectId\":\"laning.level\",\"text\":\"15분 레벨이 8로 상대 렉사이의 10보다 2레벨 낮았습니다. 12.1분 아래쪽 강(용 쪽)에서 상대 2명에게 죽었습니다. 다음 판에는 아래쪽 강(용 쪽)에 들어가기 전에 아군이 붙을 때까지 기다리세요.\",\"factIds\":[\"laning.referenceMin\",\"laning.level.me\",\"laning.opponent\",\"laning.level.enemy\",\"laning.level.diffAbs\",\"laning.deathsBefore.1.min\",\"laning.deathsBefore.1.region\",\"laning.deathsBefore.1.enemies\"]}]},\"fight\":{\"good\":[],\"bad\":[{\"subjectId\":\"fight.objective\",\"text\":\"오브젝트 막타는 0번이었습니다. 12.8분 용은 상대 팀이 잡았고 내가 막타를 치지 않았습니다. 다음 판에는 용이 나오기 전에 캠프 순서를 맞춰 아래쪽 강 입구에 먼저 도착하세요.\",\"factIds\":[\"fight.objective.lastHits\",\"scene.fight.objective.0.min\",\"scene.fight.objective.0.objective\",\"scene.fight.objective.0.taken\",\"scene.fight.objective.0.lastHit\"]},{\"subjectId\":\"fight.advantage\",\"text\":\"오브젝트를 잡은 시각 앞뒤 40초 안에 내가 참여한 싸움 득실 중 우리 팀 몫은 15.4%였습니다. 12.1분 아래쪽 강(용 쪽)에서 내가 먼저 죽으며 우리 팀 0킬, 상대 팀 3킬이 났습니다. 다음 판에는 용 전 아래쪽 강 입구에서 아군을 기다렸다 함께 들어가세요.\",\"factIds\":[\"fight.windowSec\",\"fight.advantage.sharePct\",\"scene.fight.advantage.0.min\",\"scene.fight.advantage.0.region\",\"scene.fight.advantage.0.firstDeath\",\"scene.fight.advantage.0.killsOurs\",\"scene.fight.advantage.0.killsTheirs\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.vision\",\"text\":\"오브젝트 싸움 밖 시야 점수 합이 11, 분당 0.72로 평소 시야는 잘 챙겼습니다.\",\"factIds\":[\"macro.vision.points\",\"macro.vision.perMinute\"]}],\"bad\":[{\"subjectId\":\"macro.advantage\",\"text\":\"오브젝트를 잡은 시각 앞뒤 40초 밖에서 내가 참여한 싸움의 우리 팀 몫은 0%였습니다. 14분 바텀 라인 우리 포탑 쪽에서 우리 팀 0킬, 상대 팀 3킬이 났습니다. 다음 판에는 바텀 라인 우리 포탑 쪽에서 먼저 죽은 아군 곁에 미리 붙어 숫자를 맞추세요.\",\"factIds\":[\"fight.windowSec\",\"macro.advantage.sharePct\",\"scene.macro.advantage.0.min\",\"scene.macro.advantage.0.region\",\"scene.macro.advantage.0.killsOurs\",\"scene.macro.advantage.0.killsTheirs\"]},{\"subjectId\":\"macro.side\",\"text\":\"포탑 피해량이 0으로 사이드 압박이 낮았습니다.\",\"factIds\":[\"macro.side.turretDamage\"]}]}},\"keyMoments\":[{\"index\":0,\"text\":\"8.2분 싸움에서 우리 팀 2킬, 상대 팀 3킬로 골드 격차가 약 800 벌어졌고, 이어서 상대 팀이 공허 유충을 잡았습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]}],\"chunkUse\":[{\"slot\":\"laning.bad.0\",\"chunkIds\":[\"laning.gold.ALL.bad.01\"]},{\"slot\":\"fight.bad.0\",\"chunkIds\":[\"fight.objective.JUNGLE_DAMAGE.bad.01\"]},{\"slot\":\"fight.bad.1\",\"chunkIds\":[\"fight.advantage.ALL.bad.01\"]},{\"slot\":\"macro.bad.0\",\"chunkIds\":[\"fight.advantage.ALL.bad.01\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 8637,
+          "cacheWrite": 0,
+          "cacheRead": 8217,
+          "output": 2003
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 14481
+    }
+  ],
+  "knowledge": {
+    "version": "c91d410c750d",
+    "chunks": [
+      {
+        "id": "fight.objective.JUNGLE_DAMAGE.bad.01",
+        "content": "딜정글의 오브젝트 막타가 적을 때\n딜정글의 오브젝트 막타가 적고 그 오브젝트를 상대 팀이 잡았다면, 오브젝트 시간에 갱킹이나 파밍으로 다른 곳에 있었을 수 있다. 다음 판에는 그 오브젝트가 다시 나오는 시간에 맞춰 캠프 순서를 거꾸로 짜서, 나오기 전에 오브젝트 쪽 강 입구에 도착한다."
+      },
+      {
+        "id": "fight.advantage.ALL.bad.01",
+        "content": "오브젝트 싸움 득실이 낮을 때\n오브젝트를 잡은 시각 앞뒤 기준 시간 안에 내가 참여한 싸움에서 우리 팀 몫이 낮으면, 싸움이 열리기 전부터 숫자나 위치에서 밀렸을 수 있다. 그 싸움에서 내가 먼저 죽었다면, 다음 판에는 같은 오브젝트가 나오기 전 아군이 모일 때까지 오브젝트 쪽 강 입구 앞에서 기다렸다가 함께 들어간다. 우리 팀 다른 사람이 먼저 죽었다면 그 아군 곁으로 미리 붙어 숫자를 맞춘다."
+      },
+      {
+        "id": "macro.advantage.ALL.bad.01",
+        "content": "오브젝트 밖 싸움에서 팀이 밀렸을 때\n오브젝트 싸움 밖에서 내가 참여한 싸움의 우리 팀 몫이 낮으면 숫자가 맞지 않는 싸움에 휘말렸을 수 있다. 그 싸움이 상대 정글이나 강에서 났고 내가 먼저 죽었다면, 다음 판에는 그 지역에 들어가기 전에 입구에 와드를 두고 가장 가까운 아군과 함께 들어간다. 우리 정글에서 났다면 강 쪽 입구에 와드를 먼저 두고 아군 쪽으로 물러서며 싸운다."
+      },
+      {
+        "id": "macro.side.ALL.bad.01",
+        "content": "사이드 압박이 낮을 때\n포탑 피해가 포지션 기대보다 낮으면 라인을 밀어 포탑을 칠 시간이 적었을 수 있다. 다음 판에는 오브젝트 싸움에서 이긴 직후 바로 귀환하지 않고 가장 가까운 상대 포탑부터 친다."
+      },
+      {
+        "id": "macro.vision.ALL.good.01",
+        "content": "평소 시야가 좋았을 때\n오브젝트 시간 밖의 시야 점수가 포지션 기대보다 높았다면 지도에 정보를 꾸준히 깔아 팀이 안전하게 움직이도록 도운 것일 수 있다. 다음 판에도 다음 오브젝트가 나오기 전에 그 오브젝트 쪽 강 입구와 상대 정글 입구에 와드를 둔다."
+      },
+      {
+        "id": "laning.gold.ALL.bad.01",
+        "content": "라인전 골드가 뒤졌을 때\n라인전 골드가 상대 라이너보다 적으면 CS를 놓쳤거나 데스로 골드를 내준 경우가 많을 수 있다. 비교 시점 전 데스가 그 라인의 상대 포탑 쪽에서 났다면, 다음 판에는 상대 정글이 지도에 보이지 않는 동안 라인 가운데를 넘지 않고 우리 포탑 쪽에서 막타만 챙긴다. 데스 없이 골드가 뒤졌다면 상대와 교환하기보다 미니언 막타를 먼저 친다."
+      },
+      {
+        "id": "laning.level.ALL.bad.01",
+        "content": "라인전 레벨이 뒤졌을 때\n레벨이 상대 라이너보다 낮으면 경험치를 받지 못한 시간이 길었다는 뜻일 수 있다. 비교 시점 전에 데스가 있었다면 그 데스 뒤 라인으로 돌아오는 동안 경험치가 빠졌을 수 있다. 다음 판에는 라인을 비우기 전에 미니언 웨이브를 상대 포탑까지 밀어 두고 움직인다."
+      },
+      {
+        "id": "fight.objective.ALL.bad.01",
+        "content": "오브젝트 막타가 적을 때\n오브젝트 막타가 적고 그 오브젝트를 상대 팀이 잡았다면 오브젝트가 나올 때 다른 곳에 있었을 수 있다. 다음 판에는 그 오브젝트가 다시 나오기 전에 가까운 라인을 먼저 밀어 두고, 오브젝트 쪽 강 입구에 먼저 도착해 아군을 기다린다."
+      }
+    ]
+  }
+}

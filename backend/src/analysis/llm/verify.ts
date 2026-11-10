@@ -2,12 +2,14 @@
 // 판단은 코드가 한다. LLM 문장의 숫자는 그 문장의 factIds가 가리키는 fact의 표기(또는 어림 규칙)와만 대조한다.
 import { isReversed, type Fact, type FactSheet, type Slot } from './facts.js';
 import {
+  ADVICE_MARKER,
   allowedUnitWords,
   AREAS,
   DEATH_CLAUSE,
   DIRECTION_WORDS,
   FORBIDDEN_PATTERNS,
   INTERPRETIVE_WORDS,
+  isSceneFactId,
   NUMBER_NAME_PATTERNS,
   REVERSAL_WORDS,
   SUBJECT_DIRECTION_WORDS,
@@ -34,9 +36,10 @@ export interface SlotText {
   chunkIds?: string[];
 }
 
+// Q2: 좋은 점·부족한 점 칸은 "결과 + 장면 + 조언"을 담도록 2문장 120자 → 3문장 170자
 export const LIMITS = {
-  itemChars: 120,
-  itemSentences: 2,
+  itemChars: 170,
+  itemSentences: 3,
   summaryChars: 200,
   summarySentences: 2,
 } as const;
@@ -150,11 +153,15 @@ function subjectDirection(subjectId: string, kind: 'good' | 'bad', text: string)
   return wrong ? `${kind === 'good' ? '좋은 점' : '부족한 점'} 칸에 반대 방향 단어 "${wrong}"` : null;
 }
 
-function sentenceCount(text: string): number {
+function splitSentences(text: string): string[] {
   return text
     .split(/(?<=[.!?。])\s+|(?<=[다요])\.(?!\d)/)
     .map((s) => s.trim())
-    .filter((s) => s.replace(/[.!?。\s]/g, '').length > 0).length;
+    .filter((s) => s.replace(/[.!?。\s]/g, '').length > 0);
+}
+
+function sentenceCount(text: string): number {
+  return splitSentences(text).length;
 }
 
 const PARTICLE_AFTER =
@@ -187,6 +194,16 @@ export interface VerifyContext {
   allChampionNames: readonly string[];
   /** 프롬프트에 준 RAG 조각 ID. 없으면(RAG 꺼짐) chunkIds를 쓰면 안 된다 */
   knowledgeIds?: ReadonlySet<string>;
+}
+
+/** 장면 fact가 문장에 나왔나: 시각은 "N분", 오브젝트·지역은 괄호 설명을 뺀 이름. 횟수 같은 숫자 값·그 밖의 글자 값은 장면을 짚은 것으로 보지 않는다 */
+export function citesScene(f: Fact, text: string): boolean {
+  if (f.unit === '분') return f.display.some((d) => new RegExp(`(^|[^0-9.])${d.replace('.', '\\.')}\\s?분`).test(text));
+  if (typeof f.value === 'string' && /\.(objective|region)$/.test(f.id)) {
+    const name = f.value.replace(/\(.*?\)/g, '').trim();
+    return name.length > 0 && text.includes(name);
+  }
+  return false;
 }
 
 export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): VerifyFailure[] {
@@ -249,6 +266,13 @@ export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): Verify
   for (const { re, why } of FORBIDDEN_PATTERNS) if (re.test(text)) add('forbidden', why);
   const interp = INTERPRETIVE_WORDS.find((w) => text.includes(w));
   if (interp && !text.includes('보입니다')) add('forbidden', `해석어 "${interp}"는 "~것으로 보입니다"로 끝맺어야 함`);
+  // 4-1. 조언은 이 판의 장면 하나를 짚어야 한다 (Q2): "다음 판"이 있으면 factIds에 장면 fact가 있고, 그 값(시각·오브젝트·지역)이 문장에 나와야 한다
+  //      장면은 조언 문장 안에서 짚어야 한다 (앞 문장의 시각만으로는 통과하지 않음)
+  for (const sentence of splitSentences(text).filter((x) => ADVICE_MARKER.test(x))) {
+    if (!facts.some((f) => isSceneFactId(f.id) && citesScene(f, sentence))) {
+      add('forbidden', '장면 없는 조언: "다음 판" 조언 문장 안에 이 칸의 장면 fact(scene.* 또는 라인전 데스)의 시각·오브젝트·지역 하나를 쓰고 그 id를 factIds에 적어야 함');
+    }
+  }
 
   // 5. 길이
   const isSummary = slot.area === 'summary';

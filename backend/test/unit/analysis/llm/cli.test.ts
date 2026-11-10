@@ -127,11 +127,11 @@ describe('CLI --rag (B4, 가짜 검색기)', () => {
     const common = ['--ledger', join(dir, 'l.jsonl'), '--out', join(dir, 'out'), '--recordings', join(dir, 'rec')];
     assert.equal(await runCli([...ARGS, '--rag', '--yes', ...common], { ANTHROPIC_API_KEY: 'k' }, h.io, r.deps), 0);
     const recs = readdirSync(join(dir, 'rec'));
-    assert.deepEqual(recs, ['KR_8437852704.p5.2026-11-04.2.claude-opus-5-5.low.json']);
+    assert.deepEqual(recs, ['KR_8437852704.p5.2026-11-10.2.claude-opus-5-5.low.json']);
     const rec = JSON.parse(readFileSync(join(dir, 'rec', recs[0]!), 'utf8')) as { promptVersion: string; knowledge: { chunks: unknown[] } };
-    assert.equal(rec.promptVersion, '2026-11-04.2');
+    assert.equal(rec.promptVersion, '2026-11-10.2');
     assert.equal(rec.knowledge.chunks.length, 1);
-    assert.match(readFileSync(join(dir, 'l.jsonl'), 'utf8'), /"promptVersion":"2026-11-04.2"/);
+    assert.match(readFileSync(join(dir, 'l.jsonl'), 'utf8'), /"promptVersion":"2026-11-10.2"/);
     const h2 = harness();
     const r2 = ragDeps(h2);
     assert.equal(await runCli([...ARGS, '--rag', '--replay', join(dir, 'rec'), ...common], {}, h2.io, r2.deps), 0);
