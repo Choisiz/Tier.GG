@@ -19,11 +19,12 @@ export interface EngineSnapshot {
   summary: AnalysisResult['summary'];
 }
 
-/** 판정 부분만 (scenes·engineVersion 제외) */
+/** 판정 부분만 (scenes·advice·engineVersion 제외. advice는 Q3 조언 규칙, 점수 밖 문장 재료) */
 export function judgedPart(r: AnalysisResult): unknown {
   const rest: Record<string, unknown> = { ...r };
   delete rest.engineVersion;
   delete rest.scenes;
+  delete rest.advice;
   return rest;
 }
 

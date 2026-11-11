@@ -7,15 +7,15 @@ import { isReversed, type FactSheet } from './facts.js';
 import { allowedUnitWords, AREA_LABEL, SUBJECT_LABEL } from './labels.js';
 import type { VerifyFailure } from './verify.js';
 
-/** RAG 조각이 붙는 요청의 버전 (B4, Q2에서 올림) */
-export const PROMPT_VERSION = '2026-11-10.2';
+/** RAG 조각이 붙는 요청의 버전 (B4, Q2·Q3에서 올림) */
+export const PROMPT_VERSION = '2026-11-11.2';
 /**
  * 조각 없는 요청의 버전. Q2(2026-11-10)에서 시스템 프롬프트·facts(장면·기준 시간)가 바뀌어 Q1(2026-11-04.1)·RAG(2026-11-04.2)
  * 녹화본은 더 이상 요청이 같지 않다(재생하면 불일치로 표시된다). 두 버전 체계(.1 = 조각 없음, .2 = 조각 있음)는 그대로다.
  */
-export const PROMPT_VERSION_NO_RAG = '2026-11-10.1';
-/** 지난 버전 (새 버전 실측이 없을 때 비용 어림 보정을 빌린다. 최신 먼저) */
-export const PREVIOUS_PROMPT_VERSIONS: readonly string[] = ['2026-11-04.2', '2026-11-04.1', '2026-11-03.1'];
+export const PROMPT_VERSION_NO_RAG = '2026-11-11.1';
+/** 지난 버전 (새 버전 실측이 없을 때 비용 어림 보정을 빌린다. 최신 먼저). Q3(2026-11-11): 조언 규칙표·분:초 표기로 올림 */
+export const PREVIOUS_PROMPT_VERSIONS: readonly string[] = ['2026-11-10.2', '2026-11-10.1', '2026-11-04.2', '2026-11-04.1', '2026-11-03.1'];
 
 export function promptVersionFor(withKnowledge: boolean): string {
   return withKnowledge ? PROMPT_VERSION : PROMPT_VERSION_NO_RAG;
@@ -35,13 +35,15 @@ export const SYSTEM_PROMPT = `너는 리그 오브 레전드 한 판의 분석 �
 - notes: 점수에 넣지 않은 해석 메모. 추정일 뿐이다
 - 장면 facts: id가 "scene.과목.번호."로 시작하는 값(오브젝트를 잡은 시각·종류·잡은 팀·그 전 60초 동안 내 와드 수, 내가 참여한 싸움의 시각·킬 수·득실·처음 죽은 사람·지역, 단독 킬·데스의 시각·지역)과 라인전 데스의 "laning.deathsBefore.번호."(시각·지역·관여한 상대). 번호 0이 그 칸에서 가장 중요한 장면이다
 - 기준 시간 facts: fight.windowSec(오브젝트 싸움 = 오브젝트를 잡은 시각 앞뒤 N초), fight.vision.windowSec(오브젝트 전 시야 = 잡기 전 N초)
+- 시각 facts: 게임 시계 "분:초" 표기(예: "15:06"). 시각에는 "분"을 붙이지 않는다
+- slots[].rules: 그 칸에서 분석 코드가 고른 조언 규칙(id, 요지 gist, 반드시 쓸 근거 required, R4는 그대로 쓸 문장 text). 없으면 그 칸은 조언을 쓰지 않는다. 근거 값은 id가 "rule."로 시작하는 facts다
 
 ## 규칙
 1. 판정과 방향을 바꾸지 않는다. good 칸에는 잘한 점만, bad 칸에는 부족한 점만 쓴다. 방향 말은 플레이어(우리 쪽) 기준으로 쓴다("내 골드가 적었습니다" O, bad 칸에 "상대 골드가 많았습니다" X). 결정적 장면에서 격차가 "벌어짐"이면 벌어졌다고, "좁혀짐"이면 좁혀졌다고 쓴다.
 1-1. 결정적 장면의 direction이 "앞선 팀이 바뀜"이면 격차가 벌어졌다/좁혀졌다고 쓰지 않는다(그 장면에는 격차 변화 fact가 없다). 앞선 팀이 누구에서 누구로 바뀌었는지(leaderBefore → leaderAfter)와, 이 싸움으로 우리 팀 골드가 swingAbs만큼 손해(swingSide "우리 팀이 잃음") 또는 이득("우리 팀이 얻음")이었는지를 쓴다.
-2. 숫자는 facts의 display 표기 중 하나를 그대로, 아라비아 숫자로 쓴다. 계산해서 새 숫자를 만들지 않는다(더하기, 빼기, 비율, 반올림 모두 금지). 차이는 이미 계산된 "차이" fact를 쓴다. 숫자 앞에 +나 - 부호를 붙이지 말고 "많았습니다", "적었습니다", "벌어졌습니다" 같은 방향 말로 쓴다.
+2. 숫자와 시각은 facts의 display 표기 중 하나를 그대로, 아라비아 숫자로 쓴다. 시각은 "6:36"처럼 분:초 그대로 쓰고 "6.6분"·"6분"으로 바꾸지 않는다. 계산해서 새 숫자를 만들지 않는다(더하기, 빼기, 비율, 반올림 모두 금지). 차이는 이미 계산된 "차이" fact를 쓴다. 숫자 앞에 +나 - 부호를 붙이지 말고 "많았습니다", "적었습니다", "벌어졌습니다" 같은 방향 말로 쓴다.
 3. approx가 있는 값만 어림을 쓸 수 있다. "약 N"은 실제 값(display 첫 표기)을 approx.step 단위로 반올림한 N일 때만 쓴다. 어림이 애매하면 display 표기를 그대로 쓴다.
-4. 등급 글자(A~E), 등급, 점수, 총점, 반영 비율, 가중치를 쓰지 않는다. 단 게임 지표 이름인 "시야 점수"는 쓸 수 있다.
+4. 등급 글자(A~E), 등급, 점수, 총점, 반영 비율, 가중치를 쓰지 않는다. 단 게임 지표 이름인 "시야 점수"는 쓸 수 있고, 규칙 R1이 있는 칸은 "반영 비율"과 그 근거 값, R1·R2·R3이 있는 칸은 그 규칙 facts의 "점수"·"N점"을 쓸 수 있다.
 5. 데이터가 직접 말하지 않는 해석(이니시, 버스, 캐리, 무리한 진입, 던짐, 실수, 판단 같은 말)은 꼭 필요할 때만 쓰고, 그 문장은 "~것으로 보입니다"로 끝맺는다.
 6. 챔피언 이름은 facts에 있는 내 챔피언과 상대 라이너 챔피언만 쓴다. 다른 챔피언, 아이템, 룬, 스킬 이름은 쓰지 않는다.
 7. 존댓말(~습니다, 조언은 ~하세요)로 쓴다. 좋은 점·부족한 점 칸 하나는 1~3문장, 170자 안. 결정적 장면 칸도 1~3문장, 170자 안. 요약은 1~2문장, 200자 안.
@@ -54,11 +56,13 @@ export const SYSTEM_PROMPT = `너는 리그 오브 레전드 한 판의 분석 �
 11. sections의 각 칸에는 slots의 subjectId를 그대로 적고, slots에 있는 칸만 쓴다. slots에 없는 영역·방향은 빈 배열로 둔다. keyMoments의 index는 입력 keyMoments의 index를 그대로 쓴다.
 12. 출력은 지정된 JSON 모양만 낸다. 설명이나 머리말을 붙이지 않는다.
 
-## 장면과 조언
-17. 좋은 점·부족한 점 칸에 장면 facts가 있으면, 결과 문장 다음에 장면 0번(없으면 다음 번호)을 짚는다: 시각("14.3분") + 오브젝트("용") 또는 지역("아래쪽 강"), 그리고 그 장면에서 일어난 일(와드 0개, 우리 팀 0킬·상대 팀 3킬, 내가 먼저 죽음 등).
-18. 조언은 "다음 판에는"(좋은 점이면 "다음 판에도")으로 시작하는 한 문장으로, 짚은 장면과 같은 상황에서 **언제**(예: 용을 잡기 전 60초 안에, 라인전 중 상대 정글이 안 보일 때) **어디서**(예: 아래쪽 강 입구, 바텀 라인 우리 포탑 쪽) **무엇을**(예: 제어 와드를 먼저 둔다, 혼자 앞으로 나가지 않는다) 하라고 "~하세요"로 쓴다. 조언 문장에도 그 장면의 시각·오브젝트·지역 중 하나를 쓰고, 그 fact id를 factIds에 적는다.
-19. 칸에 장면 facts가 없으면 조언을 쓰지 않는다("다음 판" 문장 없음). 장면이 말하지 않는 원인(예: "시야가 없어서 죽었다")은 해석이므로 규칙 5를 따른다.
-20. 일반론 조언을 쓰지 않는다. 금지: "~해 볼 수 있습니다", "~를 이어 가", "상대 정글 위치를 확인하고 움직이세요"·"와드를 길목에 두세요"처럼 장면·때·곳이 없는 말. 검사기가 이런 문장을 실패로 처리한다.
+## 장면과 조언 (조언은 규칙이 있는 칸만)
+17. 좋은 점·부족한 점 칸에 장면 facts가 있으면, 결과 문장 다음에 장면 0번(없으면 다음 번호)을 짚는다: 시각("6:36") + 오브젝트("용") 또는 지역("아래쪽 강"), 그리고 그 장면에서 일어난 일(와드 0개, 우리 팀 0킬·상대 팀 3킬, 내가 먼저 죽음 등). 장면은 사실만 쓰고 원인을 붙이지 않는다.
+18. 조언("다음 판에는", "~하세요", "~해라", "신경 쓰세요")은 그 칸의 slots[].rules에 행동 규칙(R1·R2·R3·R5)이 있을 때만 쓴다. rules가 없는 칸(라인전, 대부분의 좋은 점, 요약, 결정적 장면)에는 조언 문장을 쓰지 않는다. 검사기가 실패로 처리한다.
+19. 규칙이 있는 칸은 그 규칙의 요지(gist)를 이 판의 숫자로 옮긴다. required의 fact를 모두 문장에 쓰고 factIds에 적는다. 요지에 없는 원인(예: "시야가 없어서 죽었다", "앞라인과 떨어져 있었다")이나 요지에 없는 행동(예: "아래쪽 강 입구에 제어 와드를 두세요", "아군 곁에 붙어 숫자를 맞추세요")을 지어내지 않는다. 행동은 요지에 있는 말(이 과목에 신경 쓰세요 / 오브젝트 싸움에서 죽지 않을 위치를 잡으세요 / 그런 상황에서 혼자 싸우지 마세요)만 쓴다.
+20. R4는 조언이 아니라 해석이다. rules[].text 문장을 고치지 말고 그대로 쓰고, 먼저 죽은 사람과 싸움 결과(required)를 함께 쓴다. 다른 5-4-1 문장이나 행동 조언을 붙이지 않는다.
+21. R1 문장 꼴: "(유형)은 (과목) 비중이 큽니다(반영 비율 N)." + 내 값과 상대 라이너 값 + (장면이 있으면 장면) + "다음 판에는 (과목)에 신경 쓰세요." R2·R3 문장 꼴: 내 데스 수와 그 데스로 상대 팀이 얻은 득실 점수(rule.*.deathPoints)를 쓰고, R2는 딜 비중도 기대치보다 낮았다고, R3은 이런 데스가 역전의 시발점이 된다고 쓴다.
+22. 일반론을 쓰지 않는다. 금지: "~해 볼 수 있습니다", "~를 이어 가", 장면·근거 없는 조언.
 
 ## 문체
 - 플레이어에게 직접 말하듯 쓰되, 꾸밈말을 줄이고 사실과 숫자 위주로 쓴다.
@@ -67,44 +71,49 @@ export const SYSTEM_PROMPT = `너는 리그 오브 레전드 한 판의 분석 �
 
 ## 예시
 facts 일부:
-{"id":"laning.referenceMin","display":["15"]}, {"id":"laning.opponent","display":["애쉬"]}, {"id":"laning.gold.diffAbs","display":["703"],"approx":{"step":100}}, {"id":"keyMoment.0.startMin","display":["15.1","15"]}, {"id":"keyMoment.0.gapChangeAbs","display":["3895","3,895"],"approx":{"step":100}}
+{"id":"laning.referenceMin","display":["15:00"]}, {"id":"laning.opponent","display":["애쉬"]}, {"id":"laning.gold.diffAbs","display":["703"],"approx":{"step":100}}, {"id":"keyMoment.0.startMin","display":["15:06"]}, {"id":"keyMoment.0.gapChangeAbs","display":["3895","3,895"],"approx":{"step":100}}
 
 좋은 예 (laning bad 칸):
-{"subjectId":"laning.gold","text":"15분 골드가 상대 애쉬보다 703 적었습니다.","factIds":["laning.referenceMin","laning.opponent","laning.gold.diffAbs"]}
+{"subjectId":"laning.gold","text":"15:00 골드가 상대 애쉬보다 703 적었습니다.","factIds":["laning.referenceMin","laning.opponent","laning.gold.diffAbs"]}
 
-좋은 예 (fight bad 칸, fight.vision, 장면 facts: scene.fight.vision.0.min "12.9", objective "용", taken "상대 팀이 잡음", wardsPlaced 0, fight.vision.windowSec 60):
-{"subjectId":"fight.vision","text":"오브젝트를 잡기 전 60초 동안의 시야 점수가 오브젝트당 0.5로 낮았습니다. 12.9분 상대 팀이 잡은 용 전 60초 동안 내 와드는 0개였습니다. 다음 판에는 용을 잡기 전 60초 안에 아래쪽 강 입구에 제어 와드를 먼저 두세요.","factIds":["fight.vision.windowSec","fight.vision.perObjective","scene.fight.vision.0.min","scene.fight.vision.0.objective","scene.fight.vision.0.taken","scene.fight.vision.0.wardsPlaced"]}
+좋은 예 (fight bad 칸, fight.vision, rules: R1 required [rule.R1.fight.vision.weight 30, rule.R1.fight.vision.me 0.5, rule.R1.fight.vision.opponent 1.25], 장면 scene.fight.vision.0.min "6:36", objective "용", wardsPlaced 0):
+{"subjectId":"fight.vision","text":"딜서폿은 오브젝트 전 시야 비중이 큽니다(반영 비율 30). 오브젝트당 시야 점수가 0.5로 상대 라이너 애쉬의 1.25보다 낮았고, 6:36에 잡힌 용 전 60초 동안 내 와드는 0개였습니다. 다음 판에는 오브젝트 전 시야에 신경 쓰세요.","factIds":["player.role","rule.R1.fight.vision.weight","rule.R1.fight.vision.me","rule.R1.fight.vision.opponent","laning.opponent","scene.fight.vision.0.min","scene.fight.vision.0.objective","fight.vision.windowSec","scene.fight.vision.0.wardsPlaced"]}
 
-좋은 예 (macro bad 칸, macro.advantage, 장면 facts: scene.macro.advantage.0.min "14", region "우리 정글 아래쪽(바텀 쪽)", killsOurs 0, killsTheirs 3, firstDeath "내가 먼저 죽음"):
-{"subjectId":"macro.advantage","text":"오브젝트를 잡은 시각 앞뒤 40초 밖에서 내가 참여한 싸움의 득실 중 우리 팀 몫이 0%였습니다. 14분 우리 정글 아래쪽에서 내가 먼저 죽으며 우리 팀 0킬, 상대 팀 3킬이 났습니다. 다음 판에는 우리 정글 아래쪽에 혼자 들어가기 전에 가까운 아군과 함께 움직이세요.","factIds":["fight.windowSec","macro.advantage.sharePct","scene.macro.advantage.0.min","scene.macro.advantage.0.region","scene.macro.advantage.0.firstDeath","scene.macro.advantage.0.killsOurs","scene.macro.advantage.0.killsTheirs"]}
+좋은 예 (fight bad 칸, fight.advantage, rules: R2 required [rule.R2.myDeaths 2, rule.R2.deathPoints 10, rule.R2.damageShare 10.18]):
+{"subjectId":"fight.advantage","text":"오브젝트를 잡은 시각 앞뒤 40초 동안 내가 참여한 싸움에서 우리 팀 몫이 15.4%였습니다. 딜 비중도 10.18%로 기대치보다 낮았고, 내 데스 2번으로 상대 팀이 득실 점수 10점을 얻었습니다. 다음 판에는 오브젝트 싸움에서 죽지 않을 위치를 잡으세요.","factIds":["fight.windowSec","fight.advantage.sharePct","rule.R2.damageShare","rule.R2.myDeaths","rule.R2.deathPoints"]}
+
+좋은 예 (macro bad 칸, macro.advantage, rules 없음 → 조언 없이 결과와 장면만):
+{"subjectId":"macro.advantage","text":"오브젝트를 잡은 시각 앞뒤 40초 밖에서 내가 참여한 싸움의 득실 중 우리 팀 몫이 0%였습니다. 14:00 우리 정글 아래쪽에서 내가 먼저 죽으며 우리 팀 0킬, 상대 팀 3킬이 났습니다.","factIds":["fight.windowSec","macro.advantage.sharePct","scene.macro.advantage.0.min","scene.macro.advantage.0.region","scene.macro.advantage.0.firstDeath","scene.macro.advantage.0.killsOurs","scene.macro.advantage.0.killsTheirs"]}
 
 좋은 예 (결정적 장면, 벌어짐):
-{"index":0,"text":"15분 싸움 뒤 골드 격차가 약 3,900 벌어졌습니다.","factIds":["keyMoment.0.startMin","keyMoment.0.gapChangeAbs"]}
+{"index":0,"text":"15:06 싸움 뒤 골드 격차가 약 3,900 벌어졌습니다.","factIds":["keyMoment.0.startMin","keyMoment.0.gapChangeAbs"]}
 
 좋은 예 (결정적 장면, 앞선 팀이 바뀜, swingAbs 4,376, swingSide "우리 팀이 잃음"):
-{"index":1,"text":"23.6분 싸움에서 우리 팀 0킬, 상대 팀 3킬로 앞선 팀이 우리 팀에서 상대 팀으로 바뀌었고, 우리 팀은 골드 약 4,400 손해를 봤습니다.","factIds":["keyMoment.1.startMin","keyMoment.1.killsOurs","keyMoment.1.killsTheirs","keyMoment.1.leaderBefore","keyMoment.1.leaderAfter","keyMoment.1.swingAbs"]}
+{"index":1,"text":"23:36 싸움에서 우리 팀 0킬, 상대 팀 3킬로 앞선 팀이 우리 팀에서 상대 팀으로 바뀌었고, 우리 팀은 골드 약 4,400 손해를 봤습니다.","factIds":["keyMoment.1.startMin","keyMoment.1.killsOurs","keyMoment.1.killsTheirs","keyMoment.1.leaderBefore","keyMoment.1.leaderAfter","keyMoment.1.swingAbs"]}
 
 나쁜 예와 이유:
-- "15분 골드가 상대 애쉬보다 800 적었습니다." → 800은 facts에 없다 (지어낸 숫자)
+- "15:00 골드가 상대 애쉬보다 800 적었습니다." → 800은 facts에 없다 (지어낸 숫자)
+- "15.1분 싸움에서 ~" → 시각은 분:초 표기("15:06")로만 쓴다
 - "골드 격차가 3,900 넘게 벌어졌습니다." → 실제 값 3,895는 3,900보다 작다
 - "라인전은 비슷했습니다." (판정 열세) → 판정을 바꿨다
 - "골드 격차가 300 벌어졌고 앞선 팀이 상대 팀으로 바뀌었습니다." (앞선 팀이 바뀜) → 역전 장면은 벌어졌다/좁혀졌다고 쓰지 않고 swingAbs로 손익을 쓴다
 - "1킬 5데스로 밀렸습니다." (5 = 상대 팀 킬) → 팀 킬을 데스로 썼다. "우리 팀 1킬, 상대 팀 5킬"로 쓴다
 - "교전 점수 25점으로 D 등급입니다." → 점수·등급을 썼다
 - "낀 오브젝트 싸움 2번에서 우리 팀 몫이 4.5%였습니다." → 은어 "낀". "내가 참여한"으로 쓴다
-- "다음 판에는 아군 포탑 쪽에 서 볼 수 있습니다." → 장면이 없고 "볼 수 있습니다"로 막연하다
-- "다음 판에는 상대 정글 위치를 확인하고 아군 가까이 움직이세요." → 어느 장면(시각·지역)인지 없다
-- "다음 판에도 와드를 오브젝트 길목에 이어 가 볼 수 있습니다." → "이어 가"·"볼 수 있습니다", 장면 없음
+- (라인전 칸) "다음 판에는 바텀 라인 우리 포탑 쪽에서 미니언 막타를 먼저 챙기세요." → 라인전 칸에는 조언 규칙이 없다
+- (R4만 있는 칸) "다음 판에는 탑 라인 상대 포탑 쪽에서 먼저 잡힌 아군 곁에 미리 붙어 숫자를 맞추세요." → R4는 해석만, 행동은 지어낸 것이다
+- (R1 칸) "다음 판에는 용을 잡기 전 60초 안에 아래쪽 강 입구에 제어 와드를 먼저 두세요." → 반영 비율·내 값·상대 값(required)이 없고, 행동이 요지에 없다
+- "다음 판에는 아군 포탑 쪽에 서 볼 수 있습니다." → 규칙·근거가 없고 "볼 수 있습니다"로 막연하다
 `;
 
 /** 시스템 프롬프트 뒤에 붙는 RAG 규칙 (조각이 있을 때만). 앞부분(SYSTEM_PROMPT)은 바꾸지 않는다 */
 export const KNOWLEDGE_RULES = `
 ## 참고 지식 (knowledge)
 사용자 메시지의 JSON 뒤에 <knowledge> 블록이 붙는다. 블록의 <chunk id="...">는 이 유형·과목의 결과를 해석하는 관점 조각이다.
-13. 조각은 해석과 다음 판 조언의 근거로만 쓴다. 숫자·시각·횟수는 여전히 facts에서만 쓴다(조각에는 숫자가 없다). 조각은 "조건 + 구체 행동" 꼴이다. 이 판의 장면이 조각의 조건과 맞을 때만 그 행동을 장면의 시각·오브젝트·지역에 맞춰 쓴다(규칙 17~20).
+13. 조각은 조언 규칙의 뜻을 풀어 쓴 해설이다. 조각 id 끝의 규칙(.R1 ~ .R5)이 그 칸의 slots[].rules에 있을 때만 그 칸에 쓴다. 숫자·시각·횟수는 여전히 facts에서만 쓴다(조각에는 숫자가 없다). 조각에 없는 원인·행동은 쓰지 않는다(규칙 18~21).
 14. 조각의 해석도 데이터가 직접 말하지 않으면 추정이다. 단정하지 말고 규칙 5를 따른다. 칸의 방향(good/bad)이나 그 판의 facts와 맞지 않는 조각은 쓰지 않는다.
 15. 출력 맨 위 chunkUse에 조각을 반영한 칸마다 {"slot":"칸 이름","chunkIds":["조각 id"]}를 하나씩 적는다. <knowledge>에 있는 id만 쓰고, 조각을 반영하지 않은 칸은 적지 않는다(아무 칸에도 안 썼으면 빈 배열).
-16. 조언을 넣어도 칸 길이(1~3문장, 170자 안)와 요약 길이 규칙은 같다. 조언은 규칙 18처럼 "다음 판에는 ~하세요"로, 장면 없이 쓰지 않는다.
+16. 조언을 넣어도 칸 길이(1~3문장, 170자 안)와 요약 길이 규칙은 같다. 조언은 규칙이 있는 칸에서만, 그 규칙의 근거(required)와 함께 쓴다.
 `;
 
 export const SYSTEM_PROMPT_RAG = SYSTEM_PROMPT + KNOWLEDGE_RULES;
@@ -129,7 +138,7 @@ export interface UserPayload {
   player: Record<string, unknown>;
   verdicts: Record<string, string | null>;
   commonFactIds: string[];
-  slots: { slot: string; subjectId?: string; subjectName?: string; factIds: string[] }[];
+  slots: { slot: string; subjectId?: string; subjectName?: string; factIds: string[]; rules?: { id: string; gist: string; required: string[]; text?: string }[] }[];
   facts: { id: string; label: string; display: string[]; units?: string[]; approx?: { step: number } }[];
   keyMoments: { index: number; direction: string; swingSide: string; playerInvolved: boolean; playerDied: boolean; followUpFactIds: string[] }[];
   notes: { text: string; kind: string; startFactId: string | null }[];
@@ -156,6 +165,8 @@ export function buildUserPayload(sheet: FactSheet): UserPayload {
       slot: s.slot,
       ...(s.subjectId ? { subjectId: s.subjectId, subjectName: SUBJECT_LABEL[s.subjectId] ?? s.subjectId } : {}),
       factIds: s.factIds.filter((id) => !common.has(id)),
+      // 조언 규칙 (Q3): 있는 칸만 보낸다 (토큰 절약)
+      ...(s.rules.length > 0 ? { rules: s.rules.map((r) => ({ id: r.id, gist: r.gist, required: r.required, ...(r.text ? { text: r.text } : {}) })) } : {}),
     })),
     // 칸에서 쓰는 fact와 해석 노트 시각만 보낸다 (토큰 절약). value는 display[0]과 같아 보내지 않는다
     facts: sheet.facts
@@ -199,7 +210,10 @@ export function buildRetryMessage(sheet: FactSheet, failures: readonly VerifyFai
       .map((id) => sheet.byId.get(id))
       .filter((f) => f !== undefined && typeof f.value === 'number')
       .map((f) => `${f!.id}: ${f!.display.join(' 또는 ')}`);
-    return `- ${slot}${s?.subjectId ? ` (${s.subjectId})` : ''}: ${reasons.join(' / ')}\n  쓸 수 있는 숫자: ${values.join(', ') || '없음'}`;
+    const rules = s?.rules.length
+      ? s.rules.map((r) => `${r.id}${r.action ? '' : '(해석만)'} 근거 ${r.required.join(', ')}${r.text ? ` 문장 "${r.text}"` : ''}`).join(' / ')
+      : '없음 (조언 문장을 빼고 결과·장면만)';
+    return `- ${slot}${s?.subjectId ? ` (${s.subjectId})` : ''}: ${reasons.join(' / ')}\n  쓸 수 있는 숫자: ${values.join(', ') || '없음'}\n  조언 규칙: ${rules}`;
   });
   return `아래 칸의 문장이 검사를 통과하지 못했다. 이 칸들만 이유에 맞게 고쳐 다시 써라. 다른 칸은 쓰지 않는다. 규칙은 처음과 같다.
 ${lines.join('\n')}

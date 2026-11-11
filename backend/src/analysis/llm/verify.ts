@@ -1,16 +1,17 @@
 // 검증기 (ai_spec 2-6): 문장마다 모양·방향·숫자·금지어·길이·이름을 검사한다.
 // 판단은 코드가 한다. LLM 문장의 숫자는 그 문장의 factIds가 가리키는 fact의 표기(또는 어림 규칙)와만 대조한다.
-import { isReversed, type Fact, type FactSheet, type Slot } from './facts.js';
+import { isReversed, TIME_UNIT, type Fact, type FactSheet, type Slot, type SlotRule } from './facts.js';
 import {
-  ADVICE_MARKER,
+  ADVICE_SENTENCE,
   allowedUnitWords,
+  FIRST_DEATH_SENTENCES,
   AREAS,
   DEATH_CLAUSE,
   DIRECTION_WORDS,
   FORBIDDEN_PATTERNS,
   INTERPRETIVE_WORDS,
-  isSceneFactId,
   NUMBER_NAME_PATTERNS,
+  RULE_EXEMPT_PATTERNS,
   REVERSAL_WORDS,
   SUBJECT_DIRECTION_WORDS,
   SWING_WORDS,
@@ -53,7 +54,12 @@ export interface NumberToken {
   approx: 'about' | 'over' | 'under' | null;
   /** 숫자 바로 뒤 단위어 (골드·킬·데스·CS·개·번·분·%p 등). 없으면 null */
   unit: string | null;
+  /** 게임 시각 "분:초" 표기면 true (value = 초) */
+  time?: boolean;
 }
+
+/** 게임 시각 "m:ss" (Q3). 앞뒤가 숫자가 아니어야 한다 */
+const TIME_RE = /(?<![\d.:])(\d{1,2}):([0-5]\d)(?![\d:])/g;
 
 const KOREAN_NUM: Readonly<Record<string, number>> = {
   한: 1,
@@ -73,9 +79,13 @@ const NUMBER_RE = /(약\s*)?([-−])?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?(\s*(?:넘�
 
 /** 문장에서 숫자를 모두 뽑는다 (쉼표·소수·부호·어림 표현·한글 수사+단위). 이름 속 숫자("1차 포탑")는 뺀다 */
 export function extractNumbers(text: string): NumberToken[] {
-  let t = text;
-  for (const re of NUMBER_NAME_PATTERNS) t = t.replace(new RegExp(re.source, 'g'), (m) => ' '.repeat(m.length));
   const out: NumberToken[] = [];
+  // 시각 "15:06"을 먼저 하나의 값(초)으로 읽고 지운다 ("1:1" 같은 이름 패턴보다 먼저)
+  let t = text.replace(TIME_RE, (m, mm: string, ss: string) => {
+    out.push({ raw: m, value: Number(mm) * 60 + Number(ss), approx: null, unit: null, time: true });
+    return ' '.repeat(m.length);
+  });
+  for (const re of NUMBER_NAME_PATTERNS) t = t.replace(new RegExp(re.source, 'g'), (m) => ' '.repeat(m.length));
   for (const m of t.matchAll(NUMBER_RE)) {
     const idx = m.index ?? 0;
     const sign = m[2];
@@ -109,6 +119,8 @@ function displayValues(f: Fact): number[] {
 /** 숫자 하나가 fact 하나의 표기·어림 규칙과 맞는지 */
 export function numberMatchesFact(tok: NumberToken, f: Fact): boolean {
   if (typeof f.value !== 'number') return false;
+  // 시각은 시각 fact와만, 초 단위로 같아야 한다 (표기 "분:초")
+  if (tok.time || f.unit === TIME_UNIT) return !!tok.time && f.unit === TIME_UNIT && tok.value === f.value;
   const exact = displayValues(f).some((d) => Math.abs(d - tok.value) < 1e-9);
   const step = f.approx?.step;
   if (tok.approx === null) return exact;
@@ -196,14 +208,36 @@ export interface VerifyContext {
   knowledgeIds?: ReadonlySet<string>;
 }
 
-/** 장면 fact가 문장에 나왔나: 시각은 "N분", 오브젝트·지역은 괄호 설명을 뺀 이름. 횟수 같은 숫자 값·그 밖의 글자 값은 장면을 짚은 것으로 보지 않는다 */
+/** 장면 fact가 문장에 나왔나: 시각은 "분:초", 오브젝트·지역은 괄호 설명을 뺀 이름. 횟수 같은 숫자 값·그 밖의 글자 값은 장면을 짚은 것으로 보지 않는다 */
 export function citesScene(f: Fact, text: string): boolean {
-  if (f.unit === '분') return f.display.some((d) => new RegExp(`(^|[^0-9.])${d.replace('.', '\\.')}\\s?분`).test(text));
-  if (typeof f.value === 'string' && /\.(objective|region)$/.test(f.id)) {
-    const name = f.value.replace(/\(.*?\)/g, '').trim();
-    return name.length > 0 && text.includes(name);
-  }
+  if (f.unit === TIME_UNIT) return citesFact(f, text);
+  if (typeof f.value === 'string' && /\.(objective|region)$/.test(f.id)) return citesFact(f, text);
   return false;
+}
+
+/**
+ * fact 값이 문장에 나왔나 (Q3 조언 근거 인용). 시각·숫자는 문장에서 뽑은 숫자 중 이 fact와 맞는 것이 있어야 하고,
+ * 글자 값은 괄호 설명을 뺀 값(또는 "~(탱커)"처럼 괄호 앞부분)이 문장에 있어야 한다.
+ */
+export function citesFact(f: Fact, text: string): boolean {
+  if (typeof f.value === 'number') return extractNumbers(text).some((tok) => numberMatchesFact(tok, f));
+  const name = f.value.replace(/\(.*?\)/g, '').trim();
+  return name.length > 0 && text.includes(name);
+}
+
+/** 조언 문장인가 (Q3): "다음 판", 명령형 "~세요"·"~라", "신경 써" */
+export function isAdviceSentence(sentence: string): boolean {
+  return ADVICE_SENTENCE.some((re) => re.test(sentence));
+}
+
+/** 규칙의 근거 fact를 모두 factIds에 적고 문장에 썼나 */
+function citesRule(r: SlotRule, st: SlotText, sheet: FactSheet, text: string): string[] {
+  const missing: string[] = [];
+  for (const id of r.required) {
+    const f = sheet.byId.get(id);
+    if (!f || !st.factIds.includes(id) || !citesFact(f, text)) missing.push(id);
+  }
+  return missing;
 }
 
 export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): VerifyFailure[] {
@@ -262,16 +296,31 @@ export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): Verify
     }
   }
 
-  // 4. 금지어·해석어
-  for (const { re, why } of FORBIDDEN_PATTERNS) if (re.test(text)) add('forbidden', why);
+  // 4. 금지어·해석어 (Q3: 발동한 규칙의 근거를 말할 때만 "반영 비율"(R1)·"득실 점수"(R1·R2·R3)를 허용)
+  const exempt = new Set(slot.rules.flatMap((r) => RULE_EXEMPT_PATTERNS[r.id] ?? []));
+  for (const { re, why } of FORBIDDEN_PATTERNS) if (!exempt.has(re) && re.test(text)) add('forbidden', why);
   const interp = INTERPRETIVE_WORDS.find((w) => text.includes(w));
   if (interp && !text.includes('보입니다')) add('forbidden', `해석어 "${interp}"는 "~것으로 보입니다"로 끝맺어야 함`);
-  // 4-1. 조언은 이 판의 장면 하나를 짚어야 한다 (Q2): "다음 판"이 있으면 factIds에 장면 fact가 있고, 그 값(시각·오브젝트·지역)이 문장에 나와야 한다
-  //      장면은 조언 문장 안에서 짚어야 한다 (앞 문장의 시각만으로는 통과하지 않음)
-  for (const sentence of splitSentences(text).filter((x) => ADVICE_MARKER.test(x))) {
-    if (!facts.some((f) => isSceneFactId(f.id) && citesScene(f, sentence))) {
-      add('forbidden', '장면 없는 조언: "다음 판" 조언 문장 안에 이 칸의 장면 fact(scene.* 또는 라인전 데스)의 시각·오브젝트·지역 하나를 쓰고 그 id를 factIds에 적어야 함');
+  // 4-1. 조언 규칙 (Q3, Q2의 "장면 없는 조언" 검사를 대체): 조언 문장("다음 판", 명령형, "신경 써")은
+  //      이 칸에서 행동 조언 규칙(R1·R2·R3·R5)이 발동했을 때만 쓸 수 있고, 그 규칙의 근거 fact를 factIds에 적고 칸 문장에 써야 한다.
+  //      규칙이 없는 칸(라인전·좋은 점·요약·결정적 장면 등)의 조언은 실패 → 재시도 → 템플릿(조언 없음).
+  const actionRules = slot.rules.filter((r) => r.action);
+  if (splitSentences(text).some(isAdviceSentence)) {
+    if (actionRules.length === 0) {
+      add('forbidden', `근거 없는 조언: 이 칸에는 발동한 조언 규칙이 없어 "다음 판"·"~하세요" 같은 조언을 쓸 수 없음${slot.rules.length ? ` (발동 규칙 ${slot.rules.map((r) => r.id).join(', ')}은 해석 문장만)` : ''}`);
+    } else {
+      const misses = actionRules.map((r) => ({ r, miss: citesRule(r, st, sheet, text) }));
+      if (!misses.some((m) => m.miss.length === 0)) {
+        add('forbidden', `조언 근거 미인용: 발동한 규칙의 근거 fact를 factIds에 적고 문장에 써야 함 — ${misses.map((m) => `${m.r.id}(${m.miss.join(', ')})`).join(' / ')}`);
+      }
     }
+  }
+  // 4-2. 첫 데스 해석(5-4-1) 문장은 R4가 발동한 칸에서 그 규칙의 문장 그대로만
+  const r4 = slot.rules.find((r) => r.id === 'R4');
+  for (const sentence of FIRST_DEATH_SENTENCES) {
+    if (!text.includes(sentence.stem)) continue;
+    if (!r4) add('forbidden', `첫 데스 해석 "${sentence.stem}"은 R4가 발동한 칸에서만 쓴다`);
+    else if (!text.includes(r4.text ?? '') || sentence.full !== r4.text) add('forbidden', `첫 데스 해석은 이 칸의 R4 문장 "${r4.text}" 그대로만 쓴다`);
   }
 
   // 5. 길이

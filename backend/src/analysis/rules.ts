@@ -2,7 +2,7 @@
 // 규칙이나 경계값을 바꾸면 ENGINE_VERSION을 올린다 (5단계 캐시 키에 들어간다).
 import type { Grade, Position, Role } from './types.js';
 
-export const ENGINE_VERSION = '2026-11-10.1';
+export const ENGINE_VERSION = '2026-11-11.1';
 
 /** 5개 등급을 높은 순서로 */
 export const GRADES: readonly Grade[] = ['A', 'B', 'C', 'D', 'E'];

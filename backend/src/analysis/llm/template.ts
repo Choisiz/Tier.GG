@@ -1,6 +1,7 @@
 // 템플릿 문장 (ai_spec 2-6): LLM 실패·검증 실패 때 쓰는 대체 문장.
 // 숫자는 facts의 display[0]을 그대로 넣어 검증기를 항상 통과한다 (테스트로 확인).
-import { isReversed, type FactSheet, type Slot } from './facts.js';
+// 시각은 분:초("15:06")로 쓴다 (Q3). 조언 문장은 넣지 않는다: 규칙이 발동한 칸이라도 템플릿은 결과·장면만 (Q3 "템플릿(조언 없음)").
+import { isReversed, TIME_UNIT, type FactSheet, type Slot } from './facts.js';
 import type { SlotText } from './verify.js';
 
 export const LANING_UNAVAILABLE_TEXT = '이 판은 라인전 상대를 비교할 수 없었습니다.';
@@ -12,8 +13,8 @@ function picker(sheet: FactSheet, used: string[]): Pick {
     const f = sheet.byId.get(id);
     if (!f) throw new Error(`템플릿이 쓰는 fact가 없음: ${id}`);
     if (!used.includes(id)) used.push(id);
-    // 분은 첫 표기(소수 첫째 자리), 정수는 쉼표 표기, 소수는 원래 값
-    if (typeof f.value === 'number' && f.unit !== '분' && Number.isInteger(f.value)) return f.display[f.display.length - 1]!;
+    // 시각은 분:초 표기, 정수는 쉼표 표기, 소수는 원래 값
+    if (typeof f.value === 'number' && f.unit !== TIME_UNIT && Number.isInteger(f.value)) return f.display[f.display.length - 1]!;
     return f.display[0]!;
   };
 }
@@ -37,23 +38,23 @@ function sceneSentence(sheet: FactSheet, subjectId: string, good: boolean, p: Pi
     // 라인전: 부족한 점(골드·KDA)이면 비교 시점 전 첫 데스 장면
     if (!good && (subjectId === 'laning.gold' || subjectId === 'laning.kda') && has(sheet, 'laning.deathsBefore.0.min')) {
       const where = has(sheet, 'laning.deathsBefore.0.region') ? ` ${p('laning.deathsBefore.0.region')}에서` : '';
-      return ` ${p('laning.deathsBefore.0.min')}분${where} 데스가 있었습니다.`;
+      return ` ${p('laning.deathsBefore.0.min')}에${where} 데스가 있었습니다.`;
     }
     return '';
   }
   const where = has(sheet, `${k}.region`) ? ` ${p(`${k}.region`)}에서` : '';
   switch (subjectId) {
     case 'fight.vision':
-      return ` ${p(`${k}.min`)}분 ${p(`${k}.objective`)}을 잡기 전 ${p('fight.vision.windowSec')}초 동안 내가 설치한 와드는 ${p(`${k}.wardsPlaced`)}개였습니다.`;
+      return ` ${p(`${k}.min`)}에 잡힌 ${p(`${k}.objective`)} 전 ${p('fight.vision.windowSec')}초 동안 내가 설치한 와드는 ${p(`${k}.wardsPlaced`)}개였습니다.`;
     case 'fight.objective':
       return good && sheet.byId.get(`${k}.lastHit`)?.value === '내가 막타를 침'
-        ? ` ${p(`${k}.min`)}분 ${p(`${k}.objective`)} 막타를 직접 쳤습니다.`
-        : ` ${p(`${k}.min`)}분 ${p(`${k}.objective`)}은 ${p(`${k}.taken`).replace('잡음', '잡았습니다')}.`;
+        ? ` ${p(`${k}.min`)}에 ${p(`${k}.objective`)} 막타를 직접 쳤습니다.`
+        : ` ${p(`${k}.min`)}에 ${p(`${k}.objective`)}은 ${p(`${k}.taken`).replace('잡음', '잡았습니다')}.`;
     case 'fight.advantage':
     case 'macro.advantage':
-      return ` ${p(`${k}.min`)}분${where} 난 싸움은 우리 팀 ${p(`${k}.killsOurs`)}킬, 상대 팀 ${p(`${k}.killsTheirs`)}킬이었습니다.`;
+      return ` ${p(`${k}.min`)}에${where} 난 싸움은 우리 팀 ${p(`${k}.killsOurs`)}킬, 상대 팀 ${p(`${k}.killsTheirs`)}킬이었습니다.`;
     case 'macro.solo':
-      return ` ${p(`${k}.min`)}분${where} ${p(`${k}.what`)} 장면이 있었습니다.`;
+      return ` ${p(`${k}.min`)}에${where} ${p(`${k}.what`)} 장면이 있었습니다.`;
     default:
       return '';
   }
@@ -69,13 +70,13 @@ function subjectMain(sheet: FactSheet, subjectId: string, good: boolean, p: Pick
   const ref = () => p('laning.referenceMin');
   switch (subjectId) {
     case 'laning.gold':
-      return `${ref()}분 골드가 상대 ${opp()}보다 ${p('laning.gold.diffAbs')} ${good ? '많았습니다' : '적었습니다'}.`;
+      return `${ref()} 골드가 상대 ${opp()}보다 ${p('laning.gold.diffAbs')} ${good ? '많았습니다' : '적었습니다'}.`;
     case 'laning.level':
-      return `${ref()}분 레벨이 상대 ${opp()}보다 ${p('laning.level.diffAbs')} ${good ? '높았습니다' : '낮았습니다'}.`;
+      return `${ref()} 레벨이 상대 ${opp()}보다 ${p('laning.level.diffAbs')} ${good ? '높았습니다' : '낮았습니다'}.`;
     case 'laning.kda':
-      return `${ref()}분까지 ${p('laning.kda.formula')}이 ${p('laning.kda.me')}${ro(p('laning.kda.me'))} 상대 ${opp()}의 ${p('laning.kda.enemy')}보다 ${good ? '좋았습니다' : '나빴습니다'}.`;
+      return `${ref()}까지 ${p('laning.kda.formula')}이 ${p('laning.kda.me')}${ro(p('laning.kda.me'))} 상대 ${opp()}의 ${p('laning.kda.enemy')}보다 ${good ? '좋았습니다' : '나빴습니다'}.`;
     case 'laning.cs':
-      return `${ref()}분 CS가 상대 ${opp()}보다 ${p('laning.cs.diffAbs')}개 ${good ? '많았습니다' : '적었습니다'}.`;
+      return `${ref()} CS가 상대 ${opp()}보다 ${p('laning.cs.diffAbs')}개 ${good ? '많았습니다' : '적었습니다'}.`;
     case 'fight.advantage':
       return `오브젝트를 잡은 시각 앞뒤 ${p('fight.windowSec')}초 동안 내가 참여한 싸움의 득실에서 우리 팀 몫이 ${p('fight.advantage.sharePct')}%${good ? '로 컸습니다' : '에 그쳤습니다'}.`;
     case 'fight.damage': {
@@ -83,10 +84,10 @@ function subjectMain(sheet: FactSheet, subjectId: string, good: boolean, p: Pick
       const d1 = has(sheet, 'fight.damage.diff1Abs') ? Number(sheet.byId.get('fight.damage.diff1Abs')!.value) : -1;
       const word = good ? '높았습니다' : '낮았습니다';
       if (d1 >= d0 && d1 >= 0) {
-        return `${p('fight.damage.phase1StartMin')}분 이후 챔피언 딜 비중이 ${p('fight.damage.share1')}%로 이 유형의 기대치 ${p('fight.damage.expected1')}%보다 ${word}.`;
+        return `${p('fight.damage.phase1StartMin')} 이후 챔피언 딜 비중이 ${p('fight.damage.share1')}%로 이 유형의 기대치 ${p('fight.damage.expected1')}%보다 ${word}.`;
       }
       if (d0 >= 0) {
-        return `${p('fight.damage.phase0EndMin')}분까지 챔피언 딜 비중이 ${p('fight.damage.share0')}%로 이 유형의 기대치 ${p('fight.damage.expected0')}%보다 ${word}.`;
+        return `${p('fight.damage.phase0EndMin')}까지 챔피언 딜 비중이 ${p('fight.damage.share0')}%로 이 유형의 기대치 ${p('fight.damage.expected0')}%보다 ${word}.`;
       }
       return `챔피언 딜 비중이 이 유형의 기대치보다 ${word}.`;
     }
@@ -121,10 +122,10 @@ function keyMomentText(sheet: FactSheet, index: number, p: Pick, withFollowUp: b
   if (isReversed(km.goldDiffBefore, km.goldDiffAfter)) {
     // 역전: 격차 변화(|뒤|−|앞|) 대신 앞선 팀이 바뀐 것과 우리 팀 기준 손익을 쓴다 (Q1)
     const side = km.swing > 0 ? '이득을' : '손해를';
-    s = `${p(`${k}.startMin`)}분 킬 ${p(`${k}.kills`)}개가 난 싸움 뒤 골드가 앞선 팀이 ${p(`${k}.leaderBefore`)}에서 ${p(`${k}.leaderAfter`)}으로 바뀌었고, 우리 팀이 골드 ${p(`${k}.swingAbs`)} ${side} 봤습니다.`;
+    s = `${p(`${k}.startMin`)}에 킬 ${p(`${k}.kills`)}개가 난 싸움 뒤 골드가 앞선 팀이 ${p(`${k}.leaderBefore`)}에서 ${p(`${k}.leaderAfter`)}으로 바뀌었고, 우리 팀이 골드 ${p(`${k}.swingAbs`)} ${side} 봤습니다.`;
   } else {
     const dir = km.direction === 'widened' ? '벌어졌습니다' : '좁혀졌습니다';
-    s = `${p(`${k}.startMin`)}분 킬 ${p(`${k}.kills`)}개가 난 싸움 뒤 골드 격차가 ${p(`${k}.gapChangeAbs`)} ${dir}.`;
+    s = `${p(`${k}.startMin`)}에 킬 ${p(`${k}.kills`)}개가 난 싸움 뒤 골드 격차가 ${p(`${k}.gapChangeAbs`)} ${dir}.`;
   }
   if (withFollowUp && has(sheet, `${k}.followUp.0`)) s += ` 이어서 ${p(`${k}.followUp.0`)}.`;
   return s;

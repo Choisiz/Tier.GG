@@ -224,7 +224,33 @@ export interface AnalysisResult {
   notes: Note[];
   /** 장면 정보 (Q2). 점수·등급·말할 순서에 쓰지 않는 문장 재료 */
   scenes: Scenes;
+  /** 조언 규칙표 (Q3). 발동한 규칙과 근거. 점수·등급·말할 순서에 쓰지 않는 문장 재료 */
+  advice: AdviceResult;
   warnings: string[];
+}
+
+/** advice를 붙이기 전 판정 결과 */
+export type JudgedResult = Omit<AnalysisResult, 'advice'>;
+
+// ---------- 조언 규칙 (Q3, 점수 밖) ----------
+
+export type AdviceRuleId = 'R1' | 'R2' | 'R3' | 'R4' | 'R5';
+
+/** 발동한 규칙 하나 */
+export interface FiredRule {
+  id: AdviceRuleId;
+  /** 이 규칙이 붙는 과목 (칸의 subjectId) */
+  subjectId: string;
+  /** 이 규칙이 붙는 칸 방향 */
+  kind: 'good' | 'bad';
+  /** 숫자·글자 근거 (facts.ts가 rule.* fact로 옮긴다) */
+  facts: Facts;
+}
+
+export interface AdviceResult {
+  rules: FiredRule[];
+  /** 상대 라이너 (R1 비교 대상). 같은 포지션 상대가 1명이 아니면 null */
+  opponentParticipantId: number | null;
 }
 
 // ---------- 장면 (Q2, 점수 밖) ----------

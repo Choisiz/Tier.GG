@@ -12,12 +12,12 @@ const good = JSON.stringify(passingAnswer(sheet));
 
 function withWrongGold(): string {
   const a = passingAnswer(sheet);
-  a.sections.laning.bad[0]!.text = '15분 골드가 상대 애쉬보다 800 적었습니다.';
+  a.sections.laning.bad[0]!.text = '15:00 골드가 상대 애쉬보다 800 적었습니다.';
   return JSON.stringify(a);
 }
 
 const fixGold = JSON.stringify({
-  fixes: [{ slot: 'laning.bad.0', text: '15분 골드가 상대 애쉬보다 703 적었습니다.', factIds: ['laning.referenceMin', 'laning.opponent', 'laning.gold.diffAbs'] }],
+  fixes: [{ slot: 'laning.bad.0', text: '15:00 골드가 상대 애쉬보다 703 적었습니다.', factIds: ['laning.referenceMin', 'laning.opponent', 'laning.gold.diffAbs'] }],
 });
 const badFix = JSON.stringify({ fixes: [{ slot: 'laning.bad.0', text: '골드가 900 적었습니다.', factIds: ['laning.gold.diffAbs'] }] });
 
@@ -166,7 +166,7 @@ describe('createFeedback 결과 모양', () => {
     assert.equal(feedback.sections.laning.bad.length, 2);
     assert.equal(feedback.sections.macro.good[0]!.subjectId, 'macro.side');
     assert.equal(feedback.keyMoments.length, 3);
-    assert.equal(feedback.meta.engineVersion, '2026-11-10.1');
+    assert.equal(feedback.meta.engineVersion, '2026-11-11.1');
     assert.equal(feedback.meta.fallbackReason, null);
     assert.equal(feedback.sections.laning.note, undefined);
   });

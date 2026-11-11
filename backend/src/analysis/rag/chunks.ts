@@ -1,11 +1,12 @@
 // RAG 지식 문서 → 조각 (ai_spec B4-2·B4-3, F-1·F-2). 파일 읽기 말고는 순수 함수다.
 // 조각 하나 = `### <id> <제목>` + `- meta: k=v, ...` 한 줄 + 본문 2~5문장. 고정 길이로 자르지 않는다.
+// Q3: 조각은 조언 규칙(R1~R5) 하나에 연결한 해설이다. meta `rule=R1`이 필수이고 ID 끝이 그 규칙이다 (예: fight.vision.ALL.bad.R1).
 // 허용 값은 엔진과 같은 목록(유형 10개 + ALL, 과목 ID = labels.ts SUBJECT_LABEL)과 계약 v9 12-1의 CHECK 값이다.
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FORBIDDEN_PATTERNS, INTERPRETIVE_WORDS, SUBJECT_LABEL, VAGUE_PATTERNS } from '../llm/labels.js';
-import type { Position, Role } from '../types.js';
+import type { AdviceRuleId, Position, Role } from '../types.js';
 
 export const ROLES: readonly Role[] = [
   'TOP_TANK',
@@ -42,7 +43,32 @@ export type ChunkPolarity = 'good' | 'bad' | 'any';
 const POSITIONS: readonly ChunkPosition[] = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'ALL'];
 const AREAS: readonly ChunkArea[] = ['laning', 'fight', 'macro', 'general'];
 const POLARITIES: readonly ChunkPolarity[] = ['good', 'bad', 'any'];
-const META_KEYS = ['role', 'area', 'subject', 'polarity', 'position'] as const;
+const META_KEYS = ['role', 'area', 'subject', 'polarity', 'position', 'rule'] as const;
+
+/**
+ * 규칙마다 조각을 붙일 수 있는 과목·방향 (advice.ts 규칙표와 같음). R1은 반영 비율이 30 이상인 유형이 있는 과목만
+ * (rules.ts FIGHT_WEIGHTS·MACRO_WEIGHTS: 단독 킬·데스는 최대 25라 R1이 없다).
+ */
+export const RULE_TARGETS: Readonly<Record<AdviceRuleId, { subjects: readonly string[]; polarities: readonly ChunkPolarity[] }>> = {
+  R1: {
+    subjects: ['fight.advantage', 'fight.damage', 'fight.vision', 'fight.objective', 'macro.advantage', 'macro.side', 'macro.farm', 'macro.vision'],
+    polarities: ['bad'],
+  },
+  R2: { subjects: ['fight.damage', 'fight.advantage'], polarities: ['bad'] },
+  R3: { subjects: ['fight.advantage'], polarities: ['bad'] },
+  R4: { subjects: ['fight.advantage'], polarities: ['good', 'bad'] },
+  R5: { subjects: ['macro.solo'], polarities: ['bad'] },
+};
+export const RULE_IDS = Object.keys(RULE_TARGETS) as AdviceRuleId[];
+
+/** ID 끝 규칙 칸: R1 또는 R1-2 (같은 규칙 조각이 여럿일 때) */
+const RULE_SUFFIX_RE = /^(R[1-5])(?:-\d+)?$/;
+
+/** ID에서 규칙을 읽는다 (Q3). 규칙 칸이 없는 옛 조각(…bad.01)은 null → 검색에서 쓰지 않는다 */
+export function ruleOfId(id: string): AdviceRuleId | null {
+  const m = RULE_SUFFIX_RE.exec(id.split('.').pop() ?? '');
+  return m ? (m[1] as AdviceRuleId) : null;
+}
 
 /** 본문 길이 경고 기준 (소제목+본문) */
 export const CHUNK_MAX_CHARS = 600;
@@ -60,6 +86,8 @@ export interface KnowledgeChunk {
   /** NULL = 과목 무관 (그 영역 공통) */
   subject: string | null;
   polarity: ChunkPolarity;
+  /** 연결한 조언 규칙 (Q3). DB에는 칸이 없고 ID 끝에 들어 있다 */
+  rule: AdviceRuleId;
   title: string;
   body: string;
   /** 임베딩·저장하는 본문 = 소제목 + 줄바꿈 + 본문 */
@@ -97,7 +125,7 @@ function sentenceCount(text: string): number {
     .filter((s) => s.length > 0).length;
 }
 
-/** 조각 ID 규칙: `<과목ID 또는 영역.common>.<유형>.<방향>.<두 자리>` (예: fight.damage.SUPPORT_DAMAGE.bad.01) */
+/** 조각 ID 규칙 (Q3): `<과목ID>.<유형>.<방향>.<규칙>` (예: fight.vision.SUPPORT_DAMAGE.bad.R1, 여럿이면 R1-2) */
 export function expectedIdPrefix(c: Pick<KnowledgeChunk, 'area' | 'subject' | 'role' | 'polarity'>): string {
   return `${c.subject ?? `${c.area}.common`}.${c.role}.${c.polarity}.`;
 }
@@ -160,7 +188,9 @@ export function parseKnowledgeFile(text: string, file: string): ParseResult {
     const area = meta.get('area');
     const subjectRaw = meta.get('subject');
     const polarity = meta.get('polarity');
-    for (const k of ['role', 'area', 'polarity'] as const) if (!meta.has(k)) err(`필수 meta 누락: ${k}`);
+    const rule = meta.get('rule');
+    for (const k of ['role', 'area', 'polarity', 'rule'] as const) if (!meta.has(k)) err(`필수 meta 누락: ${k}`);
+    if (rule && !(RULE_IDS as string[]).includes(rule)) err(`허용되지 않은 rule: ${rule} (R1~R5)`);
     if (role && role !== 'ALL' && !(ROLES as readonly string[]).includes(role)) err(`허용되지 않은 role: ${role}`);
     if (area && !(AREAS as readonly string[]).includes(area)) err(`허용되지 않은 area: ${area}`);
     if (polarity && !(POLARITIES as readonly string[]).includes(polarity)) err(`허용되지 않은 polarity: ${polarity}`);
@@ -172,6 +202,11 @@ export function parseKnowledgeFile(text: string, file: string): ParseResult {
       warn('subject 없음: 이 영역의 모든 과목에 검색된다');
     }
     if (area === 'general' && subject !== null) err('area=general에는 subject를 쓰지 않음');
+    if (rule && (RULE_IDS as string[]).includes(rule)) {
+      const t = RULE_TARGETS[rule as AdviceRuleId];
+      if (subject === null || !t.subjects.includes(subject)) err(`${rule}은 과목 ${t.subjects.join('·')}에만 붙는다 (지금 ${subject ?? '없음'})`);
+      if (polarity && !(t.polarities as readonly string[]).includes(polarity)) err(`${rule}은 방향 ${t.polarities.join('·')}에만 붙는다 (지금 ${polarity})`);
+    }
     const validRole = role && (role === 'ALL' || (ROLES as readonly string[]).includes(role)) ? (role as ChunkRole) : null;
     const position = meta.get('position') ?? (validRole && validRole !== 'ALL' ? ROLE_POSITION[validRole] : 'ALL');
     if (!(POSITIONS as readonly string[]).includes(position)) err(`허용되지 않은 position: ${position}`);
@@ -194,7 +229,8 @@ export function parseKnowledgeFile(text: string, file: string): ParseResult {
 
     if (validRole && area && polarity && (POLARITIES as readonly string[]).includes(polarity)) {
       const prefix = expectedIdPrefix({ area: area as ChunkArea, subject, role: validRole, polarity: polarity as ChunkPolarity });
-      if (!r.id.startsWith(prefix) || !/^\d{2}$/.test(r.id.slice(prefix.length))) err(`ID가 규칙과 다름: 기대 "${prefix}NN"`);
+      const suffix = r.id.slice(prefix.length);
+      if (!r.id.startsWith(prefix) || !RULE_SUFFIX_RE.test(suffix) || ruleOfId(r.id) !== rule) err(`ID가 규칙과 다름: 기대 "${prefix}${rule ?? 'R?'}" (또는 ${rule ?? 'R?'}-2)`);
     }
     if (errors.some((e) => e.line === r.line && e.file === file)) continue;
     chunks.push({
@@ -205,6 +241,7 @@ export function parseKnowledgeFile(text: string, file: string): ParseResult {
       area: area as ChunkArea,
       subject,
       polarity: polarity as ChunkPolarity,
+      rule: rule as AdviceRuleId,
       title: r.title,
       body,
       content,

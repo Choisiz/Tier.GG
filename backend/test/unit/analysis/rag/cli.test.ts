@@ -85,11 +85,11 @@ describe('rag ingest', () => {
   });
   it('--yes: 새 조각만 임베딩·upsert, 다시 하면 "바뀐 조각 0", --prune 없이는 DELETE 없음', async () => {
     const extra = { ...CHUNKS[0]!, id: 'gone.common.ALL.bad.01' };
-    const h = harness([...CHUNKS.slice(0, 60), extra]);
+    const h = harness([...CHUNKS.slice(0, 20), extra]);
     const code = await runRagCli(['ingest', '--yes'], ENV, h.io, h.deps);
     assert.equal(code, 0);
-    assert.equal(h.embedded(), CHUNKS.length - 60);
-    assert.equal(h.f.sql.filter((s) => s === 'INSERT').length, CHUNKS.length - 60);
+    assert.equal(h.embedded(), CHUNKS.length - 20);
+    assert.equal(h.f.sql.filter((s) => s === 'INSERT').length, CHUNKS.length - 20);
     assert.ok(!h.f.sql.includes('DELETE'));
     const h2 = harness(CHUNKS);
     assert.equal(await runRagCli(['ingest', '--yes'], ENV, h2.io, h2.deps), 0);
@@ -104,7 +104,7 @@ describe('rag ingest', () => {
   });
   it('문서에 숫자가 있으면 오류로 멈춤 (종료 코드 1, DB 안 읽음)', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'kn-'));
-    writeFileSync(join(dir, 'adc.md'), '### fight.damage.ADC.bad.01 제목\n- meta: role=ADC, area=fight, subject=fight.damage, polarity=bad\n딜이 22% 낮다. 다음 판에 해 본다.\n');
+    writeFileSync(join(dir, 'adc.md'), '### fight.damage.ADC.bad.R1 제목\n- meta: role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1\n딜이 22% 낮다. 다음 판에 해 본다.\n');
     const h = harness();
     assert.equal(await runRagCli(['ingest', '--dir', dir], ENV, h.io, h.deps), 1);
     assert.match(h.err.join('\n'), /숫자 포함/);
@@ -125,6 +125,6 @@ describe('rag eval', () => {
     assert.equal(h.made(), 1);
     assert.equal(h.embedded(), 20);
     assert.equal(h.f.sql.filter((s) => s === 'SELECT').length, 20);
-    assert.match(h.out.join('\n'), /상위 2개 적중: 기대 조각 \d+\/21 \(\d+\.\d%\)/);
+    assert.match(h.out.join('\n'), /상위 2개 적중: 기대 조각 \d+\/22 \(\d+\.\d%\)/);
   });
 });

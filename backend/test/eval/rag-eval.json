@@ -1,231 +1,294 @@
 {
-  "version": 1,
-  "note": "B4 검색 평가 세트 20문항 (Build B: q05·q14를 새 공통 조각 문항으로 교체). 질의 문장(retrieve.ts queryText와 같은 꼴) + 필터 → 상위 2개 안에 있어야 할 조각 ID. npm run rag -- eval (--check는 네트워크 없이 형식만). 문서 조각 ID가 바뀌면 함께 고친다.",
+  "version": 2,
+  "note": "Q3 검색 평가 세트 20문항: 조각은 조언 규칙(R1~R5)에 연결되고 ID 끝이 규칙이다. 질의 문장(retrieve.ts queryText와 같은 꼴, 끝에 발동 규칙의 근거 이름) + 필터 + rules(그 칸에서 발동한 규칙) → 상위 2개 안에 있어야 할 조각 ID. npm run rag -- eval (--check는 네트워크 없이 형식만). 문서 조각 ID가 바뀌면 함께 고친다.",
   "items": [
     {
       "id": "q01",
-      "query": "딜서폿 챔피언 딜 비중 부족, 오브젝트 싸움 부족, 패배",
+      "query": "딜서폿 오브젝트 전 시야 부족, 오브젝트 싸움 부족, 패배, 반영 비율",
       "role": "SUPPORT_DAMAGE",
       "area": "fight",
-      "subject": "fight.damage",
+      "subject": "fight.vision",
       "polarity": "bad",
+      "rules": [
+        "R1"
+      ],
       "expected": [
-        "fight.damage.SUPPORT_DAMAGE.bad.01"
-      ]
+        "fight.vision.SUPPORT_DAMAGE.bad.R1"
+      ],
+      "note": "세나 판 교전 시야 칸 (R1)"
     },
     {
       "id": "q02",
-      "query": "원딜 챔피언 딜 비중 부족, 데스 먼저, 패배",
-      "role": "ADC",
-      "area": "fight",
-      "subject": "fight.damage",
+      "query": "딜서폿 오브젝트 밖 싸움 득실 부족, 그 밖의 운영 부족, 패배, 반영 비율",
+      "role": "SUPPORT_DAMAGE",
+      "area": "macro",
+      "subject": "macro.advantage",
       "polarity": "bad",
+      "rules": [
+        "R1"
+      ],
       "expected": [
-        "fight.damage.ADC.bad.01"
-      ]
+        "macro.advantage.ALL.bad.R1"
+      ],
+      "note": "딜서폿 조각 없음 → ALL"
     },
     {
       "id": "q03",
-      "query": "원딜 챔피언 딜 비중 부족, 아이템 늦음 중후반 파밍 부족, 패배",
-      "role": "ADC",
+      "query": "딜서폿 오브젝트 싸움 득실 부족, 오브젝트 싸움 부족, 패배, 첫 데스 해석",
+      "role": "SUPPORT_DAMAGE",
       "area": "fight",
-      "subject": "fight.damage",
+      "subject": "fight.advantage",
       "polarity": "bad",
+      "rules": [
+        "R4"
+      ],
       "expected": [
-        "fight.damage.ADC.bad.02"
-      ]
+        "fight.advantage.ALL.bad.R4"
+      ],
+      "note": "세나 판 교전 득실 칸 (R4만)"
     },
     {
       "id": "q04",
-      "query": "탱정글 오브젝트 막타 부족, 오브젝트 싸움 부족, 패배",
-      "role": "JUNGLE_TANK",
-      "area": "fight",
-      "subject": "fight.objective",
+      "query": "탱탑 사이드 압박 부족, 그 밖의 운영 보통, 승리, 반영 비율",
+      "role": "TOP_TANK",
+      "area": "macro",
+      "subject": "macro.side",
       "polarity": "bad",
+      "rules": [
+        "R1"
+      ],
       "expected": [
-        "fight.objective.JUNGLE_TANK.bad.01"
+        "macro.side.TOP_TANK.bad.R1"
       ]
     },
     {
       "id": "q05",
-      "query": "딜서폿 오브젝트 밖 싸움 득실 부족, 그 밖의 운영 부족, 패배",
-      "role": "SUPPORT_DAMAGE",
-      "area": "macro",
-      "subject": "macro.advantage",
-      "polarity": "bad",
-      "expected": [
-        "macro.advantage.ALL.bad.01"
-      ],
-      "note": "딜서폿 조각 없음 → ALL로 넓힘 (Build B 추가 공통 조각)"
-    },
-    {
-      "id": "q06",
-      "query": "탱탑 오브젝트 싸움 득실 부족, 먼저 죽고 싸움 패배",
+      "query": "탱탑 오브젝트 싸움 득실 좋음, 오브젝트 싸움 잘함, 승리, 첫 데스 해석",
       "role": "TOP_TANK",
       "area": "fight",
       "subject": "fight.advantage",
-      "polarity": "bad",
+      "polarity": "good",
+      "rules": [
+        "R4"
+      ],
       "expected": [
-        "fight.advantage.TOP_TANK.bad.01"
+        "fight.advantage.ALL.good.R4"
+      ]
+    },
+    {
+      "id": "q06",
+      "query": "딜정글 오브젝트 막타 부족, 오브젝트 싸움 부족, 패배, 반영 비율",
+      "role": "JUNGLE_DAMAGE",
+      "area": "fight",
+      "subject": "fight.objective",
+      "polarity": "bad",
+      "rules": [
+        "R1"
+      ],
+      "expected": [
+        "fight.objective.JUNGLE_DAMAGE.bad.R1"
       ]
     },
     {
       "id": "q07",
-      "query": "딜탑 오브젝트 싸움 득실 부족, 오브젝트 싸움 부족, 패배",
-      "role": "TOP_DAMAGE",
+      "query": "딜정글 챔피언 딜 비중 부족, 오브젝트 싸움 부족, 패배, 반영 비율, 득실 점수 + 딜 등급",
+      "role": "JUNGLE_DAMAGE",
       "area": "fight",
-      "subject": "fight.advantage",
+      "subject": "fight.damage",
       "polarity": "bad",
-      "expected": [
-        "fight.advantage.ALL.bad.01"
+      "rules": [
+        "R1",
+        "R2"
       ],
-      "note": "딜탑 조각 없음 → ALL로 넓힘"
+      "expected": [
+        "fight.damage.ALL.bad.R1",
+        "fight.damage.ALL.bad.R2"
+      ],
+      "note": "R1·R2 동시 발동"
     },
     {
       "id": "q08",
-      "query": "탱서폿 오브젝트 전 시야 부족, 오브젝트 싸움 부족, 패배",
-      "role": "SUPPORT_TANK",
+      "query": "딜정글 오브젝트 싸움 득실 부족, 오브젝트 싸움 부족, 패배, 득실 점수 + 딜 등급, 첫 데스 해석",
+      "role": "JUNGLE_DAMAGE",
       "area": "fight",
-      "subject": "fight.vision",
+      "subject": "fight.advantage",
       "polarity": "bad",
+      "rules": [
+        "R2",
+        "R4"
+      ],
       "expected": [
-        "fight.vision.SUPPORT_TANK.bad.01"
+        "fight.advantage.ALL.bad.R2",
+        "fight.advantage.ALL.bad.R4"
       ]
     },
     {
       "id": "q09",
-      "query": "유틸서폿 오브젝트 전 시야 좋음, 오브젝트 싸움 잘함, 승리",
-      "role": "SUPPORT_UTILITY",
+      "query": "딜미드 챔피언 딜 비중 부족, 오브젝트 싸움 보통, 승리, 반영 비율",
+      "role": "MID_DAMAGE",
       "area": "fight",
-      "subject": "fight.vision",
-      "polarity": "good",
+      "subject": "fight.damage",
+      "polarity": "bad",
+      "rules": [
+        "R1"
+      ],
       "expected": [
-        "fight.vision.SUPPORT_UTILITY.good.01"
+        "fight.damage.MID_DAMAGE.bad.R1"
       ]
     },
     {
       "id": "q10",
-      "query": "유틸서폿 평소 시야 부족, 그 밖의 운영 부족, 패배",
-      "role": "SUPPORT_UTILITY",
+      "query": "원딜 중후반 파밍 부족, 그 밖의 운영 부족, 패배, 반영 비율",
+      "role": "ADC",
       "area": "macro",
-      "subject": "macro.vision",
+      "subject": "macro.farm",
       "polarity": "bad",
+      "rules": [
+        "R1"
+      ],
       "expected": [
-        "macro.vision.SUPPORT_UTILITY.bad.01"
+        "macro.farm.ADC.bad.R1"
       ]
     },
     {
       "id": "q11",
-      "query": "딜미드 중후반 파밍 부족, 그 밖의 운영 부족, 패배",
-      "role": "MID_DAMAGE",
+      "query": "원딜 단독 킬·데스 부족, 그 밖의 운영 부족, 패배, 단독 킬·데스",
+      "role": "ADC",
       "area": "macro",
-      "subject": "macro.farm",
+      "subject": "macro.solo",
       "polarity": "bad",
+      "rules": [
+        "R5"
+      ],
       "expected": [
-        "macro.farm.MID_DAMAGE.bad.01"
+        "macro.solo.ALL.bad.R5"
       ]
     },
     {
       "id": "q12",
-      "query": "원딜 중후반 파밍 좋음, 그 밖의 운영 잘함, 승리",
+      "query": "원딜 챔피언 딜 비중 부족, 오브젝트 싸움 부족, 패배, 반영 비율",
       "role": "ADC",
-      "area": "macro",
-      "subject": "macro.farm",
-      "polarity": "good",
+      "area": "fight",
+      "subject": "fight.damage",
+      "polarity": "bad",
+      "rules": [
+        "R1"
+      ],
       "expected": [
-        "macro.farm.ADC.good.01"
+        "fight.damage.ADC.bad.R1"
       ]
     },
     {
       "id": "q13",
-      "query": "딜탑 사이드 압박 부족, 그 밖의 운영 보통, 패배",
-      "role": "TOP_DAMAGE",
-      "area": "macro",
-      "subject": "macro.side",
+      "query": "유틸서폿 오브젝트 전 시야 부족, 오브젝트 싸움 부족, 패배, 반영 비율",
+      "role": "SUPPORT_UTILITY",
+      "area": "fight",
+      "subject": "fight.vision",
       "polarity": "bad",
+      "rules": [
+        "R1"
+      ],
       "expected": [
-        "macro.side.TOP_DAMAGE.bad.01"
+        "fight.vision.SUPPORT_UTILITY.bad.R1"
       ]
     },
     {
       "id": "q14",
-      "query": "딜서폿 사이드 압박 좋음, 그 밖의 운영 부족, 패배",
-      "role": "SUPPORT_DAMAGE",
+      "query": "탱서폿 평소 시야 부족, 그 밖의 운영 부족, 패배, 반영 비율",
+      "role": "SUPPORT_TANK",
       "area": "macro",
-      "subject": "macro.side",
-      "polarity": "good",
-      "expected": [
-        "macro.side.ALL.good.01"
+      "subject": "macro.vision",
+      "polarity": "bad",
+      "rules": [
+        "R1"
       ],
-      "note": "딜서폿 조각 없음 → ALL로 넓힘 (Build B 추가 공통 조각)"
+      "expected": [
+        "macro.vision.SUPPORT_TANK.bad.R1"
+      ]
     },
     {
       "id": "q15",
-      "query": "딜서폿 단독 킬·데스 부족, 그 밖의 운영 부족, 패배",
-      "role": "SUPPORT_DAMAGE",
-      "area": "macro",
-      "subject": "macro.solo",
+      "query": "탱정글 오브젝트 막타 부족, 오브젝트 싸움 부족, 패배, 반영 비율",
+      "role": "JUNGLE_TANK",
+      "area": "fight",
+      "subject": "fight.objective",
       "polarity": "bad",
+      "rules": [
+        "R1"
+      ],
       "expected": [
-        "macro.solo.SUPPORT_DAMAGE.bad.01"
+        "fight.objective.JUNGLE_TANK.bad.R1"
       ]
     },
     {
       "id": "q16",
-      "query": "탱미드 단독 킬·데스 부족, 그 밖의 운영 부족, 패배",
+      "query": "탱미드 오브젝트 밖 싸움 득실 부족, 그 밖의 운영 부족, 패배, 반영 비율",
       "role": "MID_TANK",
       "area": "macro",
-      "subject": "macro.solo",
-      "polarity": "bad",
-      "expected": [
-        "macro.solo.ALL.bad.01"
-      ],
-      "note": "탱미드 조각 없음 → ALL로 넓힘"
-    },
-    {
-      "id": "q17",
-      "query": "탱정글 오브젝트 밖 싸움 득실 좋음, 그 밖의 운영 잘함, 승리",
-      "role": "JUNGLE_TANK",
-      "area": "macro",
       "subject": "macro.advantage",
-      "polarity": "good",
+      "polarity": "bad",
+      "rules": [
+        "R1"
+      ],
       "expected": [
-        "macro.advantage.JUNGLE_TANK.good.01"
+        "macro.advantage.MID_TANK.bad.R1"
       ]
     },
     {
-      "id": "q18",
-      "query": "딜서폿 라인전 킬·데스·어시스트 부족, 라인전 열세, 패배",
-      "role": "SUPPORT_DAMAGE",
-      "area": "laning",
-      "subject": "laning.kda",
+      "id": "q17",
+      "query": "딜탑 오브젝트 싸움 득실 부족, 오브젝트 싸움 부족, 패배, 득실 점수 + 딜 등급",
+      "role": "TOP_DAMAGE",
+      "area": "fight",
+      "subject": "fight.advantage",
       "polarity": "bad",
-      "expected": [
-        "laning.kda.ALL.bad.01"
+      "rules": [
+        "R3"
       ],
-      "note": "라인전은 공통 조각"
+      "expected": [
+        "fight.advantage.ALL.bad.R3"
+      ],
+      "note": "R3 (딜은 높음)"
+    },
+    {
+      "id": "q18",
+      "query": "딜미드 중후반 파밍 부족, 그 밖의 운영 보통, 승리, 반영 비율",
+      "role": "MID_DAMAGE",
+      "area": "macro",
+      "subject": "macro.farm",
+      "polarity": "bad",
+      "rules": [
+        "R1"
+      ],
+      "expected": [
+        "macro.farm.MID_DAMAGE.bad.R1"
+      ]
     },
     {
       "id": "q19",
-      "query": "탱미드 라인전 골드 부족, 라인전 열세, 패배",
-      "role": "MID_TANK",
-      "area": "laning",
-      "subject": "laning.gold",
+      "query": "탱정글 평소 시야 부족, 그 밖의 운영 부족, 패배, 반영 비율",
+      "role": "JUNGLE_TANK",
+      "area": "macro",
+      "subject": "macro.vision",
       "polarity": "bad",
+      "rules": [
+        "R1"
+      ],
       "expected": [
-        "laning.gold.MID_TANK.bad.01",
-        "laning.gold.ALL.bad.01"
+        "macro.vision.JUNGLE_TANK.bad.R1"
       ]
     },
     {
       "id": "q20",
-      "query": "원딜 라인전 CS 부족, 라인전 열세, 패배",
-      "role": "ADC",
-      "area": "laning",
-      "subject": "laning.cs",
+      "query": "딜탑 챔피언 딜 비중 부족, 오브젝트 싸움 부족, 패배, 반영 비율",
+      "role": "TOP_DAMAGE",
+      "area": "fight",
+      "subject": "fight.damage",
       "polarity": "bad",
+      "rules": [
+        "R1"
+      ],
       "expected": [
-        "laning.cs.ADC.bad.01"
+        "fight.damage.TOP_DAMAGE.bad.R1"
       ]
     }
   ]

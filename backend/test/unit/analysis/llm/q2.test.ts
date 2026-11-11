@@ -18,13 +18,13 @@ const VISION = ['fight.vision.windowSec', 'fight.vision.perObjective'];
 const V0 = ['scene.fight.vision.0.min', 'scene.fight.vision.0.objective', 'scene.fight.vision.0.wardsPlaced'];
 
 describe('Q2 facts: 기준 시간·장면', () => {
-  it('교전 시야 칸: 기준 60초 + 장면 3개(시각·오브젝트·잡은 팀·와드 수), 세나 첫 장면 = 6.6분 상대가 잡은 용, 와드 0', () => {
+  it('교전 시야 칸: 기준 60초 + 장면 3개(시각·오브젝트·잡은 팀·와드 수), 세나 첫 장면 = 6:35 상대가 잡은 용, 와드 0', () => {
     const ids = slot('fight.bad.0').factIds;
     assert.equal(sheet.byId.get('fight.vision.windowSec')!.value, 60);
     assert.ok(ids.includes('fight.vision.windowSec'));
     for (const i of [0, 1, 2]) assert.ok(ids.includes(`scene.fight.vision.${i}.wardsPlaced`), String(i));
     assert.ok(!ids.includes('scene.fight.vision.3.min'));
-    assert.deepEqual(sheet.byId.get('scene.fight.vision.0.min')!.display, ['6.6', '6']);
+    assert.deepEqual(sheet.byId.get('scene.fight.vision.0.min')!.display, ['6:35']);
     assert.equal(sheet.byId.get('scene.fight.vision.0.objective')!.value, '용');
     assert.equal(sheet.byId.get('scene.fight.vision.0.taken')!.value, '상대 팀이 잡음');
     assert.equal(sheet.byId.get('scene.fight.vision.0.wardsPlaced')!.value, 0);
@@ -55,43 +55,26 @@ describe('Q2 검증기: 은어·막연한 조언 금지', () => {
     assert.ok(!rules('fight.bad.1', '부담을 느낀 것으로 보입니다.', []).includes('forbidden'));
   });
   it('"~해 볼 수 있습니다"·"이어 가"는 실패', () => {
-    assert.ok(rules('fight.bad.0', '다음 판에는 6.6분 용 전에 와드를 두어 볼 수 있습니다.', ['scene.fight.vision.0.min']).includes('forbidden'));
-    assert.ok(rules('fight.bad.0', '다음 판에도 6.6분 용 전 시야를 이어 가세요.', ['scene.fight.vision.0.min']).includes('forbidden'));
+    assert.ok(rules('fight.bad.0', '다음 판에는 6:35 용 전에 와드를 두어 볼 수 있습니다.', ['scene.fight.vision.0.min']).includes('forbidden'));
+    assert.ok(rules('fight.bad.0', '다음 판에도 6:35 용 전 시야를 이어 가세요.', ['scene.fight.vision.0.min']).includes('forbidden'));
   });
 });
 
-describe('Q2 검증기: 조언은 장면 하나를 짚어야 함', () => {
-  it('장면 없는 조언("상대 정글 위치를 확인하고 움직이세요")은 실패', () => {
-    const f = check('macro.bad.1', '다음 판에는 상대 정글 위치를 확인하고 아군 가까이 움직이세요.', []);
-    assert.ok(f.some((x) => x.rule === 'forbidden' && x.detail.startsWith('장면 없는 조언')));
-  });
-  it('장면 fact를 factIds에 적어도 문장에 시각·오브젝트·지역이 없으면 실패', () => {
-    const f = check('fight.bad.0', '다음 판에는 강 입구에 제어 와드를 먼저 두세요.', ['scene.fight.vision.0.wardsPlaced']);
-    assert.ok(f.some((x) => x.detail.startsWith('장면 없는 조언')));
-  });
-  it('장면 시각+오브젝트를 짚고 기준 시간·숫자가 facts와 맞으면 통과', () => {
-    const text =
-      '오브젝트를 잡기 전 60초 동안의 시야 점수가 오브젝트당 0.5로 낮았습니다. 6.6분 상대 팀이 잡은 용 전 60초 동안 내 와드는 0개였습니다. 다음 판에는 용을 잡기 전 60초 안에 아래쪽 강 입구에 제어 와드를 먼저 두세요.';
+// Q2의 "조언은 장면 하나를 짚어야 함" 검사는 Q3에서 "조언은 발동한 규칙의 근거를 인용해야 함"으로 바뀌었다 (q3.test.ts)
+describe('Q2 검증기: 장면·기준 시간 숫자', () => {
+  it('장면 시각+오브젝트를 짚고 기준 시간·숫자가 facts와 맞으면 통과 (조언 없이)', () => {
+    const text = '오브젝트를 잡기 전 60초 동안의 시야 점수가 오브젝트당 0.5로 낮았습니다. 6:35 상대 팀이 잡은 용 전 60초 동안 내 와드는 0개였습니다.';
     assert.deepEqual(check('fight.bad.0', text, [...VISION, ...V0, 'scene.fight.vision.0.taken']), []);
   });
-  it('앞 문장의 시각만으로는 안 됨: 조언 문장 안에서 장면을 짚어야 함', () => {
-    const text = '6.6분 용 전 와드가 0개였습니다. 다음 판에는 강 입구에 제어 와드를 먼저 두세요.';
-    const f = check('fight.bad.0', text, ['scene.fight.vision.0.min', 'scene.fight.vision.0.objective', 'scene.fight.vision.0.wardsPlaced']);
-    assert.ok(f.some((x) => x.detail.startsWith('장면 없는 조언')));
-  });
-  it('지역 이름(괄호 설명 없이)으로 짚어도 통과', () => {
-    const text = '다음 판에는 우리 기지 근처에서 싸움이 날 때 아군이 모인 뒤 들어가세요.';
-    assert.deepEqual(check('macro.bad.1', text, ['scene.macro.advantage.0.region']), []);
-  });
-  it('조언 속 숫자도 facts 검증: 없는 "1분 전"은 실패', () => {
-    const text = '다음 판에는 6.6분 용 1분 전에 강 입구에 제어 와드를 두세요.';
-    assert.ok(rules('fight.bad.0', text, ['scene.fight.vision.0.min', 'scene.fight.vision.0.objective']).includes('number'));
+  it('장면 속 없는 숫자("1분 전")는 실패', () => {
+    const text = '6:35 용 1분 전에 내 와드는 0개였습니다.';
+    assert.ok(rules('fight.bad.0', text, V0).includes('number'));
   });
   it('"60초"는 기준 시간 fact가 factIds에 있을 때만, 단위 "초"', () => {
     assert.ok(rules('fight.bad.0', '오브젝트를 잡기 전 60초 동안 시야가 낮았습니다.', []).includes('number'));
     assert.deepEqual(rules('fight.bad.0', '오브젝트를 잡기 전 60초 동안 시야가 낮았습니다.', ['fight.vision.windowSec']), []);
   });
-  it('조언 없는 문장은 장면이 없어도 통과 (조언은 선택)', () => {
+  it('조언 없는 문장은 장면이 없어도 통과', () => {
     assert.deepEqual(rules('macro.good.0', '분당 포탑 피해량이 87.4로 사이드 압박이 좋았습니다.', ['macro.side.perMinute']), []);
   });
 });
@@ -104,16 +87,16 @@ describe('Q2 템플릿', () => {
         const t = templateFor(sh, s);
         assert.doesNotMatch(t.text, /낀|다음 판/, `${id} ${s.slot}`);
         assert.deepEqual(verifySlot(s, t, ctxOf(sh)), [], `${id} ${s.slot}`);
-        if (s.subjectId === 'fight.advantage') assert.match(t.text, /앞뒤 40초 동안 내가 참여한 싸움.*\d분/, `${id} ${s.slot}`);
+        if (s.subjectId === 'fight.advantage') assert.match(t.text, /앞뒤 40초 동안 내가 참여한 싸움.*\d+:\d\d/, `${id} ${s.slot}`);
         if (s.subjectId === 'macro.advantage') assert.match(t.text, /앞뒤 40초 밖에서 내가 참여한 싸움/, `${id} ${s.slot}`);
-        if (s.subjectId === 'fight.vision') assert.match(t.text, /잡기 전 60초 동안.*\d분 .+ 60초 동안 내가 설치한 와드는 \d+개/, `${id} ${s.slot}`);
+        if (s.subjectId === 'fight.vision') assert.match(t.text, /잡기 전 60초 동안.*\d+:\d\d에 잡힌 .+ 전 60초 동안 내가 설치한 와드는 \d+개/, `${id} ${s.slot}`);
       }
     }
   });
   it('세나 판 교전 시야 템플릿 문장 고정', () => {
     assert.equal(
       templateFor(sheet, slot('fight.bad.0')).text,
-      '오브젝트를 잡기 전 60초 동안의 시야 점수가 오브젝트당 0.5로 낮았습니다. 6.6분 용을 잡기 전 60초 동안 내가 설치한 와드는 0개였습니다.',
+      '오브젝트를 잡기 전 60초 동안의 시야 점수가 오브젝트당 0.5로 낮았습니다. 6:35에 잡힌 용 전 60초 동안 내가 설치한 와드는 0개였습니다.',
     );
   });
 });
@@ -122,11 +105,11 @@ describe('Q2 프롬프트·지식 조각', () => {
   it('시스템 프롬프트에 장면·조언 규칙과 기준 시간 규칙이 있다', () => {
     assert.match(SYSTEM_PROMPT, /9-1\. 기준 시간/);
     assert.match(SYSTEM_PROMPT, /## 장면과 조언/);
-    assert.match(SYSTEM_PROMPT, /언제.*어디서.*무엇을/);
+    assert.match(SYSTEM_PROMPT, /조언은 규칙이 있는 칸만/);
   });
   it('조각에 "낀"·"볼 수 있다"·"이어 가"가 있으면 오류 (경고 아님)', () => {
     const doc = (body: string) =>
-      `# t\n\n### fight.vision.ALL.bad.01 시야 낮을 때\n- meta: role=ALL, area=fight, subject=fight.vision, polarity=bad\n${body}\n`;
+      `# t\n\n### fight.vision.ALL.bad.R1 시야 낮을 때\n- meta: role=ALL, area=fight, subject=fight.vision, polarity=bad, rule=R1\n${body}\n`;
     for (const body of ['시야가 낮았을 수 있다. 다음 판에는 와드를 두어 볼 수 있다.', '낀 싸움이 많았을 수 있다. 다음 판에는 와드를 먼저 둔다.', '시야가 낮았을 수 있다. 다음 판에도 와드를 이어 가며 둔다.']) {
       const r = parseKnowledgeFile(doc(body), 't.md');
       assert.equal(r.errors.length, 1, body);

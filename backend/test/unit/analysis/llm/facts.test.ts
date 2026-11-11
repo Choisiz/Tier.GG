@@ -1,7 +1,7 @@
 // facts (ai_spec 2-4): 세나 판 값, 표기 규칙, 등급·점수 제외, 칸 구성
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { minuteDisplay, numberDisplay } from '../../../../src/analysis/llm/facts.js';
+import { numberDisplay, timeDisplay } from '../../../../src/analysis/llm/facts.js';
 import { buildUserMessage, type UserPayload } from '../../../../src/analysis/llm/prompt.js';
 import { senaSheet, set5Sheet } from './helpers.js';
 
@@ -23,16 +23,18 @@ describe('facts: 표기 규칙', () => {
     assert.deepEqual(numberDisplay(0.5), ['0.5']);
     assert.deepEqual(numberDisplay(0.96), ['0.96']); // 1.0(정수)로 반올림한 표기는 허용하지 않는다
   });
-  it('초 → 분: 첫째 자리 반올림과 내림한 정수', () => {
-    assert.deepEqual(minuteDisplay(904.8), ['15.1', '15']);
-    assert.deepEqual(minuteDisplay(900), ['15']);
-    assert.deepEqual(minuteDisplay(1000.4), ['16.7', '16']);
+  it('초 → 게임 시계 분:초 (Q3, 초는 반올림)', () => {
+    assert.deepEqual(timeDisplay(904.8), ['15:05']);
+    assert.deepEqual(timeDisplay(900), ['15:00']);
+    assert.deepEqual(timeDisplay(1000.4), ['16:40']);
+    assert.deepEqual(timeDisplay(59.6), ['1:00']);
+    assert.deepEqual(timeDisplay(149), ['2:29']);
   });
 });
 
 describe('facts: 세나 판 값', () => {
-  it('라인전: 15분, 골드 3,958:4,661 차이 703 (어림 100), 상대 애쉬', () => {
-    assert.deepEqual(fact('laning.referenceMin').display, ['15']);
+  it('라인전: 15:00, 골드 3,958:4,661 차이 703 (어림 100), 상대 애쉬', () => {
+    assert.deepEqual(fact('laning.referenceMin').display, ['15:00']);
     assert.equal(fact('laning.gold.me').value, 3958);
     assert.equal(fact('laning.gold.enemy').value, 4661);
     assert.equal(fact('laning.gold.diffAbs').value, 703);
@@ -47,8 +49,8 @@ describe('facts: 세나 판 값', () => {
     assert.equal(fact('laning.kda.me.deaths').value, 2);
     assert.equal(fact('laning.deathsBefore.count').value, 2);
   });
-  it('결정적 장면 0: 15.1분, 킬 5, 격차 변화 3,895, 상대 팀 우세에서 시작', () => {
-    assert.deepEqual(fact('keyMoment.0.startMin').display, ['15.1', '15']);
+  it('결정적 장면 0: 15:05, 킬 5, 격차 변화 3,895, 상대 팀 우세에서 시작', () => {
+    assert.deepEqual(fact('keyMoment.0.startMin').display, ['15:05']);
     assert.equal(fact('keyMoment.0.kills').value, 5);
     assert.equal(fact('keyMoment.0.gapChangeAbs').value, 3895);
     assert.equal(fact('keyMoment.0.leaderBefore').value, '상대 팀');
@@ -64,9 +66,10 @@ describe('facts: 세나 판 값', () => {
   });
 });
 
-describe('facts: 등급·점수·반영 비율은 넣지 않는다', () => {
+describe('facts: 등급·점수·반영 비율은 넣지 않는다 (Q3: 발동한 규칙의 근거 rule.* 는 예외)', () => {
   it('id와 label에 grade·score·impact·weight·total이 없음', () => {
     for (const f of sheet.facts) {
+      if (f.id.startsWith('rule.')) continue;
       assert.doesNotMatch(f.id, /grade|score|impact|weight|total|\.ours$|\.theirs$|lastHitPoints/i, f.id);
       assert.doesNotMatch(f.label, /등급|총점|반영/, f.label);
     }

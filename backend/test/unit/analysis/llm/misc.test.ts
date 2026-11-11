@@ -111,7 +111,7 @@ describe('녹화본 재생 (0원)', () => {
   it('가짜 응답을 녹화한 뒤 재생하면 같은 결과, 요청 해시 일치', async () => {
     const wrong = passingAnswer(sheet);
     wrong.sections.laning.bad[0]!.text = '골드가 800 적었습니다.';
-    const fix = { fixes: [{ slot: 'laning.bad.0', text: '15분 골드가 상대 애쉬보다 703 적었습니다.', factIds: ['laning.referenceMin', 'laning.opponent', 'laning.gold.diffAbs'] }] };
+    const fix = { fixes: [{ slot: 'laning.bad.0', text: '15:00 골드가 상대 애쉬보다 703 적었습니다.', factIds: ['laning.referenceMin', 'laning.opponent', 'laning.gold.diffAbs'] }] };
     const calls: RecordedCall[] = [];
     const base = { model: 'claude-opus-5-5', effort: 'low' as const, budgetUsd: 1, allChampionNames: ALL_NAMES, now: () => 0 };
     const live = await generateTexts(sheet, {

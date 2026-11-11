@@ -1,8 +1,10 @@
 // facts: LLM이 문장에 쓸 수 있는 숫자·이름 목록 (ai_spec 2-4).
 // 엔진 결과(AnalysisResult)만 입력으로 하는 순수 함수. 엔진을 고치지 않고 파생값(차이 절댓값, 분 단위 시각)을 여기서 만든다.
 // 등급·등급 점수·과목 점수·impact·반영 비율·총점은 넣지 않는다.
+import { ADVICE_RULES, METRIC_LABEL, rulesFor } from '../advice.js';
+import { DAMAGE_PHASES } from '../rules.js';
 import { ROLE_LABEL } from '../role.js';
-import type { AnalysisResult, FactValue, FightScene, ObjectiveScene, PlayScene, Scenes } from '../types.js';
+import type { AdviceRuleId, AnalysisResult, FactValue, FightScene, FiredRule, ObjectiveScene, PlayScene, Scenes } from '../types.js';
 import { AREA_LABEL, FIRST_DEATH_LABEL, followUpLabel, OBJECTIVE_LABEL, REGION_LABEL, SUBJECT_FACT_LABEL, SUBJECT_LABEL, type Area } from './labels.js';
 
 export interface Fact {
@@ -18,6 +20,21 @@ export interface Fact {
 
 export type SlotKind = 'good' | 'bad';
 
+/** 칸에 붙은 조언 규칙 (Q3). 조언 문장은 이 규칙이 있을 때만, required fact를 인용해야 쓸 수 있다 */
+export interface SlotRule {
+  id: AdviceRuleId;
+  /** 조언 요지 (advice.ts ADVICE_RULES) */
+  gist: string;
+  /** 행동 조언을 허용하는 규칙인가 (R4는 해석 문장만) */
+  action: boolean;
+  /** 문장에 반드시 인용할 fact ID */
+  required: string[];
+  /** 이 규칙의 fact ID 전체 (required 포함) */
+  factIds: string[];
+  /** R4: 5-4-1 표 문장 (그대로 써야 함) */
+  text?: string;
+}
+
 export interface Slot {
   /** summary | laning.bad.0 | fight.good.1 | keyMoment.0 */
   slot: string;
@@ -28,6 +45,8 @@ export interface Slot {
   index: number | null;
   /** 이 칸에서 쓸 수 있는 fact ID (공통 fact 포함) */
   factIds: string[];
+  /** 이 칸에서 발동한 조언 규칙 (Q3). 없으면 빈 배열 = 조언 문장 금지 */
+  rules: SlotRule[];
 }
 
 export interface FactSheet {
@@ -62,12 +81,14 @@ export function numberDisplay(v: number): string[] {
   return uniq(out);
 }
 
-/** 초 → 분 표기: 첫째 자리 반올림 "N.N"과 내림한 정수 분 "N" (게임 시계 읽는 법) */
-export function minuteDisplay(sec: number): string[] {
-  const m1 = round(sec / 60, 1);
-  const floor = Math.floor(sec / 60);
-  return uniq([String(m1), String(floor)]);
+/** 초 → 게임 시계 표기 "분:초" (Q3, 2026-11-11 사용자 요청: "15.1분" → "15:06"). 초는 반올림 */
+export function timeDisplay(sec: number): string[] {
+  const total = Math.max(0, Math.round(sec));
+  return [`${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`];
 }
+
+/** 시각 fact의 단위 (게임 시계, 분:초로만 쓴다) */
+export const TIME_UNIT = '시각';
 
 function uniq(xs: string[]): string[] {
   return [...new Set(xs)];
@@ -81,8 +102,9 @@ class Builder {
     return this.push({ id, label, value, unit, display: numberDisplay(value), ...(approx ? { approx: { step: approx } } : {}) });
   }
 
+  /** 게임 시각 (값 = 초, 표기 = 분:초) */
   min(id: string, label: string, sec: number): string {
-    return this.push({ id, label, value: round(sec / 60, 2), unit: '분', display: minuteDisplay(sec) });
+    return this.push({ id, label, value: Math.max(0, Math.round(sec)), unit: TIME_UNIT, display: timeDisplay(sec) });
   }
 
   text(id: string, label: string, value: string): string {
@@ -170,6 +192,8 @@ export function buildFacts(result: AnalysisResult, championNames: ReadonlyMap<nu
           subjectId,
           index: null,
           factIds: [...common, ...laneCommon, ...(perItem.get(subjectId) ?? [])],
+          // 라인전에는 조언 규칙이 없다 (Q3: 라인전 조언은 쓰지 않음)
+          rules: [],
         });
       });
     }
@@ -182,7 +206,9 @@ export function buildFacts(result: AnalysisResult, championNames: ReadonlyMap<nu
         const subject = result[area].subjects.find((s) => s.id === subjectId);
         const ids = subject ? subjectFacts(b, subjectId, subject.facts) : [];
         if (result.scenes) ids.push(...sceneFacts(b, subjectId, result.scenes));
-        slots.push({ slot: `${area}.${kind}.${i}`, area, kind, subjectId, index: null, factIds: [...common, ...ids] });
+        const rules = rulesFor(result.advice, subjectId, kind).map((r) => ruleFacts(b, r, result, championNames));
+        for (const r of rules) ids.push(...r.factIds);
+        slots.push({ slot: `${area}.${kind}.${i}`, area, kind, subjectId, index: null, factIds: [...common, ...ids], rules });
       });
     }
   }
@@ -212,7 +238,7 @@ export function buildFacts(result: AnalysisResult, championNames: ReadonlyMap<nu
     return ids;
   });
   result.keyMoments.forEach((_, i) => {
-    slots.push({ slot: `keyMoment.${i}`, area: 'keyMoment', kind: null, subjectId: null, index: i, factIds: [...common, ...kmIds[i]!] });
+    slots.push({ slot: `keyMoment.${i}`, area: 'keyMoment', kind: null, subjectId: null, index: i, factIds: [...common, ...kmIds[i]!], rules: [] });
   });
 
   // ---------- 요약 ----------
@@ -224,6 +250,7 @@ export function buildFacts(result: AnalysisResult, championNames: ReadonlyMap<nu
     subjectId: null,
     index: null,
     factIds: [...common, ...(kmi !== null ? (kmIds[kmi] ?? []) : [])],
+    rules: [],
   });
 
   // ---------- 해석 노트 (점수 밖 추정) ----------
@@ -393,3 +420,76 @@ function subjectFacts(b: Builder, subjectId: string, facts: Record<string, FactV
 }
 
 export const AREA_NAMES = AREA_LABEL;
+
+// ---------- 조언 규칙 facts (Q3) ----------
+
+const pct = (v: FactValue | undefined): number | null => (typeof v === 'number' ? v : null);
+
+/** 규칙 하나 → rule.* facts + 칸 규칙 정보 */
+function ruleFacts(b: Builder, r: FiredRule, result: AnalysisResult, championNames: ReadonlyMap<number, string>): SlotRule {
+  const meta = ADVICE_RULES[r.id];
+  const ids: string[] = [];
+  const req: string[] = [];
+  const f = r.facts;
+  const need = (id: string) => {
+    ids.push(id);
+    req.push(id);
+  };
+  switch (r.id) {
+    case 'R1': {
+      const p = `rule.R1.${r.subjectId}`;
+      const [label, unit] = METRIC_LABEL[r.subjectId] ?? [SUBJECT_LABEL[r.subjectId] ?? r.subjectId, ''];
+      const subjectName = SUBJECT_LABEL[r.subjectId] ?? r.subjectId;
+      need(b.num(`${p}.weight`, `이 유형에서 ${subjectName}의 반영 비율 (영역 합 100)`, Number(f.weight), ''));
+      need(b.num(`${p}.me`, `${label} (나)`, Number(f.me), unit));
+      if (typeof f.opponent === 'number') {
+        const oppId = result.laning?.opponent.championId;
+        const who = oppId !== undefined ? `상대 라이너 ${championNames.get(oppId) ?? ''}`.trim() : '상대 라이너';
+        need(b.num(`${p}.opponent`, `${label} (${who})`, f.opponent, unit));
+      }
+      break;
+    }
+    case 'R2':
+    case 'R3': {
+      const p = `rule.${r.id}`;
+      need(b.num(`${p}.myDeaths`, '내가 참여한 오브젝트 싸움에서 내 데스 수', Number(f.myDeaths), '번'));
+      need(b.num(`${p}.deathPoints`, `내 데스로 상대 팀이 얻은 득실 점수 (데스 1번 = 내 포지션 점수 ${f.pointsPerDeath})`, Number(f.deathPoints), '점'));
+      ids.push(b.num(`${p}.pointsPerDeath`, '데스 1번에 상대 팀이 얻는 득실 점수 (내 포지션)', Number(f.pointsPerDeath), '점'));
+      const share = pct(f.sharePct);
+      if (share !== null) ids.push(b.num(`${p}.sharePct`, '오브젝트 싸움 득실 중 우리 팀 몫', share, '%'));
+      const ds = pct(f.damageShare);
+      const de = pct(f.damageExpected);
+      const k = typeof f.damagePhase === 'number' ? f.damagePhase : null;
+      if (ds !== null && de !== null && k !== null) {
+        const [from, to] = DAMAGE_PHASES[k]!;
+        const span = Number.isFinite(to) ? `${from}~${to}분` : `${from}분 이후`;
+        const dsId = b.num(`${p}.damageShare`, `${span} 구간 챔피언 딜 비중`, ds, '%');
+        if (r.id === 'R2') need(dsId);
+        else ids.push(dsId);
+        ids.push(b.num(`${p}.damageExpected`, `${span} 구간 이 유형의 기대 딜 비중`, de, '%'));
+      }
+      if (r.id === 'R3' && typeof f.keyMomentIndex === 'number') {
+        const km = result.keyMoments[f.keyMomentIndex];
+        if (km) ids.push(b.min(`keyMoment.${f.keyMomentIndex}.startMin`, `${f.keyMomentIndex + 1}번째 장면 싸움 시작`, km.startSec));
+      }
+      break;
+    }
+    case 'R4': {
+      const p = `rule.R4.${r.kind}`;
+      const who = f.firstVictimIsMe ? '내가' : '우리 팀 다른 사람이';
+      const role = f.tank ? '탱커' : '딜러';
+      if (typeof f.deathSec === 'number') need(b.min(`${p}.deathMin`, '우리 팀이 먼저 죽은 싸움의 첫 데스 시각', f.deathSec));
+      need(b.text(`${p}.firstDeath`, '그 싸움에서 먼저 죽은 사람', `${who} 먼저 죽음(${role})`));
+      need(b.text(`${p}.outcome`, '그 싸움 결과 (득실 기준)', f.won ? '우리 팀이 더 얻음' : '상대 팀이 더 얻음'));
+      return { id: r.id, gist: meta.gist, action: meta.action, required: req, factIds: ids, text: String(f.text) };
+    }
+    case 'R5': {
+      const p = 'rule.R5';
+      if (typeof f.deathSec === 'number') need(b.min(`${p}.deathMin`, '오브젝트 싸움 밖 단독 데스 시각', f.deathSec));
+      if (typeof f.region === 'string') need(b.text(`${p}.region`, '그 단독 데스 지역', REGION_LABEL[f.region] ?? f.region));
+      ids.push(b.num(`${p}.enemies`, '그 단독 데스에 관여한 상대 수', Number(f.enemies), '명'));
+      break;
+    }
+  }
+  return { id: r.id, gist: meta.gist, action: meta.action, required: req, factIds: ids };
+}

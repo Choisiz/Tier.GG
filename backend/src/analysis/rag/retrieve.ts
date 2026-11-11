@@ -1,12 +1,14 @@
 // RAG 검색 (ai_spec B4-3, F-5): 엔진이 말하기로 고른 과목마다 관점 조각을 찾는다.
 // 1) 과목마다 짧은 질의 문장 → 2) 질의 전체를 임베딩 1번(한 요청)에 → 3) 과목마다 search_rag_chunks(필터 + 뜻 순위)
 // → 4) 그 유형 조각을 먼저, 없으면 role=ALL 조각으로 넓힘 → 5) 과목당 2개, 판당 8개, 같은 조각은 한 번.
+// Q3: 조언 규칙이 발동한 칸만 검색하고, ID 끝 규칙(.R1 등)이 그 칸의 규칙인 조각만 쓴다 (규칙 칸이 없는 옛 조각은 버림).
 // DB·임베딩 함수는 주입받는다 (단위 테스트는 가짜). 판정·숫자는 건드리지 않는다.
+import { ADVICE_RULES, rulesFor } from '../advice.js';
 import { ROLE_LABEL } from '../role.js';
 import { MAX_PER_KIND } from '../llm/facts.js';
 import { AREA_LABEL, SUBJECT_LABEL, type Area } from '../llm/labels.js';
-import type { AnalysisResult, Role } from '../types.js';
-import { ROLE_POSITION, roleOfId, type ChunkPolarity, type ChunkPosition, type ChunkRole } from './chunks.js';
+import type { AdviceRuleId, AnalysisResult, Role } from '../types.js';
+import { ROLE_POSITION, roleOfId, ruleOfId, type ChunkPolarity, type ChunkPosition, type ChunkRole } from './chunks.js';
 import { toVectorLiteral, type EmbedFn } from './voyage.js';
 
 export const RAG_LIMITS = {
@@ -14,8 +16,8 @@ export const RAG_LIMITS = {
   perSubject: 2,
   /** 판당 상한 (토큰 비용 상한) */
   perGame: 8,
-  /** 과목마다 DB에서 받아 오는 후보 수 (유형 조각을 먼저 고르려고 조금 넉넉히) */
-  candidates: 6,
+  /** 과목마다 DB에서 받아 오는 후보 수 (유형 조각을 먼저 고르고 규칙으로 거르려고 넉넉히. Q3에서 6 → 10) */
+  candidates: 10,
 } as const;
 
 /** search_rag_chunks 한 줄 (계약 v9 12-2) */
@@ -86,17 +88,20 @@ export interface RagTarget {
   kind: 'good' | 'bad';
   subjectId: string;
   query: string;
+  /** 이 칸에서 발동한 규칙 (Q3). 이 규칙의 조각만 쓴다 */
+  rules: AdviceRuleId[];
 }
 
-/** 질의 문장: 유형 + 과목 + 좋음/부족 + 영역 판정 + 승패 (숫자 없이 짧게) */
-export function queryText(role: Role, area: Area, subjectId: string, kind: 'good' | 'bad', verdict: string | null, win: boolean): string {
+/** 질의 문장: 유형 + 과목 + 좋음/부족 + 영역 판정 + 승패 (+ Q3 발동 규칙의 근거 이름) (숫자 없이 짧게) */
+export function queryText(role: Role, area: Area, subjectId: string, kind: 'good' | 'bad', verdict: string | null, win: boolean, rules: readonly AdviceRuleId[] = []): string {
   const parts = [`${ROLE_LABEL[role]} ${SUBJECT_LABEL[subjectId] ?? subjectId} ${kind === 'good' ? '좋음' : '부족'}`];
   if (verdict) parts.push(`${AREA_LABEL[area]} ${verdict}`);
   parts.push(win ? '승리' : '패배');
+  for (const r of rules) parts.push(ADVICE_RULES[r].basis.replace(/\s*\(.*?\)/g, ''));
   return parts.join(', ');
 }
 
-/** 엔진 결과에서 검색할 과목들. 칸(facts.ts)과 같은 순서·개수 (영역마다 좋은 점·부족한 점 최대 2개) */
+/** 엔진 결과에서 검색할 과목들. 칸(facts.ts)과 같은 순서·개수 (영역마다 좋은 점·부족한 점 최대 2개). Q3: 규칙이 발동한 칸만 (라인전은 규칙이 없다) */
 export function ragTargets(result: AnalysisResult): RagTarget[] {
   const out: RagTarget[] = [];
   const verdict: Record<Area, string | null> = { laning: result.summary.laning, fight: result.summary.fight, macro: result.summary.macro };
@@ -105,12 +110,15 @@ export function ragTargets(result: AnalysisResult): RagTarget[] {
     if (area === 'laning' && result.laning === null) continue;
     for (const kind of ['bad', 'good'] as const) {
       result.speakOrder[area][kind].slice(0, MAX_PER_KIND).forEach((subjectId, i) => {
+        const rules = [...new Set(rulesFor(result.advice, subjectId, kind).map((r) => r.id))];
+        if (rules.length === 0) return;
         out.push({
           key: `${area}.${kind}.${i}`,
           area,
           kind,
           subjectId,
-          query: queryText(result.player.role, area, subjectId, kind, verdict[area], result.player.win),
+          query: queryText(result.player.role, area, subjectId, kind, verdict[area], result.player.win, rules),
+          rules,
         });
       });
     }
@@ -144,12 +152,15 @@ export interface RetrieveOutcome {
 export interface RetrieveDeps {
   embed: EmbedFn;
   search: SearchFn;
-  limits?: Partial<typeof RAG_LIMITS>;
+  limits?: Partial<Record<keyof typeof RAG_LIMITS, number>>;
 }
 
-/** 후보 줄에서 과목 하나에 쓸 조각을 고른다: 그 유형 조각을 거리순으로 먼저, 모자라면 ALL 조각으로 채움 */
-export function pickForSubject(rows: readonly RagRow[], role: Role, subjectId: string, perSubject: number): { rows: RagRow[]; widened: boolean } {
-  const bySubject = rows.filter((r) => r.subject === null || r.subject === subjectId);
+/**
+ * 후보 줄에서 과목 하나에 쓸 조각을 고른다: 그 유형 조각을 거리순으로 먼저, 모자라면 ALL 조각으로 채움.
+ * rules(Q3): 이 칸의 규칙에 연결한 조각만 (ID 끝 규칙). 규칙 칸이 없는 옛 조각은 쓰지 않는다.
+ */
+export function pickForSubject(rows: readonly RagRow[], role: Role, subjectId: string, perSubject: number, rules: readonly AdviceRuleId[]): { rows: RagRow[]; widened: boolean } {
+  const bySubject = rows.filter((r) => (r.subject === null || r.subject === subjectId) && rules.includes(ruleOfId(r.id) as AdviceRuleId));
   const byDist = [...bySubject].sort((a, b) => a.distance - b.distance || (a.id < b.id ? -1 : 1));
   const own = byDist.filter((r) => roleOfId(r.id) === role);
   const all = byDist.filter((r) => roleOfId(r.id) === 'ALL');
@@ -162,7 +173,7 @@ export async function retrieveKnowledge(result: AnalysisResult, deps: RetrieveDe
   const limits = { ...RAG_LIMITS, ...deps.limits };
   const targets = ragTargets(result);
   const notes: string[] = [];
-  if (targets.length === 0) return { chunks: [], picks: [], queries: 0, notes: ['말할 과목 없음'] };
+  if (targets.length === 0) return { chunks: [], picks: [], queries: 0, notes: ['조언 규칙이 발동한 칸 없음 → 검색 안 함'] };
 
   const vectors = await deps.embed(
     targets.map((t) => t.query),
@@ -188,7 +199,7 @@ export async function retrieveKnowledge(result: AnalysisResult, deps: RetrieveDe
   );
 
   const picks: RagPick[] = targets.map((t, i) => {
-    const p = pickForSubject(rowsPer[i]!, role, t.subjectId, limits.perSubject);
+    const p = pickForSubject(rowsPer[i]!, role, t.subjectId, limits.perSubject, t.rules);
     if (p.widened) notes.push(`${t.key} ${t.subjectId}: 유형 조각 없음 → ALL 조각`);
     if (p.rows.length === 0) notes.push(`${t.key} ${t.subjectId}: 맞는 조각 없음`);
     return { key: t.key, subjectId: t.subjectId, ids: p.rows.map((r) => r.id), widened: p.widened };

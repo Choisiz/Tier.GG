@@ -17,7 +17,7 @@ import { applyIngest, planIngest, readStored } from '../analysis/rag/ingest.js';
 import { pgSearch, pickForSubject, RAG_LIMITS, type RagDb } from '../analysis/rag/retrieve.js';
 import { createVoyageEmbed, VOYAGE_MODEL, type EmbedFn } from '../analysis/rag/voyage.js';
 import type { Area } from '../analysis/llm/labels.js';
-import type { Role } from '../analysis/types.js';
+import type { AdviceRuleId, Role } from '../analysis/types.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const RAG_DEFAULTS = {
@@ -51,6 +51,8 @@ export interface EvalItem {
   area: Area;
   subject: string;
   polarity: 'good' | 'bad';
+  /** 그 칸에서 발동한 규칙 (Q3). 이 규칙의 조각만 고른다 */
+  rules: AdviceRuleId[];
   expected: string[];
   note?: string;
 }
@@ -175,7 +177,7 @@ export function readEvalSet(path: string): EvalItem[] {
   return json.items;
 }
 
-/** 평가 세트 검사 (네트워크 없음): 기대 조각이 문서에 있고, 필터(유형·영역·과목·방향)로 검색될 수 있는지 */
+/** 평가 세트 검사 (네트워크 없음): 기대 조각이 문서에 있고, 필터(유형·영역·과목·방향·규칙)로 검색될 수 있는지 */
 export function checkEvalSet(items: readonly EvalItem[], chunks: readonly KnowledgeChunk[]): string[] {
   const byId = new Map(chunks.map((c) => [c.id, c]));
   const problems: string[] = [];
@@ -185,6 +187,7 @@ export function checkEvalSet(items: readonly EvalItem[], chunks: readonly Knowle
     seen.add(it.id);
     if (!isRole(it.role) || !isArea(it.area) || !['good', 'bad'].includes(it.polarity) || !it.query) problems.push(`${it.id}: 필터·질의 형식 오류`);
     if (!Array.isArray(it.expected) || it.expected.length === 0) problems.push(`${it.id}: expected 없음`);
+    if (!Array.isArray(it.rules) || it.rules.length === 0) problems.push(`${it.id}: rules 없음 (Q3: 발동 규칙)`);
     for (const e of it.expected ?? []) {
       const c = byId.get(e);
       if (!c) {
@@ -196,7 +199,8 @@ export function checkEvalSet(items: readonly EvalItem[], chunks: readonly Knowle
         (c.position === ROLE_POSITION[it.role] || c.position === 'ALL') &&
         (c.area === it.area || c.area === 'general') &&
         (c.subject === null || c.subject === it.subject) &&
-        (c.polarity === it.polarity || c.polarity === 'any');
+        (c.polarity === it.polarity || c.polarity === 'any') &&
+        (it.rules ?? []).includes(c.rule);
       if (!ok) problems.push(`${it.id}: ${e}는 이 문항의 필터로 검색되지 않음`);
     }
   }
@@ -239,7 +243,7 @@ async function evaluate(values: Record<string, unknown>, env: NodeJS.ProcessEnv,
         championId: null,
         limit: RAG_LIMITS.candidates,
       });
-      const top = pickForSubject(rows, it.role, it.subject, RAG_LIMITS.perSubject).rows.map((r) => r.id);
+      const top = pickForSubject(rows, it.role, it.subject, RAG_LIMITS.perSubject, it.rules).rows.map((r) => r.id);
       const got = it.expected.filter((e) => top.includes(e)).length;
       hit += got;
       total += it.expected.length;

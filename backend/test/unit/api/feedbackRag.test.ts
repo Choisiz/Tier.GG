@@ -45,7 +45,7 @@ describe('피드백 서비스 + RAG', () => {
     assert.equal(r.calls, 1);
     assert.equal(dto.mode, 'llm');
     assert.equal(dto.meta.knowledgeVersion, 'abc123def456');
-    assert.equal(dto.meta.promptVersion, '2026-11-10.2');
+    assert.equal(dto.meta.promptVersion, '2026-11-11.2');
     const req = h.client!.requests[0]!;
     assert.ok(req.system.length > SYSTEM_PROMPT.length);
     assert.match(String(req.messages[0]!.content), /<chunk id="fight\.vision\.SUPPORT_DAMAGE\.bad\.01">/);

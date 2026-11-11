@@ -59,7 +59,7 @@ describe('템플릿: 요약·결정적 장면 (벌어짐/좁혀짐)', () => {
   it('세나 요약 템플릿 문장', () => {
     const sheet = buildFacts(senaResult(5), NAMES);
     const t = templateFor(sheet, sheet.slots[0]!);
-    assert.equal(t.text, '라인전은 열세였고, 오브젝트 싸움은 부족했고, 그 밖의 운영은 부족했습니다. 15.1분 킬 5개가 난 싸움 뒤 골드 격차가 3,895 벌어졌습니다.');
+    assert.equal(t.text, '라인전은 열세였고, 오브젝트 싸움은 부족했고, 그 밖의 운영은 부족했습니다. 15:05에 킬 5개가 난 싸움 뒤 골드 격차가 3,895 벌어졌습니다.');
   });
 });
 
@@ -99,7 +99,7 @@ describe('템플릿: 기준선 5판(set5) 모든 칸이 새 검증기를 통과 
     assert.deepEqual(fails, []);
     const adc = set5Sheet('KR_8419447142');
     const km0 = templateFor(adc, adc.slots.find((s) => s.slot === 'keyMoment.0')!);
-    assert.equal(km0.text, '23.6분 킬 3개가 난 싸움 뒤 골드가 앞선 팀이 우리 팀에서 상대 팀으로 바뀌었고, 우리 팀이 골드 4,376 손해를 봤습니다. 이어서 우리 미드 2차 포탑을 잃었습니다.');
+    assert.equal(km0.text, '23:39에 킬 3개가 난 싸움 뒤 골드가 앞선 팀이 우리 팀에서 상대 팀으로 바뀌었고, 우리 팀이 골드 4,376 손해를 봤습니다. 이어서 우리 미드 2차 포탑을 잃었습니다.');
     assert.ok(km0.factIds.includes('keyMoment.0.swingAbs'));
     assert.ok(!km0.factIds.some((x) => x.endsWith('gapChangeAbs')));
   });

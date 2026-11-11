@@ -11,9 +11,9 @@ import { fakeGame, kill, monster, puuidOf, TAGS, ward } from './helpers.js';
 describe('판정 불변 (Q2: 장면을 더해도 등급·점수·말할 과목이 그대로)', () => {
   const stored = JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8')) as { engineVersion: string; games: Record<string, EngineSnapshot> };
   const now = allSnapshots();
-  it('스냅숏은 Q2 전 엔진(2026-11-02.2)에서 만든 것이고 지금 엔진 버전은 올라갔다', () => {
+  it('스냅숏은 Q2 전 엔진(2026-11-02.2)에서 만든 것이고 (Q3 조언 규칙을 더한 뒤에도) 지금 엔진 버전은 올라갔다', () => {
     assert.equal(stored.engineVersion, '2026-11-02.2');
-    assert.equal(ENGINE_VERSION, '2026-11-10.1');
+    assert.equal(ENGINE_VERSION, '2026-11-11.1');
   });
   it('세나 판 + set5 4판, 판마다 10명 = 50명 모두 판정 해시·등급·총점·말할 과목·요약이 같다', () => {
     assert.equal(Object.keys(stored.games).length, 50);

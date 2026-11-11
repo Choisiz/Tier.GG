@@ -123,7 +123,7 @@ export const SUBJECT_DIRECTION_WORDS: Readonly<Record<string, { good: readonly s
 export const DEATH_CLAUSE = /데스[가는이도]?\s*(?:더\s*)?(?:많았|적었)/g;
 
 /** 숫자 바로 뒤에 오면 단위로 읽는 말 (긴 것부터) */
-export const UNIT_WORD_RE = /^\s?(%p|%포인트|%|골드|킬|데스|어시스트|CS|cs|개|번(?!째)|회|분(?!당|석|명)|초(?!반)|레벨)/;
+export const UNIT_WORD_RE = /^\s?(%p|%포인트|%|골드|킬|데스|어시스트|CS|cs|개|번(?!째)|회|분(?!당|석|명)|초(?!반)|레벨|점(?![수유령]))/;
 
 /**
  * fact별 허용 단위어. 기본은 fact.unit에서 정하고, 아래 표의 id 패턴이 맞으면 그 목록을 쓴다.
@@ -153,6 +153,7 @@ const UNIT_DEFAULT: Readonly<Record<string, readonly string[]>> = {
   개: ['개'],
   번: ['번', '회'],
   초: ['초'],
+  점: ['점'],
 };
 
 /** 이 fact 숫자 바로 뒤에 써도 되는 단위어 (비어 있으면 단위어를 붙이지 않는다) */
@@ -176,22 +177,49 @@ export const VAGUE_PATTERNS: readonly { re: RegExp; why: string }[] = [
   { re: /이어\s*가/, why: '막연한 조언 "이어 가" (→ 구체 행동으로 쓴다)' },
 ];
 
-/** 조언 문장 표시. 이 말이 있으면 장면 fact(시각·오브젝트·지역)를 하나 이상 짚어야 한다 (Q2) */
-export const ADVICE_MARKER = /다음\s*판/;
+/**
+ * 조언 문장 표시 (Q3). 하나라도 있으면 조언 문장으로 본다: "다음 판", 명령형 "~세요"·"~라"(해라·챙겨라), "신경 써/쓰".
+ * 조언 문장은 그 칸에서 행동 조언 규칙(R1·R2·R3·R5)이 발동했을 때만, 그 규칙의 근거 fact를 인용해야 통과한다.
+ */
+// 명령형 "~라"(해라·챙겨라·둬라): 문장 끝이 "라"인 말. 피드백 문체(~습니다)에서는 명령형 말고는 "라"로 끝나지 않는다
+export const ADVICE_SENTENCE: readonly RegExp[] = [/다음\s*판/, /세요\s*[.!]?\s*$/, /라\s*[.!]?\s*$/, /신경\s*(?:써|쓰)/];
 
-/** 장면 fact ID (조언이 짚을 수 있는 것): scene.* 와 라인전 데스 시각·지역 */
+/** 장면 fact ID: scene.* 와 라인전 데스 시각·지역 */
 export const isSceneFactId = (id: string): boolean => id.startsWith('scene.') || /^laning\.deathsBefore\.\d+\./.test(id);
+
+/** 5-4-1 첫 데스 해석 문장 (fight.ts FIRST_DEATH_TEXT와 같은 문장). stem이 문장에 나오면 R4 문장으로 본다 */
+export const FIRST_DEATH_SENTENCES: readonly { stem: string; full: string }[] = [
+  { stem: '이니시를 걸어 싸움을 연', full: '이니시를 걸어 싸움을 연 것으로 보입니다' },
+  { stem: '혼자 들어갔거나 팀이 따라오지 못한', full: '혼자 들어갔거나 팀이 따라오지 못한 것으로 보입니다' },
+  { stem: '먼저 잡혀 싸움을 졌', full: '먼저 잡혀 싸움을 졌습니다' },
+  { stem: '먼저 잡혔지만 팀이 받아쳐', full: '먼저 잡혔지만 팀이 받아쳐 이겼습니다' },
+];
+
+const SCORE_RE = /(?<!시야\s?)점수/;
+const N_POINT_RE = /\d\s*점(?![수유령])/;
+const WEIGHT_RE = /반영\s*비율/;
 
 /** 금지 표현 (등급·점수·총점·반영 비율 + Q2 은어·막연한 조언) */
 export const FORBIDDEN_PATTERNS: readonly { re: RegExp; why: string }[] = [
   ...VAGUE_PATTERNS,
   { re: /등급/, why: '등급 언급' },
   { re: /총점/, why: '총점 언급' },
-  { re: /(?<!시야\s?)점수/, why: '점수 언급 (시야 점수 제외)' },
-  { re: /\d\s*점(?![수유령])/, why: '"N점" 표기' },
-  { re: /반영\s*비율|가중치/, why: '반영 비율 언급' },
+  { re: SCORE_RE, why: '점수 언급 (시야 점수 제외)' },
+  { re: N_POINT_RE, why: '"N점" 표기' },
+  { re: WEIGHT_RE, why: '반영 비율 언급' },
+  { re: /가중치/, why: '가중치 언급' },
   { re: /(?:^|[^A-Za-z])[A-E](?:\s*(?:등급|학점|를 받|을 받))/, why: '등급 글자' },
 ];
+
+/**
+ * 규칙이 발동한 칸에서만 풀어 주는 금지 표현 (Q3). R1은 "이 유형은 ○○ 비중이 크다(반영 비율 N)"와 막타 점수,
+ * R2·R3은 "내 데스로 상대 팀이 얻은 득실 점수 N점"을 말해야 해서. 등급·총점·가중치는 그대로 금지.
+ */
+export const RULE_EXEMPT_PATTERNS: Readonly<Partial<Record<string, readonly RegExp[]>>> = {
+  R1: [WEIGHT_RE, SCORE_RE, N_POINT_RE],
+  R2: [SCORE_RE, N_POINT_RE],
+  R3: [SCORE_RE, N_POINT_RE],
+};
 
 /** 이어진 일(followUps) 문장 조각. "이어서 ~"에 붙여 쓰는 존댓말 절 */
 export function followUpLabel(what: string, ours: boolean): string {

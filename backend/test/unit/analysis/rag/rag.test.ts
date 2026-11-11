@@ -12,6 +12,7 @@ import {
   parseKnowledgeFiles,
   roleOfId,
   ROLE_POSITION,
+  ruleOfId,
   type KnowledgeChunk,
 } from '../../../../src/analysis/rag/chunks.js';
 import { applyIngest, DELETE_SQL, planIngest, type StoredChunk } from '../../../../src/analysis/rag/ingest.js';
@@ -24,7 +25,7 @@ const ok = (id: string, meta: string, body = '첫 문장이다. 둘째 문장이
 
 describe('조각 파싱·검사', () => {
   it('정상 조각: 메타 → 칸, position은 유형에서, content = 소제목 + 본문, 해시는 소문자 hex 64자', () => {
-    const r = parseKnowledgeFile(ok('fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad'), 'adc.md');
+    const r = parseKnowledgeFile(ok('fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1'), 'adc.md');
     assert.deepEqual(r.errors, []);
     const c = r.chunks[0]!;
     assert.equal(c.position, 'BOTTOM');
@@ -33,34 +34,55 @@ describe('조각 파싱·검사', () => {
     assert.match(c.contentHash, /^[0-9a-f]{64}$/);
     assert.equal(roleOfId(c.id), 'ADC');
     assert.equal(roleOfId('laning.gold.ALL.bad.01'), 'ALL');
+    assert.equal(c.rule, 'R1');
+    assert.equal(ruleOfId(c.id), 'R1');
+    assert.equal(ruleOfId('fight.vision.ALL.bad.R1-2'), 'R1');
+    assert.equal(ruleOfId('fight.vision.ALL.bad.01'), null); // Q3 전 조각은 규칙 없음
+  });
+  it('Q3: rule 메타 필수, 규칙마다 붙을 수 있는 과목·방향만, ID 끝 = 규칙', () => {
+    const cases: [string, string, RegExp][] = [
+      ['fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=bad', /필수 meta 누락: rule/],
+      ['fight.damage.ADC.bad.R9', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R9', /허용되지 않은 rule/],
+      ['fight.damage.ADC.bad.R5', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R5', /R5은 과목 macro\.solo에만/],
+      ['fight.damage.ADC.good.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=good, rule=R1', /R1은 방향 bad에만/],
+      ['laning.gold.ALL.bad.R1', 'role=ALL, area=laning, subject=laning.gold, polarity=bad, rule=R1', /R1은 과목/],
+      ['fight.damage.ADC.bad.R2', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1', /ID가 규칙과 다름/],
+      ['fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1', /ID가 규칙과 다름/],
+    ];
+    for (const [id, meta, re] of cases) {
+      const r = parseKnowledgeFile(ok(id, meta), 'a.md');
+      assert.equal(r.chunks.length, 0, `${id} ${meta}`);
+      assert.ok(r.errors.some((e) => re.test(e.message)), `${id} ${meta}: ${r.errors.map((e) => e.message).join(' / ')}`);
+    }
+    assert.deepEqual(parseKnowledgeFile(ok('fight.advantage.ALL.good.R4-2', 'role=ALL, area=fight, subject=fight.advantage, polarity=good, rule=R4'), 'a.md').errors, []);
   });
   it('숫자가 있으면 오류 (아라비아·전각 숫자 모두), 조각은 버림', () => {
     for (const body of ['딜이 22% 낮다. 다음 판에 해 본다.', '딜이 ２배 낮다. 다음 판에 해 본다.']) {
-      const r = parseKnowledgeFile(ok('fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad', body), 'a.md');
+      const r = parseKnowledgeFile(ok('fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1', body), 'a.md');
       assert.equal(r.chunks.length, 0);
       assert.match(r.errors[0]!.message, /숫자 포함/);
     }
   });
   it('메타 누락·허용 안 되는 값·과목/영역 불일치·ID 규칙·포지션 불일치는 오류', () => {
     const cases: [string, string, RegExp][] = [
-      ['fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.damage', /필수 meta 누락: polarity/],
-      ['fight.damage.ADC.bad.01', 'role=ADX, area=fight, subject=fight.damage, polarity=bad', /허용되지 않은 role/],
-      ['fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.dmg, polarity=bad', /허용되지 않은 subject/],
-      ['fight.damage.ADC.bad.01', 'role=ADC, area=macro, subject=fight.damage, polarity=bad', /area macro에 속하지 않음/],
-      ['fight.damage.ADC.good.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad', /ID가 규칙과 다름/],
-      ['fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, position=TOP', /포지션/],
-      ['fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, champ=1', /알 수 없는 meta 키/],
+      ['fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage', /필수 meta 누락: polarity/],
+      ['fight.damage.ADC.bad.R1', 'role=ADX, area=fight, subject=fight.damage, polarity=bad, rule=R1', /허용되지 않은 role/],
+      ['fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.dmg, polarity=bad', /허용되지 않은 subject/],
+      ['fight.damage.ADC.bad.R1', 'role=ADC, area=macro, subject=fight.damage, polarity=bad, rule=R1', /area macro에 속하지 않음/],
+      ['fight.damage.ADC.good.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1', /ID가 규칙과 다름/],
+      ['fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1, position=TOP', /포지션/],
+      ['fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1, champ=1', /알 수 없는 meta 키/],
     ];
     for (const [id, meta, re] of cases) {
       const r = parseKnowledgeFile(ok(id, meta), 'a.md');
       assert.equal(r.chunks.length, 0, meta);
       assert.ok(r.errors.some((e) => re.test(e.message)), `${meta}: ${r.errors.map((e) => e.message).join(' / ')}`);
     }
-    const noMeta = parseKnowledgeFile('### fight.damage.ADC.bad.01 제목\n본문만 있다. 둘째.\n', 'a.md');
+    const noMeta = parseKnowledgeFile('### fight.damage.ADC.bad.R1 제목\n본문만 있다. 둘째.\n', 'a.md');
     assert.match(noMeta.errors[0]!.message, /meta:/);
   });
   it('ID 중복은 파일이 달라도 오류', () => {
-    const t = ok('fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad');
+    const t = ok('fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1');
     const r = parseKnowledgeFiles([
       { name: 'a.md', text: t },
       { name: 'b.md', text: t },
@@ -70,17 +92,17 @@ describe('조각 파싱·검사', () => {
   });
   it('경고: 600자 초과, 문장 수, 검증기가 막는 해석어·금지 표현', () => {
     const long = `${'가'.repeat(610)}. 둘째 문장이다.`;
-    const r1 = parseKnowledgeFile(ok('fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad', long), 'a.md');
+    const r1 = parseKnowledgeFile(ok('fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1', long), 'a.md');
     assert.ok(r1.warnings.some((w) => /권장 600자/.test(w.message)));
-    const r2 = parseKnowledgeFile(ok('fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad', '한 문장뿐이다.'), 'a.md');
+    const r2 = parseKnowledgeFile(ok('fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1', '한 문장뿐이다.'), 'a.md');
     assert.ok(r2.warnings.some((w) => /문장/.test(w.message)));
-    const r3 = parseKnowledgeFile(ok('fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad', '이니시가 늦었다. 등급이 낮다.'), 'a.md');
+    const r3 = parseKnowledgeFile(ok('fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1', '이니시가 늦었다. 등급이 낮다.'), 'a.md');
     assert.ok(r3.warnings.some((w) => /해석어/.test(w.message)));
     assert.ok(r3.warnings.some((w) => /금지 표현/.test(w.message)));
     assert.equal(r3.chunks.length, 1); // 경고는 적재를 막지 않는다
   });
   it('첫 조각 앞의 제목·설명 줄과 ## 소제목 뒤 내용은 조각에 안 들어감', () => {
-    const t = `# 제목\n> 설명\n${ok('laning.gold.ALL.bad.01', 'role=ALL, area=laning, subject=laning.gold, polarity=bad')}\n## 기타\n이건 조각이 아니다.\n`;
+    const t = `# 제목\n> 설명\n${ok('macro.solo.ALL.bad.R5', 'role=ALL, area=macro, subject=macro.solo, polarity=bad, rule=R5')}\n## 기타\n이건 조각이 아니다.\n`;
     const r = parseKnowledgeFile(t, 'c.md');
     assert.equal(r.chunks.length, 1);
     assert.equal(r.chunks[0]!.position, 'ALL');
@@ -89,13 +111,13 @@ describe('조각 파싱·검사', () => {
 });
 
 describe('해시·버전', () => {
-  const a = parseKnowledgeFile(ok('fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad'), 'a.md').chunks;
+  const a = parseKnowledgeFile(ok('fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1'), 'a.md').chunks;
   it('같은 조각이면 순서와 관계없이 같은 12자, 본문이나 메타가 바뀌면 다름', () => {
-    const b = parseKnowledgeFile(ok('laning.gold.ALL.bad.01', 'role=ALL, area=laning, subject=laning.gold, polarity=bad'), 'c.md').chunks;
+    const b = parseKnowledgeFile(ok('macro.solo.ALL.bad.R5', 'role=ALL, area=macro, subject=macro.solo, polarity=bad, rule=R5'), 'c.md').chunks;
     const v = knowledgeVersion([...a, ...b]);
     assert.match(v, /^[0-9a-f]{12}$/);
     assert.equal(knowledgeVersion([...b, ...a]), v);
-    const edited = parseKnowledgeFile(ok('fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad', '첫 문장이다. 바뀐 문장이다.'), 'a.md').chunks;
+    const edited = parseKnowledgeFile(ok('fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1', '첫 문장이다. 바뀐 문장이다.'), 'a.md').chunks;
     assert.notEqual(knowledgeVersion([...edited, ...b]), v);
     assert.notEqual(knowledgeVersion([{ ...a[0]!, polarity: 'any' }, ...b]), v);
   });
@@ -103,10 +125,11 @@ describe('해시·버전', () => {
 
 describe('저장소 지식 문서 (docs/ai/knowledge)', () => {
   const parsed = loadKnowledgeDir(RAG_DEFAULTS.dir);
-  it('오류·경고 0, 조각 50~100개, 유형 10개 모두 + ALL, 숫자 없음, 600자 이하', () => {
+  it('오류·경고 0, 조각 30~60개(Q3 규칙 연결), 유형 10개 모두 + ALL, 숫자 없음, 600자 이하, 규칙 R1~R5 모두', () => {
     assert.deepEqual(parsed.errors, []);
     assert.deepEqual(parsed.warnings, []);
-    assert.ok(parsed.chunks.length >= 50 && parsed.chunks.length <= 100, String(parsed.chunks.length));
+    assert.ok(parsed.chunks.length >= 30 && parsed.chunks.length <= 60, String(parsed.chunks.length));
+    assert.deepEqual([...new Set(parsed.chunks.map((c) => c.rule))].sort(), ['R1', 'R2', 'R3', 'R4', 'R5']);
     const roles = new Set(parsed.chunks.map((c) => c.role));
     assert.equal(roles.size, 11);
     for (const c of parsed.chunks) {
@@ -159,69 +182,71 @@ describe('검색 (가짜 임베딩·가짜 DB)', () => {
   const result = senaResult(); // 딜서폿, 라인전·교전·운영 모두 부족, 패배
   const real = loadKnowledgeDir(RAG_DEFAULTS.dir).chunks;
 
-  it('과목 목록은 칸과 같은 순서·개수(영역마다 좋은/부족 최대 2개), 질의 문장에 유형·과목·방향·판정·승패, 숫자 없음', () => {
+  it('Q3: 조언 규칙이 발동한 칸만 검색 (라인전·규칙 없는 칸 제외), 질의 문장에 유형·과목·방향·판정·승패·규칙 근거, 숫자 없음', () => {
     const t = ragTargets(result);
     assert.deepEqual(
-      t.map((x) => `${x.key}:${x.subjectId}`),
-      ['fight.bad.0:fight.vision', 'fight.bad.1:fight.advantage', 'macro.bad.0:macro.vision', 'macro.bad.1:macro.advantage', 'macro.good.0:macro.side', 'laning.bad.0:laning.gold', 'laning.bad.1:laning.kda'],
+      t.map((x) => `${x.key}:${x.subjectId}:${x.rules.join('+')}`),
+      ['fight.bad.0:fight.vision:R1', 'fight.bad.1:fight.advantage:R4', 'macro.bad.1:macro.advantage:R1'],
     );
-    assert.equal(t[0]!.query, '딜서폿 오브젝트 전 시야 부족, 오브젝트 싸움 부족, 패배');
+    assert.equal(t[0]!.query, '딜서폿 오브젝트 전 시야 부족, 오브젝트 싸움 부족, 패배, 반영 비율');
     for (const x of t) assert.doesNotMatch(x.query, /\d/);
   });
 
-  it('질의 임베딩은 1번(한 요청, input_type=query), 과목마다 DB 1번 (유형·포지션·영역·과목·방향 필터, 챔피언 없음)', async () => {
+  it('질의 임베딩은 1번(한 요청, input_type=query), 칸마다 DB 1번, 그 칸 규칙의 조각만 (유형 조각 먼저)', async () => {
     const e = fakeEmbed();
     const d = fakeDb(real);
     const out = await retrieveKnowledge(result, { embed: e.embed, search: d.search });
     assert.equal(e.calls.length, 1);
     assert.equal(e.calls[0]!.type, 'query');
-    assert.equal(e.calls[0]!.texts.length, 7);
-    assert.equal(d.calls.length, 7);
+    assert.equal(e.calls[0]!.texts.length, 3);
+    assert.equal(d.calls.length, 3);
     for (const c of d.calls) {
       assert.equal(c.role, 'SUPPORT_DAMAGE');
       assert.equal(c.position, 'UTILITY');
       assert.equal(c.championId, null);
       assert.equal(c.subjects!.length, 1);
+      assert.equal(c.limit, 10);
     }
-    assert.equal(out.queries, 7);
-    // 딜서폿 조각이 먼저, 모자라면 ALL로 채움. 딜서폿 조각이 없는 과목은 ALL로 넓힘(widened)
+    assert.equal(out.queries, 3);
     const byKey = Object.fromEntries(out.picks.map((p) => [p.key, p]));
-    assert.deepEqual(byKey['fight.bad.0']!.ids, ['fight.vision.SUPPORT_DAMAGE.bad.01', 'fight.vision.ALL.bad.01']);
+    assert.deepEqual(byKey['fight.bad.0']!.ids, ['fight.vision.SUPPORT_DAMAGE.bad.R1', 'fight.vision.ALL.bad.R1']);
     assert.equal(byKey['fight.bad.0']!.widened, false);
-    assert.deepEqual(byKey['fight.bad.1']!.ids, ['fight.advantage.ALL.bad.01']);
+    // 득실 칸은 R4만 발동 → R2·R3 조각은 같은 과목·방향이라도 쓰지 않는다
+    assert.deepEqual(byKey['fight.bad.1']!.ids, ['fight.advantage.ALL.bad.R4']);
     assert.equal(byKey['fight.bad.1']!.widened, true);
-    assert.deepEqual(byKey['macro.bad.1']!.ids, ['macro.advantage.ALL.bad.01']);
-    assert.deepEqual(byKey['laning.bad.0']!.ids, ['laning.gold.ALL.bad.01']);
-    // 후보 9개 중 판당 상한 8개: 1순위 7개 + 2순위 첫 과목 1개
-    assert.equal(out.chunks.length, 8);
-    assert.ok(out.chunks.some((c) => c.id === 'fight.vision.ALL.bad.01'));
-    assert.ok(!out.chunks.some((c) => c.id === 'macro.vision.ALL.bad.01'));
+    assert.deepEqual(byKey['macro.bad.1']!.ids, ['macro.advantage.ALL.bad.R1']);
+    assert.equal(out.chunks.length, 4);
     assert.ok(out.notes.some((n) => /ALL 조각/.test(n)));
-    assert.ok(out.notes.some((n) => /판당 상한 8개로 1개 뺌/.test(n)));
   });
 
-  it('유형 조각을 거리순으로 먼저, 과목당 2개, 판당 8개, 같은 조각은 한 번', async () => {
+  it('규칙 칸이 없는 옛 조각(…bad.01)과 다른 규칙 조각은 DB에 남아 있어도 버린다', async () => {
+    const row = (id: string, i: number): RagRow => ({ id, source: 'perspective', area: 'fight', subject: 'fight.vision', polarity: 'bad', content: id, distance: i });
+    const search: SearchFn = async (p) => (p.subjects?.[0] === 'fight.vision' ? [row('fight.vision.ALL.bad.01', 0), row('fight.vision.SUPPORT_DAMAGE.bad.01', 0.1), row('fight.vision.ALL.bad.R2', 0.2), row('fight.vision.ALL.bad.R1', 0.3)] : []);
+    const out = await retrieveKnowledge(result, { embed: fakeEmbed().embed, search });
+    assert.deepEqual(out.chunks.map((c) => c.id), ['fight.vision.ALL.bad.R1']);
+  });
+
+  it('유형 조각을 거리순으로 먼저, 과목당 2개, 판당 상한, 같은 조각은 한 번', async () => {
     const many: KnowledgeChunk[] = [];
-    for (const s of ['fight.vision', 'fight.advantage', 'macro.vision', 'macro.advantage', 'macro.side', 'laning.gold', 'laning.kda']) {
+    for (const [s, rule] of [
+      ['fight.vision', 'R1'],
+      ['fight.advantage', 'R4'],
+      ['macro.advantage', 'R1'],
+    ] as const) {
       const area = s.split('.')[0]!;
-      const pol = s === 'macro.side' ? 'good' : 'bad';
       // ALL 조각을 앞(더 가까움)에 둬도 유형 조각이 먼저 골라져야 한다
-      many.push(chunk(`${s}.ALL.${pol}.01`, `role=ALL, area=${area}, subject=${s}, polarity=${pol}`));
-      for (const n of ['01', '02', '03']) many.push(chunk(`${s}.SUPPORT_DAMAGE.${pol}.${n}`, `role=SUPPORT_DAMAGE, area=${area}, subject=${s}, polarity=${pol}`));
+      many.push(chunk(`${s}.ALL.bad.${rule}`, `role=ALL, area=${area}, subject=${s}, polarity=bad, rule=${rule}`));
+      for (const n of ['', '-2', '-3']) many.push(chunk(`${s}.SUPPORT_DAMAGE.bad.${rule}${n}`, `role=SUPPORT_DAMAGE, area=${area}, subject=${s}, polarity=bad, rule=${rule}`));
     }
-    // 과목 무관 조각(subject 없음)은 여러 과목에 나올 수 있다 → 한 번만
-    many.unshift(chunk('fight.common.SUPPORT_DAMAGE.bad.01', 'role=SUPPORT_DAMAGE, area=fight, polarity=bad'));
-    const out = await retrieveKnowledge(result, { embed: fakeEmbed().embed, search: fakeDb(many).search });
+    const out = await retrieveKnowledge(result, { embed: fakeEmbed().embed, search: fakeDb(many).search, limits: { perGame: 4 } });
     for (const p of out.picks) {
-      assert.ok(p.ids.length <= 2);
+      assert.equal(p.ids.length, 2);
       assert.ok(p.ids.every((id) => id.includes('SUPPORT_DAMAGE')), p.ids.join());
     }
-    assert.deepEqual(out.picks[0]!.ids, ['fight.common.SUPPORT_DAMAGE.bad.01', 'fight.vision.SUPPORT_DAMAGE.bad.01']);
-    assert.deepEqual(out.picks[1]!.ids, ['fight.common.SUPPORT_DAMAGE.bad.01', 'fight.advantage.SUPPORT_DAMAGE.bad.01']);
-    assert.equal(out.chunks.length, 8);
-    assert.equal(new Set(out.chunks.map((c) => c.id)).size, 8);
-    // 과목마다 1순위부터 돌아가며 담는다: 7과목의 1순위(중복 1개 제외 6개) 뒤에 2순위
-    assert.ok(out.notes.some((n) => /판당 상한 8개/.test(n)));
+    assert.deepEqual(out.picks[0]!.ids, ['fight.vision.SUPPORT_DAMAGE.bad.R1', 'fight.vision.SUPPORT_DAMAGE.bad.R1-2']);
+    // 칸마다 1순위부터 돌아가며 담는다: 3칸의 1순위 3개 + 2순위 첫 칸 1개
+    assert.deepEqual(out.chunks.map((c) => c.id), ['fight.vision.SUPPORT_DAMAGE.bad.R1', 'fight.advantage.SUPPORT_DAMAGE.bad.R4', 'macro.advantage.SUPPORT_DAMAGE.bad.R1', 'fight.vision.SUPPORT_DAMAGE.bad.R1-2']);
+    assert.ok(out.notes.some((n) => /판당 상한 4개로 2개 뺌/.test(n)));
   });
 
   it('맞는 조각이 0개면 chunks 빈 배열 (RAG 없이 생성)', async () => {
@@ -304,9 +329,9 @@ describe('Voyage 요청 (가짜 fetch)', () => {
 // ---------- 적재 ----------
 
 describe('적재 계획·쓰기 (가짜 DB)', () => {
-  const a = chunk('fight.damage.ADC.bad.01', 'role=ADC, area=fight, subject=fight.damage, polarity=bad');
-  const b = chunk('laning.gold.ALL.bad.01', 'role=ALL, area=laning, subject=laning.gold, polarity=bad');
-  const c = chunk('laning.kda.ALL.bad.01', 'role=ALL, area=laning, subject=laning.kda, polarity=bad');
+  const a = chunk('fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R1');
+  const b = chunk('macro.solo.ALL.bad.R5', 'role=ALL, area=macro, subject=macro.solo, polarity=bad, rule=R5');
+  const c = chunk('fight.advantage.ALL.bad.R3', 'role=ALL, area=fight, subject=fight.advantage, polarity=bad, rule=R3');
   const stored = (k: KnowledgeChunk, o: Partial<StoredChunk> = {}): StoredChunk => ({
     id: k.id,
     source: k.source,

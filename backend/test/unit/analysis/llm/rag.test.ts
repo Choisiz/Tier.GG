@@ -42,7 +42,7 @@ function deps(steps: ConstructorParameters<typeof FakeLlmClient>[0], o: Partial<
 
 describe('RAG 꺼짐 = Q1과 같은 요청', () => {
   const good = JSON.stringify(passingAnswer(sheet));
-  it('knowledge 없음·null·빈 배열 모두 요청 해시가 같고, 시스템 프롬프트·스키마·메시지가 Q1 그대로, 버전 2026-11-10.1 (Q2)', async () => {
+  it('knowledge 없음·null·빈 배열 모두 요청 해시가 같고, 시스템 프롬프트·스키마·메시지가 Q1 그대로, 버전 2026-11-11.1 (Q2)', async () => {
     const hashes: string[] = [];
     for (const knowledge of [undefined, null, []] as const) {
       const { d, client, ledger } = deps([{ text: good }], knowledge === undefined ? {} : { knowledge });
@@ -54,7 +54,7 @@ describe('RAG 꺼짐 = Q1과 같은 요청', () => {
       assert.doesNotMatch(String(req.messages[0]!.content), /<knowledge>/);
       assert.equal(out.promptVersion, PROMPT_VERSION_NO_RAG);
       assert.deepEqual(out.knowledgeIds, []);
-      assert.equal(ledger.entries()[0]!.promptVersion, '2026-11-10.1');
+      assert.equal(ledger.entries()[0]!.promptVersion, '2026-11-11.1');
       assert.ok([...out.texts.values()].every((t) => t.chunkIds === undefined));
       hashes.push(requestHash(req));
     }
@@ -83,7 +83,7 @@ describe('RAG 켜짐: 프롬프트·스키마', () => {
     const req = client.requests[0]!;
     assert.ok(req.system.startsWith(SYSTEM_PROMPT));
     assert.equal(req.system, SYSTEM_PROMPT + KNOWLEDGE_RULES);
-    assert.match(KNOWLEDGE_RULES, /해석과 다음 판 조언의 근거로만/);
+    assert.match(KNOWLEDGE_RULES, /조언 규칙의 뜻을 풀어 쓴 해설/);
     assert.match(KNOWLEDGE_RULES, /숫자·시각·횟수는 여전히 facts에서만/);
     const msg = String(req.messages[0]!.content);
     assert.ok(msg.startsWith(`${buildUserMessage(sheet)}\n\n<knowledge>\n`));
@@ -91,8 +91,8 @@ describe('RAG 켜짐: 프롬프트·스키마', () => {
     assert.ok(msg.endsWith('</chunk>\n</knowledge>'));
     assert.deepEqual(req.schema, FIRST_SCHEMA_RAG);
     assert.equal(out.promptVersion, PROMPT_VERSION);
-    assert.equal(PROMPT_VERSION, '2026-11-10.2');
-    assert.equal(ledger.entries()[0]!.promptVersion, '2026-11-10.2');
+    assert.equal(PROMPT_VERSION, '2026-11-11.2');
+    assert.equal(ledger.entries()[0]!.promptVersion, '2026-11-11.2');
     assert.deepEqual(out.knowledgeIds, KN.map((k) => k.id));
   });
   it('RAG 스키마: 첫 답은 맨 위 chunkUse 하나(문법 크기 400 회피, 칸 객체는 Q1과 같음), 재시도 fix는 chunkIds 필수. Q1 스키마는 그대로', () => {
@@ -146,7 +146,7 @@ describe('RAG 켜짐: chunkIds 검증', () => {
     const item = feedback.sections.fight.bad[0]!;
     assert.equal(item.source, 'llm_retry');
     assert.deepEqual(item.chunkIds, ['fight.vision.SUPPORT_DAMAGE.bad.01']);
-    assert.equal(feedback.meta.promptVersion, '2026-11-10.2');
+    assert.equal(feedback.meta.promptVersion, '2026-11-11.2');
     assert.equal(feedback.meta.knowledgeVersion, 'abc123def456');
     assert.deepEqual(feedback.meta.knowledgeIds, KN.map((k) => k.id));
   });
@@ -156,6 +156,6 @@ describe('RAG 켜짐: chunkIds 검증', () => {
     const run = createFeedbackFromResult({ client, model: 'claude-opus-5-5', effort: 'low', budgetUsd: 1, ledger: memoryLedger(), championNames: NAMES, now: () => 0 });
     const { feedback } = await run(senaResult(), { version: 'abc123def456', chunks: [] });
     assert.equal(feedback.meta.knowledgeVersion, null);
-    assert.equal(feedback.meta.promptVersion, '2026-11-10.1');
+    assert.equal(feedback.meta.promptVersion, '2026-11-11.1');
   });
 });

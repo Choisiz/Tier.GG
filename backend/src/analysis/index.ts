@@ -1,4 +1,5 @@
 // 판정 엔진 진입점 (ai_spec 1단계). 순수 함수: 네트워크·DB·환경 변수·LLM을 쓰지 않는다.
+import { buildAdvice } from './advice.js';
 import { analyzeFight } from './fight.js';
 import { scoreObjectives } from './fights.js';
 import { analyzeKeyMoments } from './keyMoments.js';
@@ -9,7 +10,7 @@ import { ENGINE_VERSION } from './rules.js';
 import { buildScenes } from './scenes.js';
 import { areaSpeakList, buildSummary, laningSpeakList } from './summary.js';
 import { flattenEvents, type MatchContext, type Player } from './timeline.js';
-import type { AnalysisInput, AnalysisResult } from './types.js';
+import type { AnalysisInput, AnalysisResult, JudgedResult } from './types.js';
 
 export { ENGINE_VERSION } from './rules.js';
 export { championTagsFromJson, ROLE_LABEL, ROLE_OVERRIDES, ROLE_OVERRIDES_PENDING } from './role.js';
@@ -71,6 +72,16 @@ function buildContext(input: AnalysisInput): MatchContext {
 
 /** match + timeline + puuid → 판정 JSON (문장 없음, 숫자·판정·순서만) */
 export function analyzeMatch(input: AnalysisInput): AnalysisResult {
+  const { ctx, objectives, result } = analyzeCore(input);
+  // 조언 규칙표 (Q3): 판정이 끝난 뒤 문장 재료만 더한다. R1 비교용으로 같은 판을 상대 라이너 기준으로 한 번 더 분석한다 (Riot 호출 없음)
+  const oppIds = [...ctx.players.values()].filter((p) => p.teamId !== ctx.me.teamId && p.position === ctx.me.position);
+  const oppPlayer = oppIds.length === 1 ? oppIds[0]! : null;
+  const opp = oppPlayer ? analyzeCore({ ...input, puuid: oppPlayer.raw.puuid }).result : null;
+  return { ...result, advice: buildAdvice(ctx, objectives, result, opp, oppPlayer?.participantId ?? null) };
+}
+
+/** 판정 + 장면 (조언 규칙 전) */
+function analyzeCore(input: AnalysisInput): { ctx: MatchContext; objectives: ReturnType<typeof scoreObjectives>; result: JudgedResult } {
   const ctx = buildContext(input);
   const objectives = scoreObjectives(ctx.events, ctx.warnings);
   const laning = analyzeLaning(ctx);
@@ -83,7 +94,7 @@ export function analyzeMatch(input: AnalysisInput): AnalysisResult {
     fight: areaSpeakList(fight.area),
     macro: areaSpeakList(macro),
   };
-  return {
+  const result: JudgedResult = {
     engineVersion: ENGINE_VERSION,
     matchId: ctx.matchId,
     player: {
@@ -106,4 +117,5 @@ export function analyzeMatch(input: AnalysisInput): AnalysisResult {
     scenes: buildScenes(ctx, objectives, laning.result, speakOrder),
     warnings: ctx.warnings,
   };
+  return { ctx, objectives, result };
 }
