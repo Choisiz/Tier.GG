@@ -5,6 +5,7 @@ import {
   ADVICE_SENTENCE,
   allowedUnitWords,
   FIRST_DEATH_SENTENCES,
+  R4_ME_STEMS,
   AREAS,
   DEATH_CLAUSE,
   DIRECTION_WORDS,
@@ -321,6 +322,11 @@ export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): Verify
     if (!text.includes(sentence.stem)) continue;
     if (!r4) add('forbidden', `첫 데스 해석 "${sentence.stem}"은 R4가 발동한 칸에서만 쓴다`);
     else if (!text.includes(r4.text ?? '') || sentence.full !== r4.text) add('forbidden', `첫 데스 해석은 이 칸의 R4 문장 "${r4.text}" 그대로만 쓴다`);
+  }
+  for (const stem of R4_ME_STEMS) {
+    if (!text.includes(stem)) continue;
+    if (!r4) add('forbidden', `"${stem}" 문장은 R4가 발동한 칸에서만 쓴다`);
+    else if (!text.includes(r4.text ?? '')) add('forbidden', `내 역할 문장은 이 칸의 R4 문장 "${r4.text}" 그대로만 쓴다`);
   }
 
   // 5. 길이

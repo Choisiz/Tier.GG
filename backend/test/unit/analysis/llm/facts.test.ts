@@ -23,11 +23,11 @@ describe('facts: 표기 규칙', () => {
     assert.deepEqual(numberDisplay(0.5), ['0.5']);
     assert.deepEqual(numberDisplay(0.96), ['0.96']); // 1.0(정수)로 반올림한 표기는 허용하지 않는다
   });
-  it('초 → 게임 시계 분:초 (Q3, 초는 반올림)', () => {
-    assert.deepEqual(timeDisplay(904.8), ['15:05']);
+  it('초 → 게임 시계 분:초 (Q3, 초 아래는 내림, 화면과 같음)', () => {
+    assert.deepEqual(timeDisplay(904.8), ['15:04']);
     assert.deepEqual(timeDisplay(900), ['15:00']);
     assert.deepEqual(timeDisplay(1000.4), ['16:40']);
-    assert.deepEqual(timeDisplay(59.6), ['1:00']);
+    assert.deepEqual(timeDisplay(59.6), ['0:59']);
     assert.deepEqual(timeDisplay(149), ['2:29']);
   });
 });
@@ -49,8 +49,8 @@ describe('facts: 세나 판 값', () => {
     assert.equal(fact('laning.kda.me.deaths').value, 2);
     assert.equal(fact('laning.deathsBefore.count').value, 2);
   });
-  it('결정적 장면 0: 15:05, 킬 5, 격차 변화 3,895, 상대 팀 우세에서 시작', () => {
-    assert.deepEqual(fact('keyMoment.0.startMin').display, ['15:05']);
+  it('결정적 장면 0: 15:04, 킬 5, 격차 변화 3,895, 상대 팀 우세에서 시작', () => {
+    assert.deepEqual(fact('keyMoment.0.startMin').display, ['15:04']);
     assert.equal(fact('keyMoment.0.kills').value, 5);
     assert.equal(fact('keyMoment.0.gapChangeAbs').value, 3895);
     assert.equal(fact('keyMoment.0.leaderBefore').value, '상대 팀');

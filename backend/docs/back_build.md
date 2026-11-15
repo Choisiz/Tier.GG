@@ -1,6 +1,6 @@
 # 백엔드 구현 기록 — 수집 워커 + 챔피언 통계 API
 
-> 기준: `backend/docs/back_spec.md` (승인됨, 변경 05 포함), `docs/contracts/api_contract.md` **v4**(전적 검색 2026-10-27, 킬관여·라인전 2026-10-30, 게임 피드백 분석 POST 2026-11-03), `docs/contracts/db_contract.md` v8
+> 기준: `backend/docs/back_spec.md` (승인됨, 변경 07 포함), `docs/contracts/api_contract.md` **v4**(전적 검색 2026-10-27, 킬관여·라인전 2026-10-30, 게임 피드백 분석 POST 2026-11-03), `docs/contracts/db_contract.md` v8
 > 이 문서는 **지금 구현 상태만** 적는다. v1(패치 기준)·변경 01·02 구현 기록과 시도 과정은 git 기록에 남아 있다.
 > 상태 표기: ✅ 완료 / ⚠️ 부분 완료 / ❌ 실패 / ⏸️ 보류
 
@@ -19,6 +19,7 @@
   - [2-9. 게임 피드백 분석 API (변경 05)](#2-9-게임-피드백-분석-api-변경-05)
   - [2-10. 매치 상세 지표 (변경 06)](#2-10-매치-상세-지표-변경-06)
   - [2-11. 피드백 분석 RAG 연결 (!ai B4-4)](#2-11-피드백-분석-rag-연결-ai-b4-4)
+  - [2-12. 게임 수집 자동 실행 (변경 07)](#2-12-게임-수집-자동-실행-변경-07)
 - [3. 사용자가 실행하는 명령](#3-사용자가-실행하는-명령)
 - [4. 검증 결과](#4-검증-결과)
   - [4-1. 실제 소량 수집](#4-1-실제-소량-수집)
@@ -29,6 +30,7 @@
   - [4-6. 전적 검색 실제 Riot 호출 (변경 03)](#4-6-전적-검색-실제-riot-호출-변경-03)
   - [4-7. 킬관여·라인전 검증 (변경 04)](#4-7-킬관여라인전-검증-변경-04)
   - [4-8. 게임 피드백 분석 검증 (변경 05)](#4-8-게임-피드백-분석-검증-변경-05)
+  - [4-10. 게임 수집 자동 실행 검증 (변경 07)](#4-10-게임-수집-자동-실행-검증-변경-07)
 - [5. 계획과 다른 점](#5-계획과-다른-점)
 - [6. 계약 변경 요청](#6-계약-변경-요청)
 - [7. 남은 문제](#7-남은-문제)
@@ -264,6 +266,20 @@
 | 주의 | API는 Voyage 429(무료 등급 분당 한도)를 재시도하지 않는다(3초 상한). 동시 분석이 늘면 그 판은 RAG 없이 만들어진다. 서비스로 켜기 전에 Voyage 결제 등록(한도 상향) 여부를 정한다 | ⚠️ |
 | 테스트 | `test/unit/api/feedbackRag.test.ts` 6개(꺼짐 = 이전 요청, 켜짐 → `<knowledge>`·knowledgeVersion·캐시, 0개, 실패·시간 초과, 템플릿이면 검색 안 함, 켜짐/꺼짐 캐시 키 다름) + env 1개. 하네스 `rag` 옵션·`ScriptClient.requests` 추가 | ✅ |
 
+### 2-12. 게임 수집 자동 실행 (변경 07)
+
+> 요약: GitHub Actions가 매일 17:00 UTC(02:00 KST)에 수집 → purge를 돌린다. 수집 코드는 바꾸지 않았다. 실제 실행(수동 1회·예약 1회)은 사용자가 Secrets/Variables를 등록한 뒤 확인한다.
+
+| 기능 | 구현 내용 | 상태 |
+|------|-----------|------|
+| 실행 스크립트 | `backend/package.json` `collect:ci` = `node --import tsx src/cli/collect.ts` (`--env-file` 없음, 프로세스 환경 변수만). `config/env.ts`는 원래 `process.env`만 읽어 수정 없음 | ✅ |
+| 워크플로 | `.github/workflows/collect.yml` "Collect matches": `schedule` `0 17 * * *` + `workflow_dispatch`(`players_per_tier` 기본 '500', `resample` false, `purge` true). `concurrency: collect`(취소 안 함), `permissions: contents: read`, `ubuntu-latest`, `timeout-minutes: 330`, Node 24 + npm 캐시(`backend/package-lock.json`), `npm ci` | ✅ |
+| 수집 단계 | `npm run collect:ci -- run --preset test --players-per-tier "$PPT" [--resample]`. 입력값은 `env`(`PPT`, `RESAMPLE`)로만 넘기고 셸에 `${{ }}`를 직접 넣지 않음. `PPT`는 정수 검사. `set -o pipefail` + `tee -a logs/collect.log`라 종료 코드(1·2·3)가 그대로 단계 실패가 된다 | ✅ |
+| purge 단계 | 예약 실행이거나 입력 `purge`=true일 때 `npm run collect:ci -- purge --yes`. 수집이 실패하면 건너뜀(기본 `success()`) | ✅ |
+| 환경 변수 | Job `env`: `secrets.DATABASE_URL`, `secrets.RIOT_API_KEY`, `vars.RIOT_PLATFORM_URL`, `vars.RIOT_REGION_URL`. 출력(echo) 없음. Variables가 비면 `env.ts` 기본값(kr/asia) | ✅ |
+| 로그 보관 | `actions/upload-artifact@v4`, `if: always()`, 7일, 파일 없으면 무시 | ✅ |
+| 실제 실행 | 수동 1회·다음 날 예약 1회 성공, `collection_logs` 기록 확인 | ⏸️ 사용자 등록 대기 |
+
 ---
 
 ## 3. 사용자가 실행하는 명령
@@ -291,6 +307,9 @@ npm run collect -- aggregate        # 창 안 게임 0개면 종료 코드 1, �
 # 오래된 원본 정리
 npm run collect -- purge            # 미리보기만 (21일보다 오래된 게임 수)
 npm run collect -- purge --yes      # purge_old_games(21) 실제 삭제. 되돌릴 수 없음, 사용자 승인 뒤에만
+
+# 자동 수집 (GitHub Actions, 변경 07): 매일 02:00 KST. 수동은 저장소 Actions → "Collect matches" → Run workflow
+# CI용 스크립트는 .env 없이 환경 변수만 읽는다: npm run collect:ci -- run --preset test --players-per-tier 500
 
 # 검사
 npm run typecheck
@@ -469,6 +488,20 @@ npm run test:integration            # 실제 Supabase, 모두 ROLLBACK. 05:00 KS
 | 패치 | 16.21, 16.20 |
 | 집계 | `aggregate` 성공: 창 안 6,788게임(패치 16.21), 아이템 20,646 · 룬 4,480 · 스킬 3,830 · 주문 1,856행 |
 | DB 크기 | 96MB(옛 데이터) → **103MB** |
+
+### 4-10. 게임 수집 자동 실행 검증 (변경 07)
+
+> 요약: 로컬 검사만 했다. 실제 수집·purge·DB 접속은 하지 않았다(Build 범위 밖).
+
+| 검사 | 결과 |
+|------|------|
+| `npm run typecheck` / `npm run lint` | 오류 0 / 0 |
+| `npm test` | 514개 통과, 실패 0 |
+| 워크플로 문법 | `npx @action-validator/cli .github/workflows/collect.yml` 통과(종료 0). `actionlint`는 이 Mac에 없어 못 돌림 → GitHub 첫 실행으로 확인 |
+| `.env` 없이 시작 (`env -i PATH HOME`) | `collect:ci -- --help` 사용법 출력·종료 0. `run`은 `DATABASE_URL이(가) 비어 있습니다` 1줄·종료 1. `DATABASE_URL`만 가짜로 주면 `RIOT_API_KEY이(가) 비어 있습니다`·종료 1. 값 출력 없음 |
+| 입력값 주입 | `PPT='5; echo hi'` → 정수 검사에서 거부 |
+| 로그 누출 점검 (코드) | `lib/logger.ts`가 모든 줄에서 `DATABASE_URL`(전체·사용자·비밀번호·호스트)·`RIOT_API_KEY`·`postgres://`·`RGAPI-` 모양을 `***`로 가림. puuid는 `shortPuuid`(앞 8자)·`RiotClient.logPath`(by-puuid 경로 앞 8자)로만 나감. collector·riot에서 `console.*` 직접 출력 없음. 누출 없음, 코드 수정 없음 |
+| 참고 | 값이 빈 오류 문구가 "루트 .env를 확인하세요"라 CI에서는 Secrets를 확인하라는 뜻으로 읽으면 된다(문구만, 동작 무관) |
 
 ---
 

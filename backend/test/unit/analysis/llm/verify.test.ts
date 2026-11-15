@@ -48,11 +48,11 @@ describe('숫자 뽑기', () => {
       ],
     );
   });
-  it('시각 fact는 분:초 표기만 맞는다 ("15.1분"·"15분"·"15:06"은 15:05 fact와 다름)', () => {
+  it('시각 fact는 분:초 표기만 맞는다 ("15.1분"·"15분"·"15:05"는 15:04 fact와 다름, 초 내림)', () => {
     const KM = ['keyMoment.0.startMin', 'keyMoment.0.gapChangeAbs'];
-    assert.deepEqual(rules('keyMoment.0', '15:05 싸움 뒤 골드 격차가 약 3,900 벌어졌습니다.', KM), []);
+    assert.deepEqual(rules('keyMoment.0', '15:04 싸움 뒤 골드 격차가 약 3,900 벌어졌습니다.', KM), []);
     assert.deepEqual(rules('keyMoment.0', '15.1분 싸움 뒤 골드 격차가 약 3,900 벌어졌습니다.', KM), ['number']);
-    assert.deepEqual(rules('keyMoment.0', '15:06 싸움 뒤 골드 격차가 약 3,900 벌어졌습니다.', KM), ['number']);
+    assert.deepEqual(rules('keyMoment.0', '15:05 싸움 뒤 골드 격차가 약 3,900 벌어졌습니다.', KM), ['number']);
   });
   it('"1차 포탑" 같은 이름 속 숫자와 범위 기호는 빼거나 부호로 보지 않는다', () => {
     assert.deepEqual(extractNumbers('바텀 1차 포탑을 잃었습니다').map((x) => x.value), []);
@@ -72,13 +72,13 @@ describe('검사 3: 숫자', () => {
     assert.deepEqual(rules('laning.bad.0', '15:00 골드가 상대 애쉬보다 약 800 적었습니다.', GOLD), ['number']);
   });
   it('"3,900 넘게"는 실제 3,895라 거부, "약 3,900"·"3,900 가까이"·"3,800 넘게"는 통과', () => {
-    assert.deepEqual(rules('keyMoment.0', '15:05 싸움 뒤 골드 격차가 3,900 넘게 벌어졌습니다.', KM0), ['number']);
-    assert.deepEqual(rules('keyMoment.0', '15:05 싸움 뒤 골드 격차가 약 3,900 벌어졌습니다.', KM0), []);
-    assert.deepEqual(rules('keyMoment.0', '15:05 싸움 뒤 골드 격차가 3,900 가까이 벌어졌습니다.', KM0), []);
-    assert.deepEqual(rules('keyMoment.0', '15:05 싸움 뒤 골드 격차가 3,800 넘게 벌어졌습니다.', KM0), []);
+    assert.deepEqual(rules('keyMoment.0', '15:04 싸움 뒤 골드 격차가 3,900 넘게 벌어졌습니다.', KM0), ['number']);
+    assert.deepEqual(rules('keyMoment.0', '15:04 싸움 뒤 골드 격차가 약 3,900 벌어졌습니다.', KM0), []);
+    assert.deepEqual(rules('keyMoment.0', '15:04 싸움 뒤 골드 격차가 3,900 가까이 벌어졌습니다.', KM0), []);
+    assert.deepEqual(rules('keyMoment.0', '15:04 싸움 뒤 골드 격차가 3,800 넘게 벌어졌습니다.', KM0), []);
   });
   it('어림은 approx가 있는 fact만 (킬 수 "약 5개"는 실패)', () => {
-    assert.deepEqual(rules('keyMoment.0', '15:05 킬 약 5개 싸움 뒤 격차가 3,895 벌어졌습니다.', KM0), ['number']);
+    assert.deepEqual(rules('keyMoment.0', '15:04 킬 약 5개 싸움 뒤 격차가 3,895 벌어졌습니다.', KM0), ['number']);
   });
   it('숫자가 맞아도 factIds에 그 fact가 없으면 실패', () => {
     assert.deepEqual(rules('laning.bad.0', '15:00 골드가 703 적었습니다.', ['laning.referenceMin']), ['number']);
@@ -108,7 +108,7 @@ describe('검사 2: 방향', () => {
     assert.ok(rules('summary', '라인전은 우세 같았지만 열세였고, 오브젝트 싸움과 운영은 부족했습니다.', ids).includes('direction'));
   });
   it('결정적 장면: 벌어졌는데 "좁혀졌습니다"는 실패', () => {
-    assert.deepEqual(rules('keyMoment.0', '15:05 싸움 뒤 골드 격차가 3,895 좁혀졌습니다.', KM0), ['direction', 'direction']);
+    assert.deepEqual(rules('keyMoment.0', '15:04 싸움 뒤 골드 격차가 3,895 좁혀졌습니다.', KM0), ['direction', 'direction']);
     const km2 = ['keyMoment.2.startMin', 'keyMoment.2.gapChangeAbs'];
     assert.deepEqual(rules('keyMoment.2', '22:12 싸움 뒤 골드 격차가 465 줄었습니다.', km2), []);
   });
@@ -224,21 +224,21 @@ describe('검사 2-2: 앞선 팀이 바뀐 결정적 장면 (Q1, 원딜 판 KR_8
   const r = (slotId: string, text: string, factIds: string[]) => verifySlot(s.slots.find((x) => x.slot === slotId)!, { text, factIds }, c);
   const KM0 = ['keyMoment.0.startMin', 'keyMoment.0.killsOurs', 'keyMoment.0.killsTheirs', 'keyMoment.0.swingAbs', 'keyMoment.0.leaderBefore', 'keyMoment.0.leaderAfter'];
   it('바뀜 + 우리 팀 손해 swingAbs는 통과 (어림 포함)', () => {
-    assert.deepEqual(r('keyMoment.0', '23:39 싸움에서 우리 팀 0킬, 상대 팀 3킬로 앞선 팀이 상대 팀으로 바뀌었고, 우리 팀은 골드 약 4,400 손해를 봤습니다.', KM0), []);
+    assert.deepEqual(r('keyMoment.0', '23:38 싸움에서 우리 팀 0킬, 상대 팀 3킬로 앞선 팀이 상대 팀으로 바뀌었고, 우리 팀은 골드 약 4,400 손해를 봤습니다.', KM0), []);
   });
   it('리뷰 문장 "300 벌어졌고 … 바뀌었습니다"는 방향·숫자·없는 fact로 실패', () => {
-    const f = r('keyMoment.0', '23:39 싸움에서 상대 팀만 3킬을 올리며 골드 격차가 300 벌어졌고, 앞선 팀이 상대 팀으로 바뀌었습니다.', [...KM0, 'keyMoment.0.gapChangeAbs']);
+    const f = r('keyMoment.0', '23:38 싸움에서 상대 팀만 3킬을 올리며 골드 격차가 300 벌어졌고, 앞선 팀이 상대 팀으로 바뀌었습니다.', [...KM0, 'keyMoment.0.gapChangeAbs']);
     assert.deepEqual([...new Set(f.map((x) => x.rule))].sort(), ['direction', 'number', 'shape']);
   });
   it('"좁혀졌습니다"(km2)·바뀜 말 없음·"이득"(실제 손해)은 실패', () => {
     const KM2 = ['keyMoment.2.startMin', 'keyMoment.2.swingAbs'];
-    assert.ok(r('keyMoment.2', '16:38 싸움 뒤 우리 팀이 앞서던 골드 격차가 3,618 좁혀졌습니다.', KM2).some((x) => x.rule === 'direction'));
-    assert.deepEqual(r('keyMoment.2', '16:38 싸움으로 우리 팀이 골드 3,618 손해를 봤습니다.', KM2).map((x) => x.rule), ['direction']);
-    assert.deepEqual(r('keyMoment.2', '16:38 싸움으로 앞선 팀이 바뀌었고 우리 팀이 골드 3,618 이득을 봤습니다.', KM2).map((x) => x.rule), ['direction']);
+    assert.ok(r('keyMoment.2', '16:37 싸움 뒤 우리 팀이 앞서던 골드 격차가 3,618 좁혀졌습니다.', KM2).some((x) => x.rule === 'direction'));
+    assert.deepEqual(r('keyMoment.2', '16:37 싸움으로 우리 팀이 골드 3,618 손해를 봤습니다.', KM2).map((x) => x.rule), ['direction']);
+    assert.deepEqual(r('keyMoment.2', '16:37 싸움으로 앞선 팀이 바뀌었고 우리 팀이 골드 3,618 이득을 봤습니다.', KM2).map((x) => x.rule), ['direction']);
   });
   it('요약도 역전 장면이면 벌어/좁혀 금지', () => {
     const ids = s.slots.find((x) => x.slot === 'summary')!.factIds;
-    const f = r('summary', '라인전은 열세였고, 오브젝트 싸움은 잘했고, 그 밖의 운영은 부족했습니다. 23:39 싸움 뒤 골드 격차가 벌어졌습니다.', ids);
+    const f = r('summary', '라인전은 열세였고, 오브젝트 싸움은 잘했고, 그 밖의 운영은 부족했습니다. 23:38 싸움 뒤 골드 격차가 벌어졌습니다.', ids);
     assert.deepEqual(f.map((x) => x.rule), ['direction']);
   });
 });

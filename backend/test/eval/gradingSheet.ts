@@ -102,7 +102,7 @@ function templateFeedback(sheet: FactSheet): Feedback {
 }
 
 function main(): number {
-  const { values } = parseArgs({ options: { q1: { type: 'string' }, rag: { type: 'string' }, q2: { type: 'string' }, rag3: { type: 'boolean', default: false }, out: { type: 'string' } } });
+  const { values } = parseArgs({ options: { q1: { type: 'string' }, rag: { type: 'string' }, q2: { type: 'string' }, rag3: { type: 'boolean', default: false }, rag3result: { type: 'string' }, out: { type: 'string' } } });
   if (!values.q1 || !values.rag || !values.out) {
     console.error('사용: --q1 <결과.json> --rag <결과.json> [--q2 <결과.json>] --out <파일.md>');
     return 1;
@@ -112,6 +112,7 @@ function main(): number {
   const q2 = values.q2 ? readJson<ResultFile>(resolve(values.q2)) : null;
   const q2Label = q2 ? 'RAG2' : 'RAG2 템플릿(LLM 실행 전)';
   const rag3 = values.rag3 && q2 !== null;
+  const rag3Live = rag3 && values.rag3result ? readJson<ResultFile>(resolve(values.rag3result)) : null;
   const tally: Tally = { slots: 0, pass: 0, adviceBlocked: 0 };
 
   const tagsJson = readJson(join(ROOT, 'test/fixtures/ddragon/champion-tags.json'));
@@ -123,9 +124,9 @@ function main(): number {
 
   const lines: string[] = rag3
     ? [
-        '# 화면 모양 채점표: Q1 기준선 · RAG1 · RAG2 · RAG3 템플릿 (set5, Q3 미리보기)',
+        (values.rag3result ? '# 화면 모양 채점표: Q1 기준선 · RAG1 · RAG2 · RAG3 (set5, RAG3 실제 실행)' : '# 화면 모양 채점표: Q1 기준선 · RAG1 · RAG2 · RAG3 템플릿 (set5, Q3 미리보기)'),
         '',
-        `- 문장 출처: **Q1** = \`${values.q1.split('/').pop()}\` (RAG 전 기준선), **RAG1** = \`${values.rag.split('/').pop()}\`, **RAG2** = \`${values.q2!.split('/').pop()}\`, **RAG3** = 템플릿 문장(LLM 실행 전, 0원. 템플릿은 조언을 쓰지 않는다).`,
+        `- 문장 출처: **Q1** = \`${values.q1.split('/').pop()}\` (RAG 전 기준선), **RAG1** = \`${values.rag.split('/').pop()}\`, **RAG2** = \`${values.q2!.split('/').pop()}\`, **RAG3** = ${values.rag3result ? `\`${values.rag3result.split('/').pop()}\` (실제 실행)` : '템플릿 문장(LLM 실행 전, 0원. 템플릿은 조언을 쓰지 않는다)'}.`,
         '- 순서·이름은 화면(분석 결과 카드)과 같다: 한 줄 요약 → 라인전 / 교전(오브젝트 싸움) / 운영(그 밖의 싸움·시야·파밍)의 좋은 점·부족한 점 → 결정적 장면.',
         '- **발동 규칙**: 그 칸에서 조언 규칙표(R1 반영 비율 · R2/R3 득실 점수+딜 · R4 첫 데스 해석 · R5 단독 데스)가 고른 규칙과 문장에 반드시 쓸 근거 값. "없음"이면 RAG3에서 그 칸은 조언을 쓸 수 없다.',
         '- **RAG2 재검사**: RAG2 녹화 문장을 Q3 검증기로 다시 검사한 결과. "조언 막힘"이 이번 변경으로 새로 막히는 조언이다. 그 밖 실패는 대부분 시각 표기("15.1분" → "15:05")가 바뀐 탓이다.',
@@ -152,7 +153,7 @@ function main(): number {
       ['Q1', pick(q1)],
       [rag3 ? 'RAG1' : 'RAG', pick(rag)],
       [q2Label, q2 ? pick(q2) : templateFeedback(sheet)],
-      ...(rag3 ? [['RAG3 템플릿', templateFeedback(sheet)] as [string, Feedback]] : []),
+      ...(rag3 ? [(rag3Live ? ['RAG3', pick(rag3Live)] : ['RAG3 템플릿', templateFeedback(sheet)]) as [string, Feedback]] : []),
     ];
     const rag2 = rag3 ? pick(q2!) : null;
     const extra = (slotId: string, st: { text: string; factIds?: string[] } | undefined) => {

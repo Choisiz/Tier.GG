@@ -3,9 +3,10 @@
 // 단독 킬·데스 6-1)과 기존 등급만 쓴다. 새 경계값은 R1의 "반영 비율 30 이상" 하나다.
 // 판정(등급·점수·말할 순서)은 바꾸지 않는다. 엔진이 다 계산한 뒤 문장 재료만 더한다.
 import { objectiveFights, type ObjectiveKill } from './fights.js';
+import { TANK_ROLES } from './role.js';
 import { DAMAGE_PHASES, KILL_POINTS } from './rules.js';
-import type { MatchContext } from './timeline.js';
-import type { AdviceResult, AdviceRuleId, Facts, FiredRule, Grade, JudgedResult, KeyMoment, Note, Scenes, SubjectResult } from './types.js';
+import { sec, type MatchContext } from './timeline.js';
+import type { AdviceResult, AdviceRuleId, Facts, FiredRule, Grade, JudgedResult, KeyMoment, Scenes, SubjectResult } from './types.js';
 
 export type { AdviceResult, AdviceRuleId, FiredRule } from './types.js';
 
@@ -27,8 +28,8 @@ export const ADVICE_RULES: Readonly<Record<AdviceRuleId, { basis: string; gist: 
     action: true,
   },
   R4: {
-    basis: '첫 데스 해석 (5-4-1)',
-    gist: '싸움에서 먼저 죽은 사람(탱/딜러)과 싸움 결과(승/패)에 맞는 5-4-1 표 문장을 그대로 쓴다. 해석일 뿐이므로 행동 조언은 붙이지 않는다',
+    basis: '첫 데스 해석 (5-4-1) + 득실 점수 (5-4)',
+    gist: '내가 참여한 오브젝트 싸움 하나에서 나에 대해서만 말한다: 내가 먼저 죽었으면 내 유형(탱/딜러)과 싸움 결과에 맞는 5-4-1 표 문장, 먼저는 아니지만 죽었으면 내 데스로 상대 팀이 얻은 점수, 살았으면 살아남았다는 문장(text)을 그대로 쓴다. 다른 아군이 먼저 죽은 일은 말하지 않는다. 해석일 뿐이므로 행동 조언은 붙이지 않는다',
     action: false,
   },
   R5: {
@@ -193,26 +194,68 @@ export function ruleR2R3(me: JudgedResult, deaths: number): FiredRule[] {
 
 // ---------- R4 ----------
 
-export function ruleR4(notes: readonly Note[]): FiredRule[] {
+/** 5-4-1 첫 데스 해석 문장 (fight.ts FIRST_DEATH_TEXT와 같은 문장). 여기서는 "내가" 먼저 죽은 싸움에만 쓴다 */
+export const R4_FIRST_TEXT: Readonly<Record<string, string>> = {
+  TANK_WIN: '이니시를 걸어 싸움을 연 것으로 보입니다',
+  TANK_LOSS: '혼자 들어갔거나 팀이 따라오지 못한 것으로 보입니다',
+  DEALER_LOSS: '먼저 잡혀 싸움을 졌습니다',
+  DEALER_WIN: '먼저 잡혔지만 팀이 받아쳐 이겼습니다',
+};
+
+/** 먼저는 아니지만 내가 죽은 싸움 (N = 내 포지션 킬 점수 × 그 싸움의 내 데스 수, 5-4) */
+export const r4DiedText = (points: number): string => `이 싸움에서 나도 죽어 상대 팀이 ${points}점을 얻었습니다`;
+/** 내가 살아남은 싸움 */
+export const R4_SURVIVED_TEXT = '이 싸움에서 나는 살아남았습니다';
+
+/**
+ * R4 (사용자 결정 2026-11-15: 피드백은 내 역할에 대해서만). 내가 참여한 오브젝트 싸움(비긴 싸움 제외) 중
+ * 진 싸움 → 부족한 점 칸, 이긴 싸움 → 좋은 점 칸에 하나씩. 내가 죽은 싸움을 먼저, 그다음 득실 차가 큰 싸움, 이른 싸움.
+ * - 내가 먼저 죽음 → 내 유형(탱/딜러)·결과의 5-4-1 문장
+ * - 먼저는 아니지만 죽음 → "나도 죽어 상대 팀이 N점을 얻었습니다"
+ * - 살아남음 → "나는 살아남았습니다"
+ * 다른 아군이 먼저 죽은 일은 말하지 않는다.
+ */
+export function ruleR4(ctx: MatchContext, objectives: readonly ObjectiveKill[]): FiredRule[] {
+  const meId = ctx.me.participantId;
+  const team = ctx.me.teamId;
+  const fights = objectiveFights(ctx, objectives)
+    .filter((f) => f.involved.has(meId))
+    .map((f) => {
+      const kills = f.kills.filter((k) => k.victimId !== undefined && ctx.players.has(k.victimId));
+      const myDeaths = kills.filter((k) => k.victimId === meId);
+      const ours = f.points.get(team) ?? 0;
+      let theirs = 0;
+      for (const [t, v] of f.points) if (t !== team) theirs += v;
+      return { kills, myDeaths, ours, theirs, firstIsMe: kills[0]?.victimId === meId };
+    })
+    .filter((f) => f.ours !== f.theirs && f.kills.length > 0);
+  const tank = TANK_ROLES.includes(ctx.me.role);
+  const per = KILL_POINTS[ctx.me.position];
   const out: FiredRule[] = [];
   for (const kind of ['bad', 'good'] as const) {
-    const want = kind === 'bad' ? 'LOSS' : 'WIN';
-    const cands = notes.filter((n) => n.id === 'fight.firstDeath' && n.key.endsWith(want));
+    const won = kind === 'good';
+    const cands = fights.filter((f) => (f.ours > f.theirs) === won);
     if (cands.length === 0) continue;
-    // 득실 차가 가장 큰 싸움 (같으면 이른 싸움)
-    const margin = (n: Note) => Math.abs(Number(n.facts.ours ?? 0) - Number(n.facts.theirs ?? 0));
-    const n = [...cands].sort((a, b) => margin(b) - margin(a) || Number(a.facts.deathSec) - Number(b.facts.deathSec))[0]!;
+    const died = (f: (typeof cands)[number]) => Number(f.myDeaths.length > 0);
+    const margin = (f: (typeof cands)[number]) => Math.abs(f.ours - f.theirs);
+    const f = [...cands].sort((a, b) => died(b) - died(a) || margin(b) - margin(a) || a.kills[0]!.timestamp - b.kills[0]!.timestamp)[0]!;
+    const status = f.firstIsMe ? 'FIRST' : f.myDeaths.length > 0 ? 'DIED' : 'SURVIVED';
+    const deathPoints = per * f.myDeaths.length;
+    const text = status === 'FIRST' ? R4_FIRST_TEXT[`${tank ? 'TANK' : 'DEALER'}_${won ? 'WIN' : 'LOSS'}`]! : status === 'DIED' ? r4DiedText(deathPoints) : R4_SURVIVED_TEXT;
     out.push({
       id: 'R4',
       subjectId: 'fight.advantage',
       kind,
       facts: {
-        key: n.key,
-        text: n.text,
-        deathSec: n.facts.deathSec ?? null,
-        firstVictimIsMe: n.facts.firstVictimIsMe ?? null,
-        tank: n.key.startsWith('TANK'),
-        won: n.key.endsWith('WIN'),
+        status,
+        text,
+        // 내가 죽었으면 내 (첫) 데스 시각, 살았으면 그 싸움 첫 킬 시각
+        sec: sec((f.myDeaths[0] ?? f.kills[0]!).timestamp),
+        myDeaths: f.myDeaths.length,
+        pointsPerDeath: per,
+        deathPoints,
+        tank,
+        won,
       },
     });
   }
@@ -241,7 +284,7 @@ export function buildAdvice(
   opponentParticipantId: number | null,
 ): AdviceResult {
   return {
-    rules: [...ruleR1(me, opp), ...ruleR2R3(me, myObjectiveFightDeaths(ctx, objectives)), ...ruleR4(me.notes), ...ruleR5(me)],
+    rules: [...ruleR1(me, opp), ...ruleR2R3(me, myObjectiveFightDeaths(ctx, objectives)), ...ruleR4(ctx, objectives), ...ruleR5(me)],
     opponentParticipantId,
   };
 }

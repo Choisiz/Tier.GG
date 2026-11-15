@@ -195,6 +195,9 @@ export const FIRST_DEATH_SENTENCES: readonly { stem: string; full: string }[] = 
   { stem: '먼저 잡혔지만 팀이 받아쳐', full: '먼저 잡혔지만 팀이 받아쳐 이겼습니다' },
 ];
 
+/** R4의 내 역할 문장 (advice.ts r4DiedText·R4_SURVIVED_TEXT). stem이 문장에 나오면 그 칸 R4 문장 그대로여야 한다 */
+export const R4_ME_STEMS: readonly string[] = ['나도 죽어 상대 팀이', '나는 살아남았습니다'];
+
 const SCORE_RE = /(?<!시야\s?)점수/;
 const N_POINT_RE = /\d\s*점(?![수유령])/;
 const WEIGHT_RE = /반영\s*비율/;
@@ -219,6 +222,8 @@ export const RULE_EXEMPT_PATTERNS: Readonly<Partial<Record<string, readonly RegE
   R1: [WEIGHT_RE, SCORE_RE, N_POINT_RE],
   R2: [SCORE_RE, N_POINT_RE],
   R3: [SCORE_RE, N_POINT_RE],
+  // R4 "나도 죽어 상대 팀이 N점을 얻었습니다" (2026-11-15)
+  R4: [N_POINT_RE],
 };
 
 /** 이어진 일(followUps) 문장 조각. "이어서 ~"에 붙여 쓰는 존댓말 절 */
@@ -278,9 +283,9 @@ export const OBJECTIVE_LABEL: Readonly<Record<string, string>> = {
   HORDE: '공허 유충',
 };
 
-export const FIRST_DEATH_LABEL: Readonly<Record<string, string>> = {
-  ME: '내가 먼저 죽음',
-  ALLY: '우리 팀 다른 사람이 먼저 죽음',
-  ENEMY: '상대가 먼저 죽음',
-  NONE: '죽은 사람 없음',
-};
+/** 싸움 하나에서 나 (장면 facts·R4 facts). 다른 아군이 먼저 죽은 일은 말하지 않는다 (2026-11-15 사용자 결정: 피드백은 내 역할만) */
+export const MY_FIGHT_LABEL = {
+  FIRST: '내가 먼저 죽음',
+  DIED: '나도 죽음',
+  SURVIVED: '나는 살아남음',
+} as const;

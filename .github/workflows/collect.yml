@@ -1,0 +1,88 @@
+# 게임 수집 자동 실행 (back_spec 3-10, 변경 07)
+# 매일 17:00 UTC(02:00 KST)에 수집 → 05:00 KST DB 예약 집계가 이어서 반영한다.
+# 필요: Secrets DATABASE_URL, RIOT_API_KEY / Variables RIOT_PLATFORM_URL, RIOT_REGION_URL
+# 공개 저장소라 Actions 로그는 누구나 볼 수 있다. 수집기 로그는 키·DB 주소를 가리고 puuid는 앞 8자만 남긴다.
+name: Collect matches
+
+on:
+  schedule:
+    - cron: '0 17 * * *'
+  workflow_dispatch:
+    inputs:
+      players_per_tier:
+        description: '티어당 표본 수 (--players-per-tier)'
+        required: false
+        default: '500'
+        type: string
+      resample:
+        description: '표본을 다시 뽑아 더하기 (--resample)'
+        required: false
+        default: false
+        type: boolean
+      purge:
+        description: '수집 뒤 21일보다 오래된 게임 정리 (purge --yes)'
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+      RIOT_PLATFORM_URL: ${{ vars.RIOT_PLATFORM_URL }}
+      RIOT_REGION_URL: ${{ vars.RIOT_REGION_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Collect
+        env:
+          # 예약 실행에는 inputs가 비어 있어 기본값을 쓴다. 입력값은 셸에 직접 끼워 넣지 않고 환경 변수로만 넘긴다.
+          PPT: ${{ inputs.players_per_tier || '500' }}
+          RESAMPLE: ${{ inputs.resample && 'true' || 'false' }}
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/logs"
+          if ! [[ "$PPT" =~ ^[0-9]+$ ]]; then
+            echo "players_per_tier는 정수여야 합니다." >&2
+            exit 1
+          fi
+          extra=()
+          if [ "$RESAMPLE" = "true" ]; then extra+=(--resample); fi
+          npm run collect:ci -- run --preset test --players-per-tier "$PPT" "${extra[@]}" 2>&1 | tee -a "$GITHUB_WORKSPACE/logs/collect.log"
+
+      - name: Purge old games
+        if: github.event_name == 'schedule' || inputs.purge
+        run: |
+          set -o pipefail
+          npm run collect:ci -- purge --yes 2>&1 | tee -a "$GITHUB_WORKSPACE/logs/collect.log"
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: collect-log-${{ github.run_id }}
+          path: logs/collect.log
+          retention-days: 7
+          if-no-files-found: ignore

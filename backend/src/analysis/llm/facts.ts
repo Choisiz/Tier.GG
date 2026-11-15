@@ -5,7 +5,7 @@ import { ADVICE_RULES, METRIC_LABEL, rulesFor } from '../advice.js';
 import { DAMAGE_PHASES } from '../rules.js';
 import { ROLE_LABEL } from '../role.js';
 import type { AdviceRuleId, AnalysisResult, FactValue, FightScene, FiredRule, ObjectiveScene, PlayScene, Scenes } from '../types.js';
-import { AREA_LABEL, FIRST_DEATH_LABEL, followUpLabel, OBJECTIVE_LABEL, REGION_LABEL, SUBJECT_FACT_LABEL, SUBJECT_LABEL, type Area } from './labels.js';
+import { AREA_LABEL, followUpLabel, MY_FIGHT_LABEL, OBJECTIVE_LABEL, REGION_LABEL, SUBJECT_FACT_LABEL, SUBJECT_LABEL, type Area } from './labels.js';
 
 export interface Fact {
   id: string;
@@ -81,9 +81,12 @@ export function numberDisplay(v: number): string[] {
   return uniq(out);
 }
 
-/** 초 → 게임 시계 표기 "분:초" (Q3, 2026-11-11 사용자 요청: "15.1분" → "15:06"). 초는 반올림 */
+/** 게임 시각 fact 값 (초, 정수). 초 아래는 버린다: 화면(frontend formatGameTime)과 같은 내림이라 장면 제목과 문장 시각이 같다 (2026-11-15) */
+export const timeSec = (sec: number): number => Math.max(0, Math.floor(sec));
+
+/** 초 → 게임 시계 표기 "분:초" (Q3, 2026-11-11 사용자 요청: "15.1분" → "15:06"). 초 아래는 내림 (timeSec) */
 export function timeDisplay(sec: number): string[] {
-  const total = Math.max(0, Math.round(sec));
+  const total = timeSec(sec);
   return [`${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`];
 }
 
@@ -104,7 +107,7 @@ class Builder {
 
   /** 게임 시각 (값 = 초, 표기 = 분:초) */
   min(id: string, label: string, sec: number): string {
-    return this.push({ id, label, value: Math.max(0, Math.round(sec)), unit: TIME_UNIT, display: timeDisplay(sec) });
+    return this.push({ id, label, value: timeSec(sec), unit: TIME_UNIT, display: timeDisplay(sec) });
   }
 
   text(id: string, label: string, value: string): string {
@@ -359,8 +362,8 @@ function fightSceneFacts(b: Builder, p: string, n: number, f: FightScene): strin
     b.num(`${p}.killsOurs`, `장면${n} 우리 팀 킬`, f.killsOurs, '개'),
     b.num(`${p}.killsTheirs`, `장면${n} 상대 팀 킬`, f.killsTheirs, '개'),
     b.text(`${p}.outcome`, `장면${n} 득실`, outcomeText(f)),
-    // 처음 죽은 사람 + 내 데스를 한 값으로 (토큰 절약)
-    b.text(`${p}.firstDeath`, `장면${n} 처음 죽은 사람`, `${FIRST_DEATH_LABEL[f.firstDeath] ?? f.firstDeath}${f.firstDeath !== 'ME' ? (f.iDied ? ', 나도 죽음' : ', 나는 살아남음') : ''}`),
+    // 이 싸움에서 나 (내 역할만 말한다, 2026-11-15: 다른 아군이 먼저 죽은 일은 넣지 않는다)
+    b.text(`${p}.firstDeath`, `장면${n} 이 싸움에서 나`, f.firstDeath === 'ME' ? MY_FIGHT_LABEL.FIRST : f.iDied ? MY_FIGHT_LABEL.DIED : MY_FIGHT_LABEL.SURVIVED),
   ];
   const objs = objectivesText(f);
   if (objs) ids.push(b.text(`${p}.objectives`, `장면${n} 잡힌 오브젝트`, objs));
@@ -386,7 +389,12 @@ function sceneFacts(b: Builder, subjectId: string, scenes: Scenes): string[] {
   const ids = (WINDOW_FACTS[subjectId] ?? []).map((w) => windowFacts(b, w, scenes));
   const key = SCENE_SOURCE[subjectId];
   if (!key) return ids;
-  const list = scenes[key] as readonly (ObjectiveScene | FightScene | PlayScene)[];
+  let list = scenes[key] as readonly (ObjectiveScene | FightScene | PlayScene)[];
+  // 싸움 장면(교전·운영 득실)은 내가 죽은 싸움을 먼저 (엔진 순서는 그대로 두고 그 안에서 안정 정렬, 2026-11-15)
+  if (key === 'fightAdvantage' || key === 'macroAdvantage') {
+    const fs = list as readonly FightScene[];
+    list = [...fs.filter((x) => x.iDied), ...fs.filter((x) => !x.iDied)];
+  }
   list.forEach((x, i) => {
     const p = `scene.${subjectId}.${i}`;
     const n = i + 1;
@@ -475,11 +483,16 @@ function ruleFacts(b: Builder, r: FiredRule, result: AnalysisResult, championNam
       break;
     }
     case 'R4': {
+      // 내 역할만 (2026-11-15): 내가 먼저 죽음 / 먼저는 아니지만 죽음 / 살아남음
       const p = `rule.R4.${r.kind}`;
-      const who = f.firstVictimIsMe ? '내가' : '우리 팀 다른 사람이';
       const role = f.tank ? '탱커' : '딜러';
-      if (typeof f.deathSec === 'number') need(b.min(`${p}.deathMin`, '우리 팀이 먼저 죽은 싸움의 첫 데스 시각', f.deathSec));
-      need(b.text(`${p}.firstDeath`, '그 싸움에서 먼저 죽은 사람', `${who} 먼저 죽음(${role})`));
+      if (typeof f.sec === 'number') need(b.min(`${p}.min`, f.status === 'SURVIVED' ? '그 싸움의 첫 킬 시각' : '그 싸움에서 내가 죽은 시각', f.sec));
+      const me = f.status === 'FIRST' ? `${MY_FIGHT_LABEL.FIRST}(${role})` : f.status === 'DIED' ? MY_FIGHT_LABEL.DIED : MY_FIGHT_LABEL.SURVIVED;
+      need(b.text(`${p}.me`, '그 싸움에서 나', me));
+      if (f.status === 'DIED') {
+        need(b.num(`${p}.deathPoints`, `그 싸움의 내 데스로 상대 팀이 얻은 득실 점수 (데스 1번 = 내 포지션 점수 ${f.pointsPerDeath})`, Number(f.deathPoints), '점'));
+        ids.push(b.num(`${p}.myDeaths`, '그 싸움에서 내 데스 수', Number(f.myDeaths), '번'));
+      }
       need(b.text(`${p}.outcome`, '그 싸움 결과 (득실 기준)', f.won ? '우리 팀이 더 얻음' : '상대 팀이 더 얻음'));
       return { id: r.id, gist: meta.gist, action: meta.action, required: req, factIds: ids, text: String(f.text) };
     }

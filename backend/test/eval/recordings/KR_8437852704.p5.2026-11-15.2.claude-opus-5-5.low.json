@@ -1,0 +1,56 @@
+{
+  "matchId": "KR_8437852704",
+  "participantId": 5,
+  "engineVersion": "2026-11-11.1",
+  "promptVersion": "2026-11-15.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-15T14:43:09.502Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "a54b82aabf5a2cda5b0d94a68136975821a91f2d6ac7e6e20ce3400062056822",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"라인전은 애쉬에게 밀렸고, 오브젝트 싸움과 그 밖의 운영도 부족했습니다. 15:04 싸움에서 우리 팀 1킬, 상대 팀 4킬로 골드 격차가 약 3,900 벌어졌고 우리 바텀 1차 포탑을 잃었습니다.\",\"factIds\":[\"laning.opponent\",\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},\"sections\":{\"laning\":{\"good\":[],\"bad\":[{\"subjectId\":\"laning.gold\",\"text\":\"15:00 골드가 3,958로 상대 애쉬의 4,661보다 703 적었습니다. 8:32 바텀 라인 우리 포탑 쪽에서 상대 2명에게 죽었습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.gold.me\",\"laning.opponent\",\"laning.gold.enemy\",\"laning.gold.diffAbs\",\"laning.deathsBefore.1.min\",\"laning.deathsBefore.1.region\",\"laning.deathsBefore.1.enemies\"]},{\"subjectId\":\"laning.kda\",\"text\":\"15:00까지 0킬 2데스 3어시스트로, 킬과 어시스트를 더하고 데스를 뺀 값이 1이었고 애쉬의 5보다 4 낮았습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.kda.me.kills\",\"laning.kda.me.deaths\",\"laning.kda.me.assists\",\"laning.kda.formula\",\"laning.kda.me\",\"laning.opponent\",\"laning.kda.enemy\",\"laning.kda.diffAbs\"]}]},\"fight\":{\"good\":[],\"bad\":[{\"subjectId\":\"fight.vision\",\"text\":\"딜서폿은 오브젝트 전 시야 비중이 큽니다(반영 비율 30). 오브젝트당 시야 점수가 0.5로 애쉬의 1.25보다 낮았고, 6:35 용을 잡기 전 60초 동안 내 와드는 0개였습니다. 다음 판에는 오브젝트 전 시야에 신경 쓰세요.\",\"factIds\":[\"player.role\",\"rule.R1.fight.vision.weight\",\"rule.R1.fight.vision.me\",\"laning.opponent\",\"rule.R1.fight.vision.opponent\",\"scene.fight.vision.0.min\",\"scene.fight.vision.0.objective\",\"fight.vision.windowSec\",\"scene.fight.vision.0.wardsPlaced\"]},{\"subjectId\":\"fight.advantage\",\"text\":\"오브젝트를 잡은 시각 앞뒤 40초 동안 내가 참여한 싸움에서 우리 팀 몫이 4.5%였습니다. 18:39 싸움 결과는 상대 팀이 더 얻음이었고, 이 싸움에서 나도 죽어 상대 팀이 5점을 얻었습니다.\",\"factIds\":[\"fight.windowSec\",\"fight.advantage.sharePct\",\"rule.R4.bad.min\",\"rule.R4.bad.outcome\",\"rule.R4.bad.me\",\"rule.R4.bad.deathPoints\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.side\",\"text\":\"포탑 피해량 2,017, 분당 87.4로 사이드 압박은 잘했습니다.\",\"factIds\":[\"macro.side.turretDamage\",\"macro.side.perMinute\"]}],\"bad\":[{\"subjectId\":\"macro.vision\",\"text\":\"오브젝트 싸움 밖 시야 점수 합이 21로, 분당 시야 점수가 0.91에 그쳤습니다.\",\"factIds\":[\"macro.vision.points\",\"macro.vision.perMinute\"]},{\"subjectId\":\"macro.advantage\",\"text\":\"딜서폿은 오브젝트 밖 싸움 득실 비중이 큽니다(반영 비율 30). 그 40초 밖 싸움에서 우리 팀 몫이 25.4%로 애쉬의 80.2%보다 낮았고, 22:12 우리 기지 근처에서 내가 먼저 죽었습니다. 다음 판에는 오브젝트 밖 싸움 득실에 신경 쓰세요.\",\"factIds\":[\"player.role\",\"rule.R1.macro.advantage.weight\",\"fight.windowSec\",\"rule.R1.macro.advantage.me\",\"laning.opponent\",\"rule.R1.macro.advantage.opponent\",\"scene.macro.advantage.0.min\",\"scene.macro.advantage.0.region\",\"scene.macro.advantage.0.firstDeath\"]}]}},\"keyMoments\":[{\"index\":0,\"text\":\"15:04 싸움에서 우리 팀 1킬, 상대 팀 4킬로 골드 격차가 약 3,900 벌어졌고, 우리 바텀 1차 포탑을 잃었습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},{\"index\":1,\"text\":\"16:40 싸움에서 우리 팀 0킬, 상대 팀 3킬로 골드 격차가 약 3,900 벌어졌고, 상대 팀이 전령을 잡았습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.gapChangeAbs\",\"keyMoment.1.followUp.1\"]},{\"index\":2,\"text\":\"22:12 싸움에서 우리 팀 4킬, 상대 팀 4킬로 골드 격차가 465 좁혀졌지만 우리 미드 억제기를 잃었습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.killsTheirs\",\"keyMoment.2.gapChangeAbs\",\"keyMoment.2.followUp.1\"]}],\"chunkUse\":[{\"slot\":\"fight.bad.0\",\"chunkIds\":[\"fight.vision.SUPPORT_DAMAGE.bad.R1\"]},{\"slot\":\"macro.bad.1\",\"chunkIds\":[\"macro.advantage.ALL.bad.R1\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 13123,
+          "cacheWrite": 9486,
+          "cacheRead": 0,
+          "output": 2201
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 16421
+    }
+  ],
+  "knowledge": {
+    "version": "048edc977f0f",
+    "chunks": [
+      {
+        "id": "fight.vision.SUPPORT_DAMAGE.bad.R1",
+        "content": "딜서폿의 오브젝트 전 시야가 부족했을 때\n딜서폿은 오브젝트 싸움 평가에서 딜 다음으로 오브젝트 전 시야의 비중이 크다. 오브젝트를 잡기 전 시간 동안 내가 두거나 지운 와드가 적었고 상대 서폿보다도 적었다는 뜻이다. 다음 판에는 오브젝트를 잡기 전 시야에 신경 쓴다."
+      },
+      {
+        "id": "fight.advantage.ALL.bad.R4",
+        "content": "우리 팀이 먼저 죽고 싸움을 졌을 때\n데이터에는 누가 싸움을 걸었는지가 없고 누가 먼저 죽었는지만 있다. 먼저 죽은 사람이 탱커이고 싸움을 졌다면 혼자 들어갔거나 팀이 따라오지 못한 것으로 보고, 딜러였다면 먼저 잡혀 싸움을 졌다고만 말한다. 해석일 뿐이라 행동 조언은 붙이지 않는다."
+      },
+      {
+        "id": "macro.advantage.ALL.bad.R1",
+        "content": "오브젝트 밖 싸움 득실 비중이 큰 유형인데 부족했을 때\n이 유형은 운영 평가에서 오브젝트 싸움 밖 득실의 비중이 크다. 오브젝트를 두고 싸우지 않는 시간에 내가 참여한 싸움에서 우리 팀 몫이 낮았고 상대 라이너보다도 낮았다는 뜻이다. 다음 판에는 그 시간의 싸움에서 우리 팀 몫을 지키는 데 신경 쓴다."
+      },
+      {
+        "id": "fight.vision.ALL.bad.R1",
+        "content": "오브젝트 전 시야 비중이 큰 유형인데 부족했을 때\n이 유형은 오브젝트 싸움 평가에서 오브젝트를 잡기 전 시야의 비중이 크다. 오브젝트 전 시간 동안 내가 두거나 지운 와드가 적었고 상대 라이너보다도 적었다는 뜻이다. 다음 판에는 오브젝트를 잡기 전 시야에 신경 쓴다."
+      }
+    ]
+  }
+}

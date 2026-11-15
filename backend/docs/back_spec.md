@@ -1,6 +1,6 @@
 # 백엔드 계획서 — 수집 워커 + 챔피언 통계 API
 
-> 상태: **승인됨** (v1 2026-10-14, 변경 01 2026-10-15, 변경 02 2026-10-16, 변경 03 2026-10-27, 변경 04 2026-10-30, 변경 05 2026-11-03)
+> 상태: **승인됨** (v1 2026-10-14, 변경 01 2026-10-15, 변경 02 2026-10-16, 변경 03 2026-10-27, 변경 04 2026-10-30, 변경 05 2026-11-03, 변경 07 2026-11-15)
 > 읽는 계약: `docs/contracts/db_contract.md`, `docs/contracts/db_contract.dbml` **v8** (최근 14일 기준, 변경 04: 룬 보조 정렬·수집 범위 티어당 250명)
 > 작성하는 계약: `docs/contracts/api_contract.md` **v4** (전적 검색 추가 2026-10-27, 킬관여·라인전 15분 골드 추가 2026-10-30, 게임 피드백 분석 POST 추가 2026-11-03)
 > 이 문서는 **지금 계획만** 적는다. 패치 기준이던 v1 계획과 변경 01·02·03·04·05 원문(04의 설계 비교·실측 근거, 05의 사용자 결정 질문 포함)은 git 기록(`24918eb`, 변경 02~04는 각 Build 커밋 이전)에 남아 있다.
@@ -24,6 +24,7 @@
   - [3-7. 제한기](#3-7-제한기)
   - [3-8. aggregate와 purge](#3-8-aggregate와-purge)
   - [3-9. 테스트 수집 규모](#3-9-테스트-수집-규모)
+  - [3-10. 자동 실행 (GitHub Actions, 변경 07)](#3-10-자동-실행-github-actions-변경-07)
 - [4. Riot에서 DB로 변환 규칙](#4-riot에서-db로-변환-규칙)
 - [5. API 설계](#5-api-설계)
   - [5-1. 공통 규칙](#5-1-공통-규칙)
@@ -327,6 +328,39 @@ backend/
 
 - 시간 계산: 98회 / 120초 = 시간당 약 2,940회. 24시간 키 안에 끝나야 한다.
 - 전체 테스트 수집은 Review 범위가 아니다. 사용자가 승인 후 직접 실행한다.
+
+### 3-10. 자동 실행 (GitHub Actions, 변경 07)
+
+> 2026-11-15 승인 (사용자 선택 "A안"). 게임 수집 자동 실행 + 전체 재수집 1회.
+
+- 요약: 수집기는 지금 Mac에서 손으로 돌릴 때만 실행된다. DB의 `pg_cron`(매일 05:00 KST 집계)은 SQL만 돌릴 수 있어 Riot을 부르는 수집기를 실행할 수 없다(확인: 집계는 11-11~11-14 매일 성공, 최신 게임은 11-03에서 멈춤). **GitHub Actions 예약 실행**으로 매일 수집을 돌리고, 끝나면 DB의 05:00 집계가 이어서 반영한다. 수집 로직은 바꾸지 않는다.
+
+| 항목 | 내용 |
+|------|------|
+| 파일 | `.github/workflows/collect.yml` 1개 (Build 2026-11-15) |
+| 시각 | 매일 **17:00 UTC (02:00 KST)** 시작 → 05:00 KST 집계 전에 끝나게. 첫 전체 수집(약 5시간)은 수동 실행 |
+| 실행 | `ubuntu-latest`, Node 24, `backend`에서 `npm ci` → `npm run collect:ci -- run --preset test --players-per-tier 500` → `npm run collect:ci -- purge --yes`(21일보다 오래된 게임 정리) |
+| 수동 실행 | `workflow_dispatch` 입력: `players_per_tier`(기본 500), `resample`(기본 false), `purge`(기본 true) |
+| 환경 변수 | GitHub **Secrets**: `DATABASE_URL`, `RIOT_API_KEY`. **Variables**: `RIOT_PLATFORM_URL`, `RIOT_REGION_URL`. 사용자가 저장소 Settings에서 직접 등록 |
+| 스크립트 | `package.json`에 `collect:ci` (`--env-file` 없이 실행. CI에는 `.env` 파일이 없음). 기존 `collect`는 그대로 |
+| 안전장치 | `timeout-minutes: 330`(6시간 한도 전 종료, 다음 실행이 이어서 모음), `concurrency`로 동시 실행 1개, 수집기 자체 잠금 유지. 키 만료(종료 코드 2)·실패는 워크플로 실패 → GitHub가 메일로 알림. 수집이 실패하면 purge는 건너뜀. 입력값은 환경 변수로만 넘기고 `players_per_tier`는 정수 검사 |
+| 로그 | Actions 로그는 **공개 저장소라 누구나 볼 수 있다.** 수집기 로그에는 키·DB 주소가 없고 puuid는 앞 8자만 나온다(확인 항목). 전체 로그는 artifact로 7일 보관 |
+
+#### 전체 재수집 (한 번만, 사용자 승인 2026-11-15 "db데이터를 밀어버리고")
+
+1. 메인이 로컬에서 한 트랜잭션으로 `purge_old_games(14)`(현재 게임 전부 삭제)·`DELETE FROM ranked_players`(표본 1,500명) 실행 — 활동 중인 플레이어로 표본을 새로 뽑기 위해.
+2. 워크플로를 수동 실행(`resample=false`, 표본이 비어 있으니 새로 뽑힘)해 첫 전체 수집. 끝나면 `aggregate`로 바로 반영.
+
+#### 완료 기준 (변경 07)
+
+1. 워크플로 문법 검사(`actionlint` 또는 GitHub에서 첫 실행 성공), 수동 실행 1회 성공, `collection_logs`에 기록, 다음 날 02:00 KST 예약 실행 1회 성공 확인.
+2. 로그에 키·DB 주소·전체 puuid 없음.
+3. typecheck·lint·test 0 (스크립트 1줄 추가뿐).
+
+#### 작업 범위·진행 (변경 07)
+
+- `.github/workflows/collect.yml`, `backend/package.json`(스크립트 1줄), `backend/docs/{back_spec,back_build}.md`, README "로컬 실행" 절 몇 줄.
+- 수집 자동화(3장 "항상 전체 Review" 대상: 수집)라 Build 뒤 **독립 Review(Sonnet)**.
 
 ---
 

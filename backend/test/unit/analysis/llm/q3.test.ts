@@ -1,11 +1,13 @@
 // Q3 (ai_spec RAG3): 조언 규칙표 R1~R5 발동/미발동 경계, 상대 라이너 비교, 분:초 표기, 조언 검증기. 유료 호출 0회.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { R1_MIN_WEIGHT, ruleR1, ruleR2R3, ruleR4, ruleR5 } from '../../../../src/analysis/advice.js';
+import { R1_MIN_WEIGHT, ruleR1, ruleR2R3, ruleR5 } from '../../../../src/analysis/advice.js';
+import { analyzeMatch } from '../../../../src/analysis/index.js';
+import { fakeGame, kill, monster, puuidOf, TAGS } from '../helpers.js';
 import { templateFor } from '../../../../src/analysis/llm/template.js';
 import { verifySlot } from '../../../../src/analysis/llm/verify.js';
 import { buildUserPayload } from '../../../../src/analysis/llm/prompt.js';
-import type { AnalysisResult, Grade, JudgedResult, PlayScene, SubjectResult } from '../../../../src/analysis/types.js';
+import type { AnalysisResult, Grade, JudgedResult, PlayScene, SubjectResult, TimelineEvent } from '../../../../src/analysis/types.js';
 import { ctxOf, senaResult, senaSheet, SET5_IDS, set5Sheet } from './helpers.js';
 
 const sena = senaResult();
@@ -89,15 +91,50 @@ describe('R2·R3 득실 점수 + 딜 등급', () => {
   });
 });
 
-describe('R4 첫 데스 해석 (5-4-1 문장 그대로)', () => {
-  it('세나: 진 싸움에서 아군 딜러가 먼저 죽음 → 부족한 점 칸에 "먼저 잡혀 싸움을 졌습니다"', () => {
-    const r4 = ruleR4(sena.notes);
-    assert.deepEqual(r4.map((r) => [r.kind, r.facts.text]), [['bad', '먼저 잡혀 싸움을 졌습니다']]);
+describe('R4 내 역할만 (2026-11-15: 먼저 죽음 → 5-4-1 / 나도 죽음 → N점 / 살아남음)', () => {
+  it('세나: R4는 교전 득실 칸에만, 다른 아군이 먼저 죽은 일은 문장에 없음', () => {
+    const r4 = sena.advice.rules.filter((r) => r.id === 'R4');
+    assert.ok(r4.length > 0);
+    for (const r of r4) {
+      assert.equal(r.subjectId, 'fight.advantage');
+      assert.doesNotMatch(String(r.facts.text), /우리 팀 다른 사람|아군/);
+    }
   });
-  it('이긴 싸움 노트는 좋은 점 칸으로, 노트가 없으면 미발동', () => {
-    const win = { ...sena.notes[0]!, key: 'TANK_WIN', text: '이니시를 걸어 싸움을 연 것으로 보입니다' };
-    assert.deepEqual(ruleR4([win]).map((r) => [r.kind, r.facts.text, r.facts.tank]), [['good', '이니시를 걸어 싸움을 연 것으로 보입니다', true]]);
-    assert.deepEqual(ruleR4([]), []);
+  // 나 = 3(럭스, 블루 미드, 딜러, 킬 점수 7)
+  const r4Of = (events: TimelineEvent[]) => {
+    const { match, timeline } = fakeGame({ events });
+    return analyzeMatch({ match, timeline, puuid: puuidOf(3), championTags: TAGS }).advice.rules.filter((r) => r.id === 'R4');
+  };
+  it('내가 먼저 죽고 진 싸움 → 딜러 5-4-1 "먼저 잡혀 싸움을 졌습니다"', () => {
+    const r4 = r4Of([monster(15, 7, 'DRAGON', 'FIRE_DRAGON'), kill(14.5, 8, 3, [7]), kill(14.7, 4, 9)]);
+    assert.deepEqual(r4.map((r) => [r.kind, r.facts.status, r.facts.text]), [['bad', 'FIRST', '먼저 잡혀 싸움을 졌습니다']]);
+    assert.equal(r4[0]!.facts.sec, 870);
+  });
+  it('아군이 먼저 죽고 나도 죽은 진 싸움 → "나도 죽어 상대 팀이 7점을 얻었습니다", 내가 살아남은 이긴 싸움 → "나는 살아남았습니다"', () => {
+    const r4 = r4Of([
+      // 10분 용(우리): 내가 9를 잡고 살아남음
+      monster(10, 2, 'DRAGON', 'FIRE_DRAGON'),
+      kill(9.8, 3, 9),
+      // 15분 용(상대): 아군 4가 먼저 죽고 나도 죽음
+      monster(15, 7, 'DRAGON', 'WATER_DRAGON'),
+      kill(14.5, 8, 4),
+      kill(14.6, 7, 3),
+      // 20분 바론(상대): 득실 차는 더 크지만 나는 어시스트만 하고 살아남음 → 내가 죽은 15분 싸움이 먼저
+      monster(20, 7, 'BARON_NASHOR'),
+      kill(19.8, 7, 1),
+      kill(19.9, 2, 9, [3]),
+    ]);
+    assert.deepEqual(
+      r4.map((r) => [r.kind, r.facts.status, r.facts.text, r.facts.sec]),
+      [
+        ['bad', 'DIED', '이 싸움에서 나도 죽어 상대 팀이 7점을 얻었습니다', 876],
+        ['good', 'SURVIVED', '이 싸움에서 나는 살아남았습니다', 588],
+      ],
+    );
+    assert.equal(r4[0]!.facts.deathPoints, 7);
+  });
+  it('참여한 오브젝트 싸움이 없으면 미발동', () => {
+    assert.deepEqual(r4Of([monster(15, 7, 'DRAGON', 'FIRE_DRAGON'), kill(14.5, 8, 4)]), []);
   });
 });
 
@@ -156,7 +193,7 @@ describe('Q3 칸 규칙과 프롬프트', () => {
     const s = (id: string) => p.slots.find((x) => x.slot === id)!;
     assert.equal(s('laning.bad.0').rules, undefined);
     assert.deepEqual(s('fight.bad.0').rules!.map((r) => [r.id, r.required]), [['R1', R1V]]);
-    assert.equal(s('fight.bad.1').rules![0]!.text, '먼저 잡혀 싸움을 졌습니다');
+    assert.equal(s('fight.bad.1').rules![0]!.text, '이 싸움에서 나도 죽어 상대 팀이 5점을 얻었습니다');
   });
 });
 
@@ -191,11 +228,23 @@ describe('Q3 검증기: 조언은 발동한 규칙의 근거를 인용해야 함
     }
     assert.ok(!details('laning.bad.0', '15:00 골드가 상대 애쉬보다 703 적었습니다.', ['laning.referenceMin', 'laning.opponent', 'laning.gold.diffAbs']).length);
   });
-  it('R4 칸: 5-4-1 문장 그대로 + 먼저 죽은 사람·결과는 통과, 다른 5-4-1 문장은 실패, R4 없는 칸에서 5-4-1 문장은 실패', () => {
-    const ids = ['rule.R4.bad.deathMin', 'rule.R4.bad.firstDeath', 'rule.R4.bad.outcome'];
-    assert.deepEqual(check('fight.bad.1', '16:40 싸움에서 우리 팀 다른 사람이 먼저 죽었고 상대 팀이 더 얻어, 먼저 잡혀 싸움을 졌습니다.', ids), []);
-    assert.ok(details('fight.bad.1', '16:40 싸움에서 혼자 들어갔거나 팀이 따라오지 못한 것으로 보입니다.', ids).some((d) => d.includes('R4 문장')));
+  it('R4 칸 (세나, 나도 죽음): R4 문장 그대로 + 시각·결과는 통과("N점" 허용), 숫자를 바꾸거나 5-4-1 문장·아군 첫 데스 문장은 실패', () => {
+    const ids = ['rule.R4.bad.min', 'rule.R4.bad.me', 'rule.R4.bad.deathPoints', 'rule.R4.bad.outcome'];
+    assert.deepEqual(check('fight.bad.1', '18:39 싸움에서 상대 팀이 더 얻었고, 이 싸움에서 나도 죽어 상대 팀이 5점을 얻었습니다.', ids), []);
+    assert.ok(details('fight.bad.1', '18:39 싸움에서 이 싸움에서 나도 죽어 상대 팀이 7점을 얻었습니다.', ids).length > 0);
+    assert.ok(details('fight.bad.1', '18:39 싸움에서 먼저 잡혀 싸움을 졌습니다.', ids).some((d) => d.includes('R4 문장')));
+    assert.ok(details('macro.bad.1', '이 싸움에서 나는 살아남았습니다.', []).some((d) => d.includes('R4가 발동한 칸에서만')));
     assert.ok(details('macro.bad.1', '먼저 잡혀 싸움을 졌습니다.', []).some((d) => d.includes('R4가 발동한 칸에서만')));
+  });
+  it('장면 facts에 다른 아군의 첫 데스가 없고, 싸움 장면은 내가 죽은 싸움이 먼저', () => {
+    for (const id of SET5_IDS) {
+      const sh = set5Sheet(id);
+      assert.ok(sh.facts.every((f) => !String(f.value).includes('우리 팀 다른 사람')), id);
+      for (const subj of ['fight.advantage', 'macro.advantage']) {
+        const vals = sh.facts.filter((f) => new RegExp(`^scene\\.${subj.replace('.', '\\.')}\\.\\d+\\.firstDeath$`).test(f.id)).map((f) => f.value !== '나는 살아남음');
+        assert.deepEqual(vals, [...vals].sort((a, b) => Number(b) - Number(a)), `${id} ${subj}`);
+      }
+    }
   });
   it('"반영 비율"은 R1 칸에서만, 요약 칸의 조언은 실패', () => {
     assert.ok(details('fight.bad.1', '반영 비율이 큰 과목입니다.', []).some((d) => d.includes('반영 비율')));

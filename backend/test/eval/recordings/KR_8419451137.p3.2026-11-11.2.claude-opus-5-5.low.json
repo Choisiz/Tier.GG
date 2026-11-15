@@ -1,0 +1,48 @@
+{
+  "matchId": "KR_8419451137",
+  "participantId": 3,
+  "engineVersion": "2026-11-11.1",
+  "promptVersion": "2026-11-11.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-15T14:21:20.506Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "337bb963148e63cb02ca7b07aa87fac7b4ccb6154860322702f8b5a4c1a5077e",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"라인전은 우세, 오브젝트 싸움은 부족, 그 밖의 운영은 잘했습니다. 16:10 싸움에서 우리 팀 4킬, 상대 팀 0킬로 골드 격차가 약 4,000 벌어졌습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\"]},\"sections\":{\"laning\":{\"good\":[{\"subjectId\":\"laning.gold\",\"text\":\"15:00 골드가 6,006으로 상대 다이애나의 5,958보다 48 많았습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.gold.me\",\"laning.opponent\",\"laning.gold.enemy\",\"laning.gold.diffAbs\"]},{\"subjectId\":\"laning.level\",\"text\":\"15:00 레벨이 11레벨로 상대 다이애나의 9레벨보다 2레벨 높았습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.level.me\",\"laning.opponent\",\"laning.level.enemy\",\"laning.level.diffAbs\"]}],\"bad\":[]},\"fight\":{\"good\":[{\"subjectId\":\"fight.advantage\",\"text\":\"오브젝트를 잡은 시각 앞뒤 40초 동안 내가 참여한 싸움 4번에서 우리 팀 몫이 78.1%였습니다. 16:10 미드 라인 우리 포탑 쪽에서 우리 팀 5킬, 상대 팀 1킬이 났고 우리 팀이 전령을 잡았습니다.\",\"factIds\":[\"fight.windowSec\",\"fight.advantage.fights\",\"fight.advantage.sharePct\",\"scene.fight.advantage.0.min\",\"scene.fight.advantage.0.region\",\"scene.fight.advantage.0.killsOurs\",\"scene.fight.advantage.0.killsTheirs\",\"scene.fight.advantage.0.objectives\"]}],\"bad\":[{\"subjectId\":\"fight.damage\",\"text\":\"딜미드는 챔피언 딜 비중 비중이 큽니다(반영 비율 60). 내 딜 비중이 11.5%로 상대 라이너 다이애나의 18.4%보다 낮았습니다. 다음 판에는 챔피언 딜 비중에 신경 쓰세요.\",\"factIds\":[\"player.role\",\"rule.R1.fight.damage.weight\",\"rule.R1.fight.damage.me\",\"laning.opponent\",\"rule.R1.fight.damage.opponent\"]},{\"subjectId\":\"fight.vision\",\"text\":\"오브젝트를 잡기 전 60초 동안의 시야 점수가 오브젝트당 0.33이었습니다. 7:37 상대 팀이 잡은 용 전에 내 와드는 0개였습니다.\",\"factIds\":[\"fight.vision.windowSec\",\"fight.vision.perObjective\",\"scene.fight.vision.0.min\",\"scene.fight.vision.0.taken\",\"scene.fight.vision.0.objective\",\"scene.fight.vision.0.wardsPlaced\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.advantage\",\"text\":\"오브젝트를 잡은 시각 앞뒤 40초 밖에서 내가 참여한 싸움 2번의 득실 중 우리 팀 몫이 83.3%였습니다. 11:04 미드 라인 우리 포탑 쪽에서 상대가 먼저 죽으며 우리 팀 6킬, 상대 팀 2킬이 났습니다.\",\"factIds\":[\"fight.windowSec\",\"macro.advantage.fights\",\"macro.advantage.sharePct\",\"scene.macro.advantage.0.min\",\"scene.macro.advantage.0.region\",\"scene.macro.advantage.0.firstDeath\",\"scene.macro.advantage.0.killsOurs\",\"scene.macro.advantage.0.killsTheirs\"]},{\"subjectId\":\"macro.side\",\"text\":\"포탑 피해량이 13,705, 분당 709.5였습니다.\",\"factIds\":[\"macro.side.turretDamage\",\"macro.side.perMinute\"]}],\"bad\":[]}},\"keyMoments\":[{\"index\":0,\"text\":\"16:10 싸움에서 우리 팀 4킬, 상대 팀 0킬로 골드 격차가 약 4,000 벌어졌고, 이어 상대 미드 1차 포탑을 깼습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},{\"index\":1,\"text\":\"11:04 싸움에서 우리 팀 6킬, 상대 팀 2킬로 골드 격차가 약 3,500 벌어졌습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.gapChangeAbs\"]},{\"index\":2,\"text\":\"14:12 싸움에서 우리 팀 3킬, 상대 팀 3킬로 골드 격차가 약 1,700 좁혀졌고, 우리 탑 1차 포탑을 잃었습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.killsTheirs\",\"keyMoment.2.gapChangeAbs\",\"keyMoment.2.followUp.0\"]}],\"chunkUse\":[{\"slot\":\"fight.bad.0\",\"chunkIds\":[\"fight.damage.MID_DAMAGE.bad.R1\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 11091,
+          "cacheWrite": 0,
+          "cacheRead": 9367,
+          "output": 1949
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 13901
+    }
+  ],
+  "knowledge": {
+    "version": "048edc977f0f",
+    "chunks": [
+      {
+        "id": "fight.damage.MID_DAMAGE.bad.R1",
+        "content": "딜미드의 교전 딜이 부족했을 때\n딜미드는 오브젝트 싸움 평가에서 챔피언 딜 비중의 비중이 가장 크다. 팀 안에서 내 챔피언 피해의 몫이 기대치보다 낮았고 상대 라이너보다도 낮았다는 뜻이다. 다음 판에는 싸움에서 챔피언 딜을 넣는 데 신경 쓴다."
+      },
+      {
+        "id": "fight.damage.ALL.bad.R1",
+        "content": "딜 비중이 큰 유형인데 부족했을 때\n이 유형은 오브젝트 싸움 평가에서 챔피언 딜 비중의 비중이 크다. 팀 안에서 내가 넣은 챔피언 피해의 몫이 이 유형의 기대치보다 낮았고 상대 라이너보다도 낮았다는 뜻이다. 다음 판에는 싸움에서 챔피언 딜을 넣는 데 신경 쓴다."
+      }
+    ]
+  }
+}
