@@ -1,0 +1,56 @@
+{
+  "matchId": "KR_8456658640",
+  "participantId": 3,
+  "engineVersion": "2026-11-19.1",
+  "promptVersion": "2026-11-19.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-19T15:01:39.530Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "ac79a38f66816e4c154ffa8e79e194dd8b5545061d886937b581bfd868965bbf",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"라인전은 경험치는 따라갔지만 골드를 내줬고, 오브젝트 싸움과 그 밖의 운영은 보통이었습니다. 34:30 싸움에서 우리 팀 4킬, 상대 팀 5킬로 골드 격차가 930 벌어졌고 우리 미드 억제기를 잃었습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.5\"]},\"sections\":{\"laning\":{\"good\":[],\"bad\":[{\"subjectId\":\"laning.growth\",\"text\":\"15:00 라인전은 경험치는 따라갔지만 골드를 내줬습니다. 레벨은 10으로 같았지만 골드가 상대 피즈보다 872 적었고, 킬 현상금 합이 310으로 상대의 1,327보다 적었습니다. 다음 판에는 상대에게 킬을 내주는 데스를 줄이세요.\",\"factIds\":[\"laning.referenceMin\",\"laning.growth.cell\",\"laning.level.me\",\"laning.opponent\",\"laning.gold.diffAbs\",\"rule.R8.me\",\"rule.R8.enemy\",\"rule.R8.action\"]},{\"subjectId\":\"laning.deaths\",\"text\":\"7:33 미드 라인 우리 포탑 쪽에서 1:1로 죽었고, 내가 준 피해는 37, 받은 피해는 1283으로 일방적으로 당했습니다. 5:06 위쪽 강(바론 쪽)에서 엘리스의 갱에 죽기 전 와드는 0개였습니다. 그 시각·지역에서 1:1 교환을 줄이고, 그 지역 쪽에 와드를 두세요.\",\"factIds\":[\"rule.R6.min\",\"rule.R6.region\",\"rule.R6.dealt\",\"rule.R6.received\",\"rule.R6.trade\",\"rule.R7.min\",\"rule.R7.region\",\"rule.R7.jungler\",\"rule.R7.wardsBefore\"]}]},\"fight\":{\"good\":[],\"bad\":[{\"subjectId\":\"fight.vision\",\"text\":\"오브젝트를 잡기 전 60초 동안의 오브젝트당 시야 점수가 0.25였습니다. 24:50 상대가 잡은 바론 전 내 제어 와드는 0개였습니다. 다음 판에는 그 오브젝트 전에 제어 와드를 두세요.\",\"factIds\":[\"fight.vision.windowSec\",\"fight.vision.perObjective\",\"rule.R11.min\",\"rule.R11.objective\",\"rule.R11.controlWards\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.vision\",\"text\":\"오브젝트 싸움 밖 시야 점수 합이 20으로, 분당 시야 점수는 0.56이었습니다.\",\"factIds\":[\"macro.vision.points\",\"macro.vision.perMinute\"]}],\"bad\":[{\"subjectId\":\"macro.side\",\"text\":\"포탑 피해량이 5,754로 분당 포탑 피해량이 161.9에 그쳤습니다.\",\"factIds\":[\"macro.side.turretDamage\",\"macro.side.perMinute\"]}]}},\"keyMoments\":[{\"index\":0,\"text\":\"34:30 싸움에서 우리 팀 4킬, 상대 팀 5킬로 골드 격차가 930 벌어졌습니다. 이후 우리 바텀 억제기와 미드 억제기를 잃었습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.1\",\"keyMoment.0.followUp.5\"]}],\"chunkUse\":[{\"slot\":\"laning.bad.0\",\"chunkIds\":[\"laning.growth.ALL.bad.R8\"]},{\"slot\":\"laning.bad.1\",\"chunkIds\":[\"laning.deaths.ALL.bad.R6\",\"laning.deaths.ALL.bad.R7\"]},{\"slot\":\"fight.bad.0\",\"chunkIds\":[\"fight.vision.ALL.bad.R11\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 10312,
+          "cacheWrite": 11256,
+          "cacheRead": 0,
+          "output": 1459
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 12993
+    }
+  ],
+  "knowledge": {
+    "version": "faca844eb987",
+    "chunks": [
+      {
+        "id": "fight.vision.ALL.bad.R11",
+        "content": "상대가 잡은 오브젝트 전에 제어 와드가 없었을 때\n상대 팀이 잡은 오브젝트 전 시간 동안 내가 둔 제어 와드가 없었다. 제어 와드는 상대 와드를 드러내고 없애 오브젝트 주변 시야를 지키는 와드다. 다음 판에는 그 오브젝트가 나오기 전에 오브젝트 근처에 제어 와드를 둔다."
+      },
+      {
+        "id": "laning.growth.ALL.bad.R8",
+        "content": "라인전 성장이 상대 라이너보다 뒤졌을 때\n라인전 비교 시점에 골드가 상대 라이너보다 뒤졌고 레벨은 같거나 뒤졌다. 골드 차는 킬과 어시스트로 얻은 골드, 미니언 처치, 포탑 방패에서 생기며, 그중 상대 쪽이 가장 많이 앞선 한 가지를 원인으로 본다. 상대가 킬 골드를 더 얻었다면 상대에게 킬을 내주는 데스를 줄이고, 미니언 처치가 뒤졌다면 비교 시점까지 미니언을 챙기고, 방패가 뒤졌다면 라인을 밀어 방패를 챙긴다. 레벨이 뒤진 원인이 데스나 라인을 비운 횟수라면 그 횟수를 줄인다. 다음 판에는 그 원인 하나에 맞춘 행동만 한다."
+      },
+      {
+        "id": "laning.deaths.ALL.bad.R6",
+        "content": "라인전에서 상대 라이너에게 일대일로 죽었을 때\n라인전에서 상대 라이너가 어시스트 없이 혼자 나를 잡은 데스다. 죽기 직전 내가 준 피해가 받은 피해보다 훨씬 적었다면 교환이 일방적이었다는 뜻이다. 데이터에는 교환 전 체력이 없어 왜 졌는지는 알 수 없고, 그 시각과 지역에서 상대 라이너와 맞붙어 졌다는 사실만 있다. 다음 판에는 그 시각과 지역에서 상대 라이너와의 일대일 교환을 줄인다."
+      },
+      {
+        "id": "laning.deaths.ALL.bad.R7",
+        "content": "라인전에서 상대 정글의 갱에 죽었을 때\n라인전에서 상대 정글이 킬이나 어시스트, 또는 피해로 관여한 데스다. 죽기 전 내가 둔 와드가 없었다면 상대 정글이 오는 길을 미리 보지 못한 상태였다는 뜻이다. 다음 판에는 갱에 당한 그 지역 쪽에 와드를 먼저 둔다."
+      }
+    ]
+  }
+}

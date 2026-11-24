@@ -1,0 +1,32 @@
+{
+  "description": "검증용 최근 솔로랭크 3판 (한 계정, 계정 식별 값 가림)",
+  "items": [
+    {
+      "matchId": "KR_8456658640",
+      "match": "KR_8456658640.match.json",
+      "timeline": "KR_8456658640.timeline.json",
+      "participantId": 3,
+      "position": "MIDDLE",
+      "role": "",
+      "note": "Ahri, 패, 35.5분, 2026-11-13"
+    },
+    {
+      "matchId": "KR_8444684709",
+      "match": "KR_8444684709.match.json",
+      "timeline": "KR_8444684709.timeline.json",
+      "participantId": 8,
+      "position": "MIDDLE",
+      "role": "",
+      "note": "Sylas, 패, 40.2분, 2026-11-03"
+    },
+    {
+      "matchId": "KR_8444657814",
+      "match": "KR_8444657814.match.json",
+      "timeline": "KR_8444657814.timeline.json",
+      "participantId": 7,
+      "position": "JUNGLE",
+      "role": "",
+      "note": "MonkeyKing, 패, 36.0분, 2026-11-03"
+    }
+  ]
+}

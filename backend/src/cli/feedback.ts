@@ -175,8 +175,11 @@ export interface FinalCheck {
   details: { slot: string; rule: string; detail: string }[];
 }
 
-/** 최종 결과 문장을 검증기로 다시 돌린다 (완료 기준: 틀린 숫자·방향·금지어 0) */
-export function finalCheck(sheet: FactSheet, fb: FeedbackResult, all: readonly string[]): FinalCheck {
+/**
+ * 최종 결과 문장을 검증기로 다시 돌린다 (완료 기준: 틀린 숫자·방향·금지어 0).
+ * Q5(C5): 그 판에 준 RAG 조각 ID(knowledgeIds, 기본은 결과 meta의 목록)를 넘겨, 조각 인용을 "조각을 주지 않았는데 chunkIds" 오류로 세지 않는다.
+ */
+export function finalCheck(sheet: FactSheet, fb: FeedbackResult, all: readonly string[], knowledgeIds: readonly string[] = fb.meta.knowledgeIds ?? []): FinalCheck {
   const out: FinalCheck = { number: 0, direction: 0, forbidden: 0, other: 0, details: [] };
   const texts = new Map<string, { text: string; factIds: string[] }>();
   texts.set('summary', fb.summary);
@@ -187,7 +190,7 @@ export function finalCheck(sheet: FactSheet, fb: FeedbackResult, all: readonly s
   for (const s of sheet.slots) {
     const st = texts.get(s.slot);
     if (!st) continue;
-    for (const f of verifySlot(s, st, { sheet, allChampionNames: all })) {
+    for (const f of verifySlot(s, st, { sheet, allChampionNames: all, ...(knowledgeIds.length > 0 ? { knowledgeIds: new Set(knowledgeIds) } : {}) })) {
       if (f.rule === 'number') out.number++;
       else if (f.rule === 'direction') out.direction++;
       else if (f.rule === 'forbidden') out.forbidden++;
@@ -474,7 +477,7 @@ export async function runCli(argv: string[], env: NodeJS.ProcessEnv, io: CliIo, 
       };
       writeFileSync(recPath!, `${JSON.stringify(rec, null, 2)}\n`);
     }
-    const fc = finalCheck(sheet, feedback, allNames);
+    const fc = finalCheck(sheet, feedback, allNames, feedback.meta.knowledgeIds);
     const jr: JobResult = {
       matchId: result.matchId,
       participantId: pid,

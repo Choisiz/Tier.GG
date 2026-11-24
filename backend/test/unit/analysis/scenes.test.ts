@@ -5,20 +5,66 @@ import { describe, it } from 'node:test';
 import { analyzeMatch, ENGINE_VERSION } from '../../../src/analysis/index.js';
 import { regionOf, SCENES_MAX } from '../../../src/analysis/scenes.js';
 import type { TimelineEvent } from '../../../src/analysis/types.js';
-import { allSnapshots, SNAPSHOT_PATH, snapshotGames, type EngineSnapshot } from './engineSnapshot.js';
+import { allSnapshots, SNAPSHOT_PATH, SNAPSHOT_PATH_Q2, SNAPSHOT_PATH_Q4, snapshotGames, type EngineSnapshot } from './engineSnapshot.js';
 import { fakeGame, kill, monster, puuidOf, TAGS, ward } from './helpers.js';
 
-describe('판정 불변 (Q2: 장면을 더해도 등급·점수·말할 과목이 그대로)', () => {
+describe('판정 불변 (Q5: 정글 라인전 데스 유형만 바뀌어 스냅숏을 새로 만듦, 장면·조언·빈 칸 채우기·Q6 칭찬 규칙·Q7 기여 지표·R12를 더해도 판정은 그대로)', () => {
   const stored = JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8')) as { engineVersion: string; games: Record<string, EngineSnapshot> };
+  const q4 = JSON.parse(readFileSync(SNAPSHOT_PATH_Q4, 'utf8')) as { engineVersion: string; games: Record<string, EngineSnapshot> };
+  const q2 = JSON.parse(readFileSync(SNAPSHOT_PATH_Q2, 'utf8')) as { engineVersion: string; games: Record<string, EngineSnapshot> };
   const now = allSnapshots();
-  it('스냅숏은 Q2 전 엔진(2026-11-02.2)에서 만든 것이고 (Q3 조언 규칙을 더한 뒤에도) 지금 엔진 버전은 올라갔다', () => {
-    assert.equal(stored.engineVersion, '2026-11-02.2');
-    assert.equal(ENGINE_VERSION, '2026-11-11.1');
+  it('스냅숏은 Q5 엔진(2026-11-22.1)에서 만든 것이고, Q6(2026-11-23.1)·Q7 엔진(2026-11-24.1)은 판정이 같아 스냅숏을 다시 만들지 않았다', () => {
+    assert.equal(stored.engineVersion, '2026-11-22.1');
+    assert.equal(ENGINE_VERSION, '2026-11-24.1');
+    assert.equal(q4.engineVersion, '2026-11-19.1');
+    assert.equal(q2.engineVersion, '2026-11-02.2');
+  });
+  it('Q4 스냅숏과 비교: 50명 모두 등급·총점·말할 과목·요약이 같고, 해시는 정글 9명만 다름 (C3 정글 데스 유형: 로밍 당함 → 수적 열세 등)', () => {
+    const shaChanged: string[] = [];
+    for (const [k, o] of Object.entries(q4.games)) {
+      const n = now[k]!;
+      assert.deepEqual([n.grades, n.totals, n.speakOrder, n.summary], [o.grades, o.totals, o.speakOrder, o.summary], k);
+      if (n.sha256 !== o.sha256) shaChanged.push(k);
+    }
+    assert.deepEqual(shaChanged.sort(), [
+      'KR_8419421568.p2',
+      'KR_8419421568.p7',
+      'KR_8419447142.p2',
+      'KR_8419447142.p7',
+      'KR_8419451137.p2',
+      'KR_8419451137.p7',
+      'KR_8419458143.p2',
+      'KR_8437852704.p2',
+      'KR_8437852704.p7',
+    ]);
   });
   it('세나 판 + set5 4판, 판마다 10명 = 50명 모두 판정 해시·등급·총점·말할 과목·요약이 같다', () => {
     assert.equal(Object.keys(stored.games).length, 50);
     assert.deepEqual(Object.keys(now).sort(), Object.keys(stored.games).sort());
     for (const [k, v] of Object.entries(stored.games)) assert.deepEqual(now[k], v, k);
+  });
+  it('Q2 전 스냅숏과 비교: 교전·운영(등급·총점·말할 과목·요약 판정어·결정적 장면)은 50명 모두 그대로, 라인전 요약 판정은 10명만 바뀜', () => {
+    const changed: string[] = [];
+    for (const [k, o] of Object.entries(q2.games)) {
+      const n = now[k]!;
+      for (const g of Object.keys(o.grades).filter((x) => !x.startsWith('laning'))) assert.equal(n.grades[g], o.grades[g], `${k} ${g}`);
+      assert.deepEqual(n.totals, o.totals, k);
+      assert.deepEqual([n.speakOrder.fight, n.speakOrder.macro], [o.speakOrder.fight, o.speakOrder.macro], k);
+      assert.deepEqual([n.summary.fight, n.summary.macro, n.summary.keyMomentIndex], [o.summary.fight, o.summary.macro, o.summary.keyMomentIndex], k);
+      if (n.summary.laning !== o.summary.laning) changed.push(`${k}:${o.summary.laning}→${n.summary.laning}`);
+    }
+    assert.deepEqual(changed.sort(), [
+      'KR_8419421568.p10:비슷→열세',
+      'KR_8419421568.p5:비슷→우세',
+      'KR_8419451137.p10:비슷→우세',
+      'KR_8419451137.p1:비슷→열세',
+      'KR_8419451137.p5:비슷→열세',
+      'KR_8419451137.p6:비슷→우세',
+      'KR_8419458143.p10:비슷→열세',
+      'KR_8419458143.p5:비슷→우세',
+      'KR_8437852704.p3:우세→비슷',
+      'KR_8437852704.p8:열세→비슷',
+    ]);
   });
 });
 

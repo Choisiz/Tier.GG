@@ -1,0 +1,96 @@
+{
+  "matchId": "KR_8471982631",
+  "participantId": 8,
+  "engineVersion": "2026-11-24.1",
+  "promptVersion": "2026-11-24.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-24T14:38:40.579Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "aceadfb6e9392c1f649351ffd8dd4270b766262b06d878d099fb8d396238749d",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"아리로 승리한 이 판에서 라인전은 우위였고, 오브젝트 싸움과 그 밖의 운영은 보통이었습니다. 27:53 싸움에서 우리 팀 5킬, 상대 팀 2킬로 골드 격차가 약 4,100 좁혀졌고, 우리 팀이 오브젝트를 잡았습니다.\",\"factIds\":[\"player.champion\",\"player.result\",\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},\"sections\":{\"laning\":{\"good\":[{\"subjectId\":\"laning.growth\",\"text\":\"15:00 라인전은 우위였습니다. 골드는 5,982로 럼블의 4,510보다 1,472 많았고, 레벨도 12로 9보다 3 높았습니다. CS도 108개로 73개보다 35개 많았습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.growth.cell\",\"laning.gold.me\",\"laning.opponent\",\"laning.gold.enemy\",\"laning.gold.diffAbs\",\"laning.level.me\",\"laning.level.enemy\",\"laning.level.diffAbs\",\"laning.cause.cs.me\",\"laning.cause.cs.enemy\",\"laning.cause.cs.diffAbs\"]}],\"bad\":[{\"subjectId\":\"laning.deaths\",\"text\":\"3:46 미드 라인 우리 포탑 쪽에서 1:1로 죽었고, 죽기 직전 준 피해 310, 받은 피해 497이었습니다. 7:12 미드 라인 상대 포탑 쪽에서 리 신의 갱에 죽었고 직전 60초 와드는 0개로 갱 회피가 아쉬웠습니다. 다음 판에는 라인전 1:1 교환에 더 집중해서 신경 쓰세요.\",\"factIds\":[\"rule.R6.min\",\"rule.R6.region\",\"rule.R6.dealt\",\"rule.R6.received\",\"rule.R7.min\",\"rule.R7.region\",\"rule.R7.jungler\",\"rule.R7.windowSec\",\"rule.R7.wardsBefore\",\"rule.R6.action\"]},{\"subjectId\":\"laning.roam\",\"text\":\"15:00까지 킬 관여는 나 6번(4킬 2어시스트), 럼블 4번(2킬 2어시스트)이었고 내 6번은 모두 럼블을 잡은 것이었습니다. 다른 라인·정글 싸움은 럼블 1번, 나 0번이었고 럼블은 5:10에 라인을 비웠습니다. 그때 상대를 따라가거나 상대 포탑 방패를 압박하세요.\",\"factIds\":[\"laning.referenceMin\",\"laning.involve.me.count\",\"laning.involve.me.kills\",\"laning.involve.me.assists\",\"laning.opponent\",\"laning.involve.enemy.count\",\"laning.involve.enemy.kills\",\"laning.involve.enemy.assists\",\"laning.involve.me.vsLaner\",\"rule.R9.enemy\",\"rule.R9.me\",\"rule.R9.away.0.min\"]}]},\"fight\":{\"good\":[{\"subjectId\":\"fight.damage\",\"text\":\"딜 비중이 0:00~15:00 34.5%, 30:00 이후 33.5%로 미드 딜러 평균 20%, 22%보다 높았습니다. 7:12 싸움에서는 내 데스 1번(상대 팀 7점)으로 우리 팀이 용(10점)을 얻어 이득 교환이었습니다.\",\"factIds\":[\"fight.damage.phase0StartMin\",\"fight.damage.phase0EndMin\",\"fight.damage.share0\",\"fight.damage.phase2StartMin\",\"fight.damage.share2\",\"player.roleAverage\",\"fight.damage.expected0\",\"fight.damage.expected2\",\"rule.R4.good.min\",\"rule.R4.good.me\",\"rule.R4.good.myDeaths\",\"rule.R4.good.deathPoints\",\"rule.R4.good.objective\",\"rule.R4.good.objectivePoints\",\"rule.R4.good.outcome\"]},{\"subjectId\":\"fight.initiate\",\"text\":\"이긴 오브젝트 싸움 중 2번은 첫 킬에 참여했습니다. 9:33 미드 라인 상대 포탑 쪽 첫 킬에 참여했고 우리 팀이 공허 유충을 잡았으며, 그 싸움을 연 것으로 보입니다.\",\"factIds\":[\"fight.initiate.count\",\"fight.initiate.min\",\"fight.initiate.region\",\"fight.initiate.inFirstKill\",\"fight.initiate.objective\"]}],\"bad\":[{\"subjectId\":\"fight.vision\",\"text\":\"오브젝트를 잡기 전 60초 시야 점수가 오브젝트당 0.29로 낮았습니다. 32:15 상대 팀이 잡은 영혼 용 전 제어 와드는 0개였습니다. 다음 판에는 그 오브젝트 전에 제어 와드를 두세요.\",\"factIds\":[\"fight.vision.windowSec\",\"fight.vision.perObjective\",\"rule.R11.min\",\"rule.R11.objective\",\"rule.R11.controlWards\"]},{\"subjectId\":\"fight.advantage\",\"text\":\"20:17 오브젝트 싸움에서 첫 킬 뒤 9초 만에 죽어 오래 버티지 못해 딜을 넣지 못한 것으로 보입니다. 이 싸움에서 나도 죽어 상대 팀이 7점을 얻었습니다. 다음 판에는 오브젝트 싸움에서 죽지 않을 위치를 잡으세요.\",\"factIds\":[\"rule.R10.deathMin\",\"rule.R10.afterSec\",\"rule.R4.bad.min\",\"rule.R4.bad.me\",\"rule.R4.bad.deathPoints\",\"rule.R4.bad.outcome\"]}]},\"macro\":{\"good\":[{\"subjectId\":\"macro.solo\",\"text\":\"게임 전체에서 상대를 1:1로 6번 잡았습니다. 2:59, 12:46, 21:22 등 럼블을 1:1로 잡았습니다.\",\"factIds\":[\"rule.P2.count\",\"rule.P2.0.min\",\"rule.P2.3.min\",\"rule.P2.4.min\",\"rule.P2.0.victim\"]},{\"subjectId\":\"macro.side\",\"text\":\"포탑 피해량 19,130, 분당 495.6으로 사이드 압박이 좋았습니다.\",\"factIds\":[\"macro.side.turretDamage\",\"macro.side.perMinute\"]}],\"bad\":[{\"subjectId\":\"macro.farm\",\"text\":\"딜미드는 중후반 파밍 비중이 큽니다(반영 비율 35). 15분 이후 분당 CS가 5.6개로 럼블의 5.9개보다 낮았습니다. 다음 판에는 중후반 파밍에 신경 쓰세요.\",\"factIds\":[\"player.role\",\"rule.R1.macro.farm.weight\",\"rule.R1.macro.farm.me\",\"laning.opponent\",\"rule.R1.macro.farm.opponent\"]}]}},\"keyMoments\":[{\"index\":0,\"text\":\"27:53 싸움에서 우리 팀 5킬, 상대 팀 2킬로 골드 격차가 약 4,100 좁혀졌고, 우리 팀이 오브젝트를 잡았습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},{\"index\":1,\"text\":\"32:20 싸움에서 우리 팀 5킬, 상대 팀 1킬로 앞선 팀이 상대 팀에서 우리 팀으로 바뀌었고, 우리 팀은 골드 약 3,700 이득을 봤습니다. 이어서 상대 미드 2차 포탑을 깼습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.leaderBefore\",\"keyMoment.1.leaderAfter\",\"keyMoment.1.swingAbs\",\"keyMoment.1.followUp.0\"]},{\"index\":2,\"text\":\"37:19 싸움에서 우리 팀 6킬, 상대 팀 1킬로 골드 격차가 약 3,300 벌어졌고, 상대 미드 넥서스 포탑을 깼습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.killsTheirs\",\"keyMoment.2.gapChangeAbs\",\"keyMoment.2.followUp.0\"]}],\"chunkUse\":[{\"slot\":\"laning.bad.0\",\"chunkIds\":[\"laning.deaths.ALL.bad.R6\",\"laning.deaths.ALL.bad.R7\"]},{\"slot\":\"laning.bad.1\",\"chunkIds\":[\"laning.roam.ALL.bad.R9\"]},{\"slot\":\"fight.bad.0\",\"chunkIds\":[\"fight.vision.ALL.bad.R11\"]},{\"slot\":\"fight.bad.1\",\"chunkIds\":[\"fight.advantage.ALL.bad.R10\"]},{\"slot\":\"macro.good.0\",\"chunkIds\":[\"macro.solo.ALL.good.P2\"]},{\"slot\":\"macro.bad.0\",\"chunkIds\":[\"macro.farm.MID_DAMAGE.bad.R1\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 22436,
+          "cacheWrite": 16838,
+          "cacheRead": 0,
+          "output": 3275
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 23567
+    },
+    {
+      "attempt": 2,
+      "kind": "retry",
+      "requestHash": "11b54f09f84aa75bce027a3d34bc0a07a666495bf6235993a096d27cfc505c55",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"fixes\":[{\"slot\":\"macro.bad.0\",\"text\":\"딜미드는 중후반 파밍 비중이 큽니다(반영 비율 35). 라인전 이후 분당 CS가 5.6개로 상대 라이너 럼블의 5.9개보다 낮았습니다. 다음 판에는 중후반 파밍에 신경 쓰세요.\",\"factIds\":[\"player.role\",\"rule.R1.macro.farm.weight\",\"rule.R1.macro.farm.me\",\"laning.opponent\",\"rule.R1.macro.farm.opponent\"],\"chunkIds\":[\"macro.farm.MID_DAMAGE.bad.R1\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 26180,
+          "cacheWrite": 15319,
+          "cacheRead": 0,
+          "output": 227
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 4676
+    }
+  ],
+  "knowledge": {
+    "version": "dfcd25ccd94f",
+    "chunks": [
+      {
+        "id": "fight.vision.ALL.bad.R11",
+        "content": "상대가 잡은 오브젝트 전에 제어 와드가 없었을 때\n상대 팀이 잡은 오브젝트 전 시간 동안 내가 둔 제어 와드가 없었다. 제어 와드는 상대 와드를 드러내고 없애 오브젝트 주변 시야를 지키는 와드다. 다음 판에는 그 오브젝트가 나오기 전에 오브젝트 근처에 제어 와드를 둔다."
+      },
+      {
+        "id": "fight.advantage.ALL.bad.R10",
+        "content": "딜러가 오브젝트 싸움 첫 킬 직후 곧바로 죽었을 때 (득실 칸)\n딜러 유형인데 내가 참여한 오브젝트 싸움에서 첫 킬 직후 곧바로 죽었다. 내 데스는 상대 팀의 득실이 되고, 남은 싸움은 아군이 한 명 적은 채로 치르게 된다. 다음 판에는 오브젝트 싸움에서 죽지 않을 위치를 잡는다."
+      },
+      {
+        "id": "macro.farm.MID_DAMAGE.bad.R1",
+        "content": "딜미드의 중후반 파밍이 부족했을 때\n딜미드는 운영 평가에서 중후반 파밍의 비중이 가장 크다. 라인전 이후 챙긴 미니언과 정글 몹이 적었고 상대 라이너보다도 적었다는 뜻이다. 다음 판에는 중후반 CS를 챙기는 데 신경 쓴다."
+      },
+      {
+        "id": "macro.solo.ALL.good.P2",
+        "content": "상대를 일대일로 여러 번 잡았을 때\n내가 마지막 일격을 넣었고 도운 아군이 없으며, 상대가 죽기 직전에 받은 챔피언 피해도 나에게서만 나왔다면 그 킬은 혼자 따낸 일대일 승리다. 일대일 킬이 여러 번이면 그 판에서 내 챔피언이 상대 챔피언보다 강했던 순간이 되풀이됐다는 뜻이다. 오브젝트 싸움 밖의 단독 킬과는 세는 방법이 달라 일대일 킬 수로만 짚는다."
+      },
+      {
+        "id": "laning.deaths.ALL.bad.R6",
+        "content": "라인전에서 상대 라이너에게 일대일로 죽었을 때\n라인전에서 상대 라이너가 어시스트 없이 혼자 나를 잡은 데스다. 죽기 직전 내가 준 피해가 받은 피해보다 훨씬 적었다면 교환이 일방적이었다는 뜻이다. 데이터에는 교환 전 체력이 없어 왜 졌는지는 알 수 없고, 그 시각과 지역에서 상대 라이너와 맞붙어 졌다는 사실만 있다. 다음 판에는 라인전 일대일 교환에 더 집중해서 신경 쓴다."
+      },
+      {
+        "id": "laning.roam.ALL.bad.R9",
+        "content": "상대 라이너가 라인 밖 싸움에 더 많이 참여했을 때\n라인전 동안 상대 라이너가 내 라인을 비우고 다른 라인이나 정글 싸움에서 나보다 많은 킬과 어시스트에 참여했다. 상대가 라인을 비운 시간은 내가 상대 포탑 방패를 깨거나 상대를 따라가 그 싸움에 합류할 수 있는 시간이다. 그 사이 방패를 깼다면 비운 시간을 활용한 것이므로 잘한 점으로 함께 짚는다. 다음 판에는 상대가 라인을 비운 시각에 상대를 따라가거나 상대 포탑 방패를 압박한다."
+      },
+      {
+        "id": "macro.farm.ALL.bad.R1",
+        "content": "중후반 파밍 비중이 큰 유형인데 부족했을 때\n이 유형은 운영 평가에서 중후반 파밍, 곧 라인전 이후 분당 CS의 비중이 크다. 라인전이 끝난 뒤 챙긴 미니언과 정글 몹이 적었고 상대 라이너보다도 적었다는 뜻이다. 다음 판에는 중후반 CS를 챙기는 데 신경 쓴다."
+      },
+      {
+        "id": "laning.deaths.ALL.bad.R7",
+        "content": "라인전에서 상대 정글의 갱에 죽었을 때\n라인전에서 상대 정글이 킬이나 어시스트, 또는 피해로 관여한 데스다. 죽기 전 내가 둔 와드가 없었다면 상대 정글이 오는 길을 미리 보지 못한 상태였다는 뜻이다. 다음 판에는 갱에 당한 그 지역 쪽에 와드를 먼저 둔다."
+      }
+    ]
+  }
+}

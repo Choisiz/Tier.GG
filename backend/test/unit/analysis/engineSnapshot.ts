@@ -32,6 +32,8 @@ export function snapshotOf(r: AnalysisResult): EngineSnapshot {
   const grades: Record<string, string | null> = {};
   for (const s of [...r.fight.subjects, ...r.macro.subjects]) grades[s.id] = s.grade;
   for (const it of r.laning?.items ?? []) grades[it.id] = String(it.point);
+  // Q4: 라인전 판정 = 2-1 칸
+  if (r.laning) grades['laning.cell'] = r.laning.cell.id;
   return {
     sha256: createHash('sha256').update(JSON.stringify(judgedPart(r))).digest('hex'),
     grades,
@@ -63,4 +65,9 @@ export function allSnapshots(): Record<string, EngineSnapshot> {
   return out;
 }
 
-export const SNAPSHOT_PATH = join(dirname(fileURLToPath(import.meta.url)), 'data/engine-invariance.2026-11-02.2.json');
+/** Q5(2026-11-22) 스냅숏: 정글 라인전 데스 유형(C3)만 바뀌어 다시 만듦. 등급·총점·말할 과목·요약은 Q4 스냅숏과 같다 */
+export const SNAPSHOT_PATH = join(dirname(fileURLToPath(import.meta.url)), 'data/engine-invariance.2026-11-22.1.json');
+/** Q4(2026-11-19, 결정 1) 라인전 판정을 2-1 표로 바꾼 뒤 만든 스냅숏. Q5 뒤에도 등급·총점·말할 과목·요약이 같은지 본다 */
+export const SNAPSHOT_PATH_Q4 = join(dirname(fileURLToPath(import.meta.url)), 'data/engine-invariance.2026-11-19.1.json');
+/** Q2 전 엔진(2026-11-02.2) 스냅숏. Q4 뒤에도 교전·운영 판정(등급·총점·말할 과목)이 같은지 보는 데 쓴다 */
+export const SNAPSHOT_PATH_Q2 = join(dirname(fileURLToPath(import.meta.url)), 'data/engine-invariance.2026-11-02.2.json');

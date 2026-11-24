@@ -42,7 +42,11 @@ describe('조각 파싱·검사', () => {
   it('Q3: rule 메타 필수, 규칙마다 붙을 수 있는 과목·방향만, ID 끝 = 규칙', () => {
     const cases: [string, string, RegExp][] = [
       ['fight.damage.ADC.bad.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=bad', /필수 meta 누락: rule/],
-      ['fight.damage.ADC.bad.R9', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R9', /허용되지 않은 rule/],
+      ['fight.damage.ADC.bad.R13', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R13', /허용되지 않은 rule/],
+      // Q7: R12(오브젝트 싸움 내 기여 낮음)는 득실 칸에만
+      ['fight.damage.ADC.bad.R12', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R12', /R12은 과목 fight\.advantage에만/],
+      // Q4: 라인전 규칙은 라인전 과목에만 (R9 = 라인 밖 관여)
+      ['fight.damage.ADC.bad.R9', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R9', /R9은 과목 laning\.roam에만/],
       ['fight.damage.ADC.bad.R5', 'role=ADC, area=fight, subject=fight.damage, polarity=bad, rule=R5', /R5은 과목 macro\.solo에만/],
       ['fight.damage.ADC.good.R1', 'role=ADC, area=fight, subject=fight.damage, polarity=good, rule=R1', /R1은 방향 bad에만/],
       ['laning.gold.ALL.bad.R1', 'role=ALL, area=laning, subject=laning.gold, polarity=bad, rule=R1', /R1은 과목/],
@@ -55,6 +59,8 @@ describe('조각 파싱·검사', () => {
       assert.ok(r.errors.some((e) => re.test(e.message)), `${id} ${meta}: ${r.errors.map((e) => e.message).join(' / ')}`);
     }
     assert.deepEqual(parseKnowledgeFile(ok('fight.advantage.ALL.good.R4-2', 'role=ALL, area=fight, subject=fight.advantage, polarity=good, rule=R4'), 'a.md').errors, []);
+    assert.deepEqual(parseKnowledgeFile(ok('laning.deaths.ALL.bad.R7', 'role=ALL, area=laning, subject=laning.deaths, polarity=bad, rule=R7'), 'a.md').errors, []);
+    assert.deepEqual(parseKnowledgeFile(ok('fight.vision.ALL.bad.R11', 'role=ALL, area=fight, subject=fight.vision, polarity=bad, rule=R11'), 'a.md').errors, []);
   });
   it('숫자가 있으면 오류 (아라비아·전각 숫자 모두), 조각은 버림', () => {
     for (const body of ['딜이 22% 낮다. 다음 판에 해 본다.', '딜이 ２배 낮다. 다음 판에 해 본다.']) {
@@ -125,11 +131,11 @@ describe('해시·버전', () => {
 
 describe('저장소 지식 문서 (docs/ai/knowledge)', () => {
   const parsed = loadKnowledgeDir(RAG_DEFAULTS.dir);
-  it('오류·경고 0, 조각 30~60개(Q3 규칙 연결), 유형 10개 모두 + ALL, 숫자 없음, 600자 이하, 규칙 R1~R5 모두', () => {
+  it('오류·경고 0, 조각 30~60개(Q3 규칙 연결), 유형 10개 모두 + ALL, 숫자 없음, 600자 이하, 규칙 R1~R11 + 칭찬 P1~P4 모두 (Q4·Q6, Q7 R12는 조각 없음)', () => {
     assert.deepEqual(parsed.errors, []);
     assert.deepEqual(parsed.warnings, []);
     assert.ok(parsed.chunks.length >= 30 && parsed.chunks.length <= 60, String(parsed.chunks.length));
-    assert.deepEqual([...new Set(parsed.chunks.map((c) => c.rule))].sort(), ['R1', 'R2', 'R3', 'R4', 'R5']);
+    assert.deepEqual([...new Set(parsed.chunks.map((c) => c.rule))].sort(), ['P1', 'P2', 'P3', 'P4', 'R1', 'R10', 'R11', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9']);
     const roles = new Set(parsed.chunks.map((c) => c.role));
     assert.equal(roles.size, 11);
     for (const c of parsed.chunks) {
@@ -182,13 +188,13 @@ describe('검색 (가짜 임베딩·가짜 DB)', () => {
   const result = senaResult(); // 딜서폿, 라인전·교전·운영 모두 부족, 패배
   const real = loadKnowledgeDir(RAG_DEFAULTS.dir).chunks;
 
-  it('Q3: 조언 규칙이 발동한 칸만 검색 (라인전·규칙 없는 칸 제외), 질의 문장에 유형·과목·방향·판정·승패·규칙 근거, 숫자 없음', () => {
+  it('Q3: 조언 규칙이 발동한 칸만 검색 (규칙 없는 칸 제외, Q4부터 라인전 R6~R9 칸 포함), 질의 문장에 유형·과목·방향·판정·승패·규칙 근거, 숫자 없음', () => {
     const t = ragTargets(result);
     assert.deepEqual(
       t.map((x) => `${x.key}:${x.subjectId}:${x.rules.join('+')}`),
-      ['fight.bad.0:fight.vision:R1', 'fight.bad.1:fight.advantage:R4', 'macro.bad.1:macro.advantage:R1'],
+      ['fight.bad.0:fight.vision:R1+R11', 'fight.bad.1:fight.advantage:R4', 'macro.bad.1:macro.advantage:R1', 'laning.bad.0:laning.growth:R8', 'laning.bad.1:laning.deaths:R6'],
     );
-    assert.equal(t[0]!.query, '딜서폿 오브젝트 전 시야 부족, 오브젝트 싸움 부족, 패배, 반영 비율');
+    assert.equal(t[0]!.query, '딜서폿 오브젝트 전 시야 부족, 오브젝트 싸움 부족, 패배, 반영 비율, 오브젝트 전 제어 와드');
     for (const x of t) assert.doesNotMatch(x.query, /\d/);
   });
 
@@ -198,8 +204,8 @@ describe('검색 (가짜 임베딩·가짜 DB)', () => {
     const out = await retrieveKnowledge(result, { embed: e.embed, search: d.search });
     assert.equal(e.calls.length, 1);
     assert.equal(e.calls[0]!.type, 'query');
-    assert.equal(e.calls[0]!.texts.length, 3);
-    assert.equal(d.calls.length, 3);
+    assert.equal(e.calls[0]!.texts.length, 5);
+    assert.equal(d.calls.length, 5);
     for (const c of d.calls) {
       assert.equal(c.role, 'SUPPORT_DAMAGE');
       assert.equal(c.position, 'UTILITY');
@@ -207,15 +213,18 @@ describe('검색 (가짜 임베딩·가짜 DB)', () => {
       assert.equal(c.subjects!.length, 1);
       assert.equal(c.limit, 10);
     }
-    assert.equal(out.queries, 3);
+    assert.equal(out.queries, 5);
     const byKey = Object.fromEntries(out.picks.map((p) => [p.key, p]));
-    assert.deepEqual(byKey['fight.bad.0']!.ids, ['fight.vision.SUPPORT_DAMAGE.bad.R1', 'fight.vision.ALL.bad.R1']);
+    // Q4: 시야 칸은 R1·R11 두 규칙 → 규칙마다 1순위(유형 R1 조각, 공통 R11 조각)
+    assert.deepEqual(byKey['fight.bad.0']!.ids, ['fight.vision.SUPPORT_DAMAGE.bad.R1', 'fight.vision.ALL.bad.R11']);
     assert.equal(byKey['fight.bad.0']!.widened, false);
+    assert.deepEqual(byKey['laning.bad.0']!.ids, ['laning.growth.ALL.bad.R8']);
+    assert.deepEqual(byKey['laning.bad.1']!.ids, ['laning.deaths.ALL.bad.R6']);
     // 득실 칸은 R4만 발동 → R2·R3 조각은 같은 과목·방향이라도 쓰지 않는다
     assert.deepEqual(byKey['fight.bad.1']!.ids, ['fight.advantage.ALL.bad.R4']);
     assert.equal(byKey['fight.bad.1']!.widened, true);
     assert.deepEqual(byKey['macro.bad.1']!.ids, ['macro.advantage.ALL.bad.R1']);
-    assert.equal(out.chunks.length, 4);
+    assert.equal(out.chunks.length, 6);
     assert.ok(out.notes.some((n) => /ALL 조각/.test(n)));
   });
 
@@ -239,7 +248,8 @@ describe('검색 (가짜 임베딩·가짜 DB)', () => {
       for (const n of ['', '-2', '-3']) many.push(chunk(`${s}.SUPPORT_DAMAGE.bad.${rule}${n}`, `role=SUPPORT_DAMAGE, area=${area}, subject=${s}, polarity=bad, rule=${rule}`));
     }
     const out = await retrieveKnowledge(result, { embed: fakeEmbed().embed, search: fakeDb(many).search, limits: { perGame: 4 } });
-    for (const p of out.picks) {
+    // Q4 라인전 칸(R8·R6)은 이 가짜 조각 묶음에 없다
+    for (const p of out.picks.filter((x) => !x.key.startsWith('laning.'))) {
       assert.equal(p.ids.length, 2);
       assert.ok(p.ids.every((id) => id.includes('SUPPORT_DAMAGE')), p.ids.join());
     }

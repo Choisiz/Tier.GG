@@ -1,0 +1,14 @@
+{
+  "description": "검증용 최근 솔로랭크 아리 1판 (계정 식별 값 가림)",
+  "items": [
+    {
+      "matchId": "KR_8468352867",
+      "match": "../recent2/KR_8468352867.match.json",
+      "timeline": "../recent2/KR_8468352867.timeline.json",
+      "participantId": 3,
+      "position": "MIDDLE",
+      "role": "",
+      "note": "Ahri, 승, 42.0분, 2026-11-21"
+    }
+  ]
+}

@@ -33,17 +33,29 @@
 
 | 이벤트 | 주요 키 | 피드백 용도 |
 |--------|---------|-------------|
-| `CHAMPION_KILL` | `timestamp`, `position`, `killerId`, `victimId`, `assistingParticipantIds`, `victimDamageReceived` | 데스 시점·장소·원인(누구에게 얼마나 맞았나) |
+| `CHAMPION_KILL` | `timestamp`, `position`, `killerId`, `victimId`, `assistingParticipantIds`, `victimDamageReceived`, `victimDamageDealt`, `bounty`, `shutdownBounty` | 데스 시점·장소·원인(누구에게 얼마나 맞았나), 1:1 교환(준 피해 대 받은 피해), 킬 골드 (Q4 사용) |
 | `ELITE_MONSTER_KILL` | `monsterType`, `monsterSubType`, `killerTeamId`, `position` | 용·전령·바론·공허 유충 |
 | `BUILDING_KILL` | `buildingType`, `towerType`, `laneType`, `teamId` | 포탑·억제기 손실 |
-| `TURRET_PLATE_DESTROYED` | `laneType`, `killerId` | 포탑 방패 |
+| `TURRET_PLATE_DESTROYED` | `laneType`, `killerId`(0 = 미니언), `teamId`(방패를 잃은 팀), `position` | 포탑 방패 (Q4 골드 분해·로밍 대응) |
 | `WARD_PLACED` / `WARD_KILL` | `creatorId`/`killerId`, `wardType` | 시야 (위치 없음) |
 | `ITEM_PURCHASED` | `itemId`, `participantId` | 제어 와드(2055) 구매 시점, 빌드 순서 |
-| `LEVEL_UP`, `SKILL_LEVEL_UP` | `level`, `skillSlot` | 레벨 격차 |
+| `LEVEL_UP`, `SKILL_LEVEL_UP` | `participantId`, `level`, `skillSlot` | 레벨 격차, 6레벨 선점 시각 (Q4) |
 
 ### 1분 스냅샷 (`participantFrames`)
 
-- `totalGold`, `currentGold`, `xp`, `level`, `minionsKilled`, `jungleMinionsKilled`, `position`, `damageStats`, `championStats`
+- `totalGold`, `currentGold`, `xp`, `level`, `minionsKilled`, `jungleMinionsKilled`, `position`, `damageStats`, `championStats`, `timeEnemySpentControlled`
+- Q4(2026-11-19)에서 더 쓰는 값: `damageStats.totalDamageTaken`(받은 피해 누적, 오브젝트 싸움 버티기), `timeEnemySpentControlled`(상대에게 건 CC 시간 누적, **ms**, 끝값 = 상세 `totalTimeCCDealt` × 1,000. 이니시 추정 근거). 둘 다 1분 단위라 싸움 구간 값은 추정이다.
+
+### Q4에서 새로 쓰는 필드 (2026-11-19, 아리 판 KR_8456658640으로 확인)
+
+| 필드 | 쓰임 | 확인한 점 |
+|------|------|-----------|
+| `CHAMPION_KILL.bounty` + `shutdownBounty` | 킬러가 받은 현상금 → 라인전 킬 골드 원인 | 2:17 피즈 첫 킬 300, 10:55 킬 310 + 셧다운 11 |
+| `CHAMPION_KILL.victimDamageDealt` | 죽기 직전 피해자가 준 피해 (`participantId` = 맞은 사람) | 7:33 아리 → 피즈 37 |
+| `CHAMPION_KILL.victimDamageReceived` | 죽기 직전 받은 피해 (`participantId` = 가해자, 0 = 미니언·포탑) → 챔피언 피해만 합산, 갱 가담자 | 7:33 피즈 1,283 + 미니언 50 |
+| `TURRET_PLATE_DESTROYED.killerId` | 방패를 깬 사람 (0 = 미니언) | 아리 3개(6:14·13:03·14:22), 피즈 2개 |
+| `LEVEL_UP.participantId`·`level` | 6레벨을 처음 찍은 시각 | 피즈 5:13(원본 ms), 아리 5:37 |
+| `WARD_PLACED.wardType` = `CONTROL_WARD` | 오브젝트 전 60초 제어 와드 수 (R11) | |
 
 ## 3. 공통 지표
 
@@ -121,7 +133,9 @@
 |------|------|
 | 와드 이벤트에 좌표 없음 | "어디를 밝혔나"는 모름. "용 전 90초 안에 제어 와드를 설치했나"까지만 판정 |
 | 위치는 1분 간격 | 교전 순간 위치 모름. 오브젝트 때 근처에 있었는지는 추정만 |
-| 스킬·스펠·핑은 합계만 | `spell1~4Casts`, `summoner1/2Casts`, `*Pings`는 횟수만 있고 시점이 없음 |
+| 스킬·스펠·핑은 합계만 | `spell1~4Casts`, `summoner1/2Casts`, `*Pings`는 횟수만 있고 시점이 없음. 죽기 직전 스킬별 피해(`victimDamageReceived`·`Dealt`)만 있다 |
+| 교환 전 체력·싸움을 건 사람·웨이브 상태 | 없음. 1:1에서 진 원인, 이니시(확정), 프리징·밀기는 판정하지 않는다 (Q4) |
+| `victimDamageReceived` 순서 | 목록 순서가 시각 순이라는 문서가 없음 → "첫 가해자"는 추정으로만 (Q4) |
 | `challenges` 공식 문서 없음 | 이름으로 뜻을 추정. 판에 따라 일부 키가 빠질 수 있음. 쓰기 전에 여러 판으로 검증 |
 
 ## 6. 실제 판으로 확인한 점

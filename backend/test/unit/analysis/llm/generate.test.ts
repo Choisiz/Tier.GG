@@ -149,8 +149,8 @@ describe('생성: 예산 장치', () => {
     assert.equal(out.fallbackReason, 'budget');
   });
   it('재시도 전에도 예산 검사: 재시도가 상한을 넘으면 그 칸만 템플릿', async () => {
-    // 상한을 1차 최악(~0.16, Q2 max_tokens 4500)보다 조금 크게: 1차는 되고, 1차 비용이 쌓인 뒤 재시도 최악은 넘친다
-    const { d, client } = deps([{ text: withWrongGold(), usage: { input: 1000, output: 4000 } }, { text: fixGold }], { budgetUsd: 0.17 });
+    // 상한을 1차 최악(~0.205, Q7 시스템 프롬프트 규칙 34~36·예시로 늘어남, max_tokens 4500)보다 조금 크게: 1차는 되고, 1차 비용이 쌓인 뒤 재시도 최악은 넘친다
+    const { d, client } = deps([{ text: withWrongGold(), usage: { input: 1000, output: 4000 } }, { text: fixGold }], { budgetUsd: 0.21 });
     const out = await generateTexts(sheet, d);
     assert.equal(client.calls, 1);
     assert.equal(out.texts.get('laning.bad.0')!.source, 'template');
@@ -166,7 +166,7 @@ describe('createFeedback 결과 모양', () => {
     assert.equal(feedback.sections.laning.bad.length, 2);
     assert.equal(feedback.sections.macro.good[0]!.subjectId, 'macro.side');
     assert.equal(feedback.keyMoments.length, 3);
-    assert.equal(feedback.meta.engineVersion, '2026-11-11.1');
+    assert.equal(feedback.meta.engineVersion, '2026-11-24.1');
     assert.equal(feedback.meta.fallbackReason, null);
     assert.equal(feedback.sections.laning.note, undefined);
   });

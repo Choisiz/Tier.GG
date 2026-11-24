@@ -189,8 +189,9 @@ describe('세나 판: 요약 (2-2)', () => {
   it('라인전 열세 · 교전 부족 · 운영 부족, 결정적 장면 1위', () => {
     assert.deepEqual(r.summary, { laning: '열세', fight: '부족', macro: '부족', keyMomentIndex: 0 });
   });
-  it('라인전 말할 순서: 부족한 점 골드 → KDA', () => {
-    assert.deepEqual(r.speakOrder.laning, { good: [], bad: ['laning.gold', 'laning.kda'] });
+  it('라인전 말할 순서 (Q4): 부족한 점 2-1 성장(경험치는 따라갔지만 골드를 내줌) → 2-3 데스', () => {
+    assert.deepEqual(r.speakOrder.laning, { good: [], bad: ['laning.growth', 'laning.deaths'] });
+    assert.equal(r.laning!.cell.id, 'XP_KEPT_GOLD_LOST');
   });
   it('첫 데스 해석은 점수 밖 노트로만', () => {
     assert.ok(r.notes.every((n) => n.kind === 'interpretation' && n.id === 'fight.firstDeath'));

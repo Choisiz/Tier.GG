@@ -165,18 +165,20 @@ const ctx = ctxOf(sheet);
 const slot = (id: string) => sheet.slots.find((s) => s.slot === id)!;
 const check = (id: string, text: string, factIds: string[]) => verifySlot(slot(id), { text, factIds }, ctx);
 const details = (id: string, text: string, factIds: string[]) => check(id, text, factIds).map((f) => `${f.rule}:${f.detail}`);
+/** Q4부터 세나 라인전 칸에도 규칙(R8·R6)이 붙는다. Q3의 "규칙 없는 칸" 검사는 규칙을 뺀 칸으로 본다 */
+const detailsNoRules = (id: string, text: string, factIds: string[]) => verifySlot({ ...slot(id), rules: [] }, { text, factIds }, ctx).map((f) => `${f.rule}:${f.detail}`);
 
 const R1V = ['rule.R1.fight.vision.weight', 'rule.R1.fight.vision.me', 'rule.R1.fight.vision.opponent'];
 const V0 = ['scene.fight.vision.0.min', 'scene.fight.vision.0.objective', 'scene.fight.vision.0.wardsPlaced', 'fight.vision.windowSec'];
 
 describe('Q3 칸 규칙과 프롬프트', () => {
-  it('세나 칸: 라인전·요약·결정적 장면은 규칙 없음, 교전 시야 R1, 교전 득실 R4(해석만), 운영 득실 R1', () => {
+  it('세나 칸: 요약·결정적 장면은 규칙 없음, 교전 시야 R1(+Q4 R11), 교전 득실 R4(해석만), 운영 득실 R1, Q4 라인전 성장 R8·데스 R6', () => {
     const map = Object.fromEntries(sheet.slots.map((s) => [s.slot, s.rules.map((r) => r.id)]));
     assert.deepEqual(map, {
       summary: [],
-      'laning.bad.0': [],
-      'laning.bad.1': [],
-      'fight.bad.0': ['R1'],
+      'laning.bad.0': ['R8'],
+      'laning.bad.1': ['R6'],
+      'fight.bad.0': ['R1', 'R11'],
       'fight.bad.1': ['R4'],
       'macro.good.0': [],
       'macro.bad.0': [],
@@ -191,16 +193,17 @@ describe('Q3 칸 규칙과 프롬프트', () => {
   it('사용자 메시지: 규칙이 있는 칸만 rules(id·요지·근거), R4는 문장 text', () => {
     const p = buildUserPayload(sheet);
     const s = (id: string) => p.slots.find((x) => x.slot === id)!;
-    assert.equal(s('laning.bad.0').rules, undefined);
-    assert.deepEqual(s('fight.bad.0').rules!.map((r) => [r.id, r.required]), [['R1', R1V]]);
+    assert.equal(s('macro.good.0').rules, undefined);
+    assert.deepEqual(s('fight.bad.0').rules!.map((r) => [r.id, r.required]).slice(0, 1), [['R1', R1V]]);
     assert.equal(s('fight.bad.1').rules![0]!.text, '이 싸움에서 나도 죽어 상대 팀이 5점을 얻었습니다');
   });
 });
 
 describe('Q3 검증기: 조언은 발동한 규칙의 근거를 인용해야 함', () => {
-  it('사용자 X: 라인전 조언(규칙 없음)은 실패', () => {
+  it('사용자 X: 라인전 조언(규칙 없음)은 실패, Q4: R8 칸이어도 근거를 인용하지 않으면 실패', () => {
     const t = '15:00 골드가 상대 애쉬보다 703 적었습니다. 다음 판에는 바텀 라인 우리 포탑 쪽에서 상대와 교환하기보다 미니언 막타를 먼저 챙기세요.';
-    assert.ok(details('laning.bad.0', t, ['laning.referenceMin', 'laning.opponent', 'laning.gold.diffAbs']).some((d) => d.startsWith('forbidden:근거 없는 조언')));
+    assert.ok(detailsNoRules('laning.bad.0', t, ['laning.referenceMin', 'laning.opponent', 'laning.gold.diffAbs']).some((d) => d.startsWith('forbidden:근거 없는 조언')));
+    assert.ok(details('laning.bad.0', t, ['laning.referenceMin', 'laning.opponent', 'laning.gold.diffAbs']).some((d) => d.startsWith('forbidden:조언 근거 미인용')));
   });
   it('사용자 X: 교전 시야 "제어 와드를 먼저 두세요"는 R1 근거(반영 비율·내 값·상대 값) 없이 실패', () => {
     const t =
@@ -224,13 +227,15 @@ describe('Q3 검증기: 조언은 발동한 규칙의 근거를 인용해야 함
   });
   it('명령형("~하세요"·"~해라")과 "신경 써"도 조언으로 본다 (규칙 없는 칸에서 실패)', () => {
     for (const t of ['미니언 막타를 먼저 챙기세요.', '미니언 막타를 먼저 챙겨라.', '막타에 신경 써야 합니다.']) {
-      assert.ok(details('laning.bad.0', t, []).some((d) => d.startsWith('forbidden:근거 없는 조언')), t);
+      assert.ok(detailsNoRules('laning.bad.0', t, []).some((d) => d.startsWith('forbidden:근거 없는 조언')), t);
     }
     assert.ok(!details('laning.bad.0', '15:00 골드가 상대 애쉬보다 703 적었습니다.', ['laning.referenceMin', 'laning.opponent', 'laning.gold.diffAbs']).length);
   });
   it('R4 칸 (세나, 나도 죽음): R4 문장 그대로 + 시각·결과는 통과("N점" 허용), 숫자를 바꾸거나 5-4-1 문장·아군 첫 데스 문장은 실패', () => {
     const ids = ['rule.R4.bad.min', 'rule.R4.bad.me', 'rule.R4.bad.deathPoints', 'rule.R4.bad.outcome'];
-    assert.deepEqual(check('fight.bad.1', '18:39 싸움에서 상대 팀이 더 얻었고, 이 싸움에서 나도 죽어 상대 팀이 5점을 얻었습니다.', ids), []);
+    // Q7: 득실 칸(등급 과목)은 두 팀 점수를 함께 쓴다 (세나 5점 대 105점)
+    const pts = ['fight.advantage.fights', 'fight.advantage.ours', 'fight.advantage.theirs'];
+    assert.deepEqual(check('fight.bad.1', '내가 참여한 오브젝트 싸움 2번은 우리 팀 5점, 상대 팀 105점으로 크게 졌습니다. 18:39 싸움에서 상대 팀이 더 얻었고, 이 싸움에서 나도 죽어 상대 팀이 5점을 얻었습니다.', [...pts, ...ids]), []);
     assert.ok(details('fight.bad.1', '18:39 싸움에서 이 싸움에서 나도 죽어 상대 팀이 7점을 얻었습니다.', ids).length > 0);
     assert.ok(details('fight.bad.1', '18:39 싸움에서 먼저 잡혀 싸움을 졌습니다.', ids).some((d) => d.includes('R4 문장')));
     assert.ok(details('macro.bad.1', '이 싸움에서 나는 살아남았습니다.', []).some((d) => d.includes('R4가 발동한 칸에서만')));

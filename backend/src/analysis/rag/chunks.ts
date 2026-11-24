@@ -1,6 +1,6 @@
 // RAG 지식 문서 → 조각 (ai_spec B4-2·B4-3, F-1·F-2). 파일 읽기 말고는 순수 함수다.
 // 조각 하나 = `### <id> <제목>` + `- meta: k=v, ...` 한 줄 + 본문 2~5문장. 고정 길이로 자르지 않는다.
-// Q3: 조각은 조언 규칙(R1~R5) 하나에 연결한 해설이다. meta `rule=R1`이 필수이고 ID 끝이 그 규칙이다 (예: fight.vision.ALL.bad.R1).
+// Q3: 조각은 조언 규칙(R1~R5, Q4부터 R1~R11, Q6부터 칭찬 규칙 P1~P4) 하나에 연결한 해설이다. meta `rule=R1`이 필수이고 ID 끝이 그 규칙이다 (예: fight.vision.ALL.bad.R1).
 // 허용 값은 엔진과 같은 목록(유형 10개 + ALL, 과목 ID = labels.ts SUBJECT_LABEL)과 계약 v9 12-1의 CHECK 값이다.
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -58,11 +58,25 @@ export const RULE_TARGETS: Readonly<Record<AdviceRuleId, { subjects: readonly st
   R3: { subjects: ['fight.advantage'], polarities: ['bad'] },
   R4: { subjects: ['fight.advantage'], polarities: ['good', 'bad'] },
   R5: { subjects: ['macro.solo'], polarities: ['bad'] },
+  // Q4: 라인전 규칙 (2-1·2-2·2-3)과 오브젝트 싸움 버티기·제어 와드
+  R6: { subjects: ['laning.deaths'], polarities: ['bad'] },
+  R7: { subjects: ['laning.deaths'], polarities: ['bad'] },
+  R8: { subjects: ['laning.growth'], polarities: ['bad'] },
+  R9: { subjects: ['laning.roam'], polarities: ['bad'] },
+  R10: { subjects: ['fight.damage', 'fight.advantage'], polarities: ['bad'] },
+  R11: { subjects: ['fight.vision'], polarities: ['bad'] },
+  // Q7: 오브젝트 싸움 내 기여 낮음 (해설 조각은 아직 없음 → 그 칸은 조각 없이 쓴다)
+  R12: { subjects: ['fight.advantage'], polarities: ['bad'] },
+  // Q6 칭찬 규칙 (좋은 점 칸만). P3은 교전 딜 칸(구간 딜 비중)·운영 단독 킬·데스 칸(후반 1:1 킬) 둘 다
+  P1: { subjects: ['fight.damage'], polarities: ['good'] },
+  P2: { subjects: ['macro.solo'], polarities: ['good'] },
+  P3: { subjects: ['fight.damage', 'macro.solo'], polarities: ['good'] },
+  P4: { subjects: ['fight.advantage'], polarities: ['good'] },
 };
 export const RULE_IDS = Object.keys(RULE_TARGETS) as AdviceRuleId[];
 
-/** ID 끝 규칙 칸: R1 또는 R1-2 (같은 규칙 조각이 여럿일 때) */
-const RULE_SUFFIX_RE = /^(R[1-5])(?:-\d+)?$/;
+/** ID 끝 규칙 칸: R1 또는 R1-2 (같은 규칙 조각이 여럿일 때). Q4: R6~R11, Q6: 칭찬 P1~P4, Q7: R12 */
+const RULE_SUFFIX_RE = /^(R(?:[1-9]|1[012])|P[1-4])(?:-\d+)?$/;
 
 /** ID에서 규칙을 읽는다 (Q3). 규칙 칸이 없는 옛 조각(…bad.01)은 null → 검색에서 쓰지 않는다 */
 export function ruleOfId(id: string): AdviceRuleId | null {
@@ -190,7 +204,7 @@ export function parseKnowledgeFile(text: string, file: string): ParseResult {
     const polarity = meta.get('polarity');
     const rule = meta.get('rule');
     for (const k of ['role', 'area', 'polarity', 'rule'] as const) if (!meta.has(k)) err(`필수 meta 누락: ${k}`);
-    if (rule && !(RULE_IDS as string[]).includes(rule)) err(`허용되지 않은 rule: ${rule} (R1~R5)`);
+    if (rule && !(RULE_IDS as string[]).includes(rule)) err(`허용되지 않은 rule: ${rule} (R1~R12, P1~P4)`);
     if (role && role !== 'ALL' && !(ROLES as readonly string[]).includes(role)) err(`허용되지 않은 role: ${role}`);
     if (area && !(AREAS as readonly string[]).includes(area)) err(`허용되지 않은 area: ${area}`);
     if (polarity && !(POLARITIES as readonly string[]).includes(polarity)) err(`허용되지 않은 polarity: ${polarity}`);

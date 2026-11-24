@@ -1,0 +1,97 @@
+{
+  "matchId": "KR_8444684709",
+  "participantId": 8,
+  "engineVersion": "2026-11-19.1",
+  "promptVersion": "2026-11-19.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "recordedAt": "2026-11-19T15:01:59.850Z",
+  "calls": [
+    {
+      "attempt": 1,
+      "kind": "first",
+      "requestHash": "c80911d315dd3b2b93eed751c2ce868e7f083d8912cfe161d612f683927be78f",
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"summary\":{\"text\":\"라인전은 골드로 앞선 우위였고, 오브젝트 싸움은 보통, 그 밖의 운영은 부족했습니다. 35:44 싸움에서 우리 팀 1킬, 상대 팀 4킬로 골드 격차가 약 3,300 벌어졌습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\"]},\"sections\":{\"laning\":{\"good\":[{\"subjectId\":\"laning.growth\",\"text\":\"15:00 라인전은 골드로 앞선 우위였습니다. 레벨은 10으로 같았고 골드는 상대 아칼리보다 600 많았습니다. 킬 골드가 638 많았고 포탑 방패도 2개 더 깼습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.growth.cell\",\"laning.level.me\",\"laning.opponent\",\"laning.gold.diffAbs\",\"laning.cause.killGold.diffAbs\",\"laning.cause.plates.diffAbs\"]},{\"subjectId\":\"laning.roam\",\"text\":\"15:00까지 라인 밖 싸움 킬·어시스트가 1번으로 상대 라이너의 0번보다 많았습니다. 4:11 바텀 라인 우리 포탑 쪽 싸움에 참여했습니다.\",\"factIds\":[\"laning.referenceMin\",\"laning.roam.me\",\"laning.roam.enemy\",\"laning.roam.me.0.min\",\"laning.roam.me.0.region\"]}],\"bad\":[{\"subjectId\":\"laning.deaths\",\"text\":\"10:32 미드 라인 우리 포탑 쪽에서 1:1로 죽었고, 내가 준 피해는 218, 받은 피해는 1647로 일방적으로 당했습니다. 6:41 미드 라인 상대 포탑 쪽 그레이브즈 갱 전 와드는 0개였습니다. 다음 판에는 그 시각·지역에서 1:1 교환을 줄이고 그 지역 쪽에 와드를 두세요.\",\"factIds\":[\"rule.R6.min\",\"rule.R6.region\",\"rule.R6.dealt\",\"rule.R6.received\",\"rule.R6.trade\",\"rule.R7.min\",\"rule.R7.region\",\"rule.R7.jungler\",\"rule.R7.wardsBefore\"]}]},\"fight\":{\"good\":[],\"bad\":[{\"subjectId\":\"fight.advantage\",\"text\":\"35:59 싸움은 상대 팀이 더 얻었고, 이 싸움에서 나도 죽어 상대 팀이 7점을 얻었습니다. 10:32에는 첫 킬 뒤 0초 만에 죽어 오래 버티지 못해 딜을 넣지 못한 것으로 보입니다. 다음 판에는 오브젝트 싸움에서 죽지 않을 위치를 잡으세요.\",\"factIds\":[\"rule.R4.bad.min\",\"rule.R4.bad.outcome\",\"rule.R4.bad.me\",\"rule.R4.bad.deathPoints\",\"rule.R10.deathMin\",\"rule.R10.afterSec\"]}]},\"macro\":{\"good\":[],\"bad\":[{\"subjectId\":\"macro.farm\",\"text\":\"딜미드는 중후반 파밍 비중이 큽니다(반영 비율 35). 15분 이후 분당 CS가 4.28개로 상대 라이너 아칼리의 6.03개보다 낮았습니다. 다음 판에는 중후반 파밍에 신경 쓰세요.\",\"factIds\":[\"player.role\",\"rule.R1.macro.farm.weight\",\"rule.R1.macro.farm.me\",\"rule.R1.macro.farm.opponent\",\"laning.opponent\"]},{\"subjectId\":\"macro.solo\",\"text\":\"단독 킬은 2번, 단독 데스는 4번이었습니다. 5:12 미드 라인 우리 포탑 쪽에서 혼자 싸워 죽었습니다. 다음 판에는 그런 상황에서 혼자 싸우지 마세요.\",\"factIds\":[\"macro.solo.kills\",\"macro.solo.deaths\",\"rule.R5.deathMin\",\"rule.R5.region\"]}]}},\"keyMoments\":[{\"index\":0,\"text\":\"35:44 싸움에서 우리 팀 1킬, 상대 팀 4킬로 골드 격차가 약 3,300 벌어졌고, 상대 팀이 오브젝트를 잡았습니다.\",\"factIds\":[\"keyMoment.0.startMin\",\"keyMoment.0.killsOurs\",\"keyMoment.0.killsTheirs\",\"keyMoment.0.gapChangeAbs\",\"keyMoment.0.followUp.0\"]},{\"index\":1,\"text\":\"39:17 싸움에서 우리 팀 1킬, 상대 팀 5킬로 골드 격차가 약 3,100 벌어졌고, 우리 미드 억제기를 잃었습니다.\",\"factIds\":[\"keyMoment.1.startMin\",\"keyMoment.1.killsOurs\",\"keyMoment.1.killsTheirs\",\"keyMoment.1.gapChangeAbs\",\"keyMoment.1.followUp.0\"]},{\"index\":2,\"text\":\"33:58 싸움에서 우리 팀 3킬, 상대 팀 4킬로 골드 격차가 약 2,900 벌어졌고, 우리 탑 2차 포탑을 잃었습니다.\",\"factIds\":[\"keyMoment.2.startMin\",\"keyMoment.2.killsOurs\",\"keyMoment.2.killsTheirs\",\"keyMoment.2.gapChangeAbs\",\"keyMoment.2.followUp.0\"]}],\"chunkUse\":[{\"slot\":\"laning.bad.0\",\"chunkIds\":[\"laning.deaths.ALL.bad.R6\",\"laning.deaths.ALL.bad.R7\"]},{\"slot\":\"fight.bad.0\",\"chunkIds\":[\"fight.advantage.ALL.bad.R10\"]},{\"slot\":\"macro.bad.0\",\"chunkIds\":[\"macro.farm.MID_DAMAGE.bad.R1\"]},{\"slot\":\"macro.bad.1\",\"chunkIds\":[\"macro.solo.ALL.bad.R5\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 17125,
+          "cacheWrite": 0,
+          "cacheRead": 11256,
+          "output": 2145
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 15970
+    },
+    {
+      "attempt": 2,
+      "kind": "retry",
+      "requestHash": "27a52a7db2a91ae3c5b9592b31fa10693a60fa0a164f388e4d5bd5cc3e941ce3",
+      "response": {
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "",
+            "signature": "CAQSsAYKEAgUGAI4AUIIdGhpbmtpbmcSDMn9HN1hRInDzX0hZRoMat/ZDKPrEgxjFtTFIjBl5fL7v6FXQg5D750QtT3DJkrPeXOr1mAQNGFN82zTCh6HzRexO6OdBVIk1v0XovkqzQVH7GaKDidWUx6ej4fmiR9v996sBuq0lc+10PRn51EnTGCjsYLsBoV32k9N3zGAiGBuHd24hty/uRVtS5cKUpNtbv8d3b5JUDcc13Dy+QWAboxjKZtVB+yEN3HZqj6+c9bLkXzzylhLbrecFWRNpXiLmDL3gbPW4ZIoKDpvHvobHtzmh7hsT+/7EqsUEZ6jac7g8vSMLS8HyHIKy06MNZZSS+lCvPut0rg6NZjrQex3gTSjqHtVxxg2uBaiNUJiCoEVf6l9oHKYkj6WCuW/ADA6Sdv2KjoebqwPtcnXpTKlGdw5JTWKNaKnv/RAZuDqKMjQZ49v3EsLEHx5wD3DLmS56Ig5w5vPduBy+hsFXvIDJkbNbB/3KIdRB5mtbdNYbsxg1u8dIv+MPxNCv8JYU1PGCW0jD7JabnH7oavyKtTAk99VDIOIOF5+a5mpov7uAh+Z26QNhk1n8UFFuYSUYA/9SmF3GKkLEq01j3Xwz6LSbT6vm52NwnKRjhrx5RKTk1QmC4IbIvTIwY/i4pnmZw5b6Or+QyM9Ppymgw6/A9wvsoXtzx1K67ltDhCPKSP7sZxxNb1BKqVa+SJB4rNXFjIYc4jp5xbJKibahYy1l0xSJVLTynBgcUhWyPRPuZKDwDAXAi5VCvz82WM23PJch/PBpeui+8nbndI12HQXR74aomOSHLo3XnzAR/8S75z7QvvtyG1REYFIsai+K2RCqh6SsZzvbRluKkWNEs0Lzj//wlo5dqWylb+zpcnpbrUvpfUdDiOZC5JIi4iHJMXU+pn40vdWxwZdiQMNusCbSOY6WttWrEoU8P99+OVtmZey5/vwCFfy2+jPwOY7lMQsIOcf0l1Q00CfaOJAD8i2pyYyKiqqBAHPpQF6WpKZ9BURXLxOCMVhYFbQBXQSwImmODaVtIcFezbjBVVPMkSpf2UIUxdbzfUlrglCg6H6D58YAQ=="
+          },
+          {
+            "type": "text",
+            "text": "{\"fixes\":[{\"slot\":\"macro.bad.0\",\"text\":\"딜미드는 중후반 파밍 비중이 큽니다(반영 비율 35). 라인전 이후 분당 CS가 4.28개로 상대 라이너 아칼리의 6.03개보다 낮았습니다. 다음 판에는 중후반 파밍에 신경 쓰세요.\",\"factIds\":[\"player.role\",\"rule.R1.macro.farm.weight\",\"rule.R1.macro.farm.me\",\"rule.R1.macro.farm.opponent\",\"laning.opponent\"],\"chunkIds\":[\"macro.farm.MID_DAMAGE.bad.R1\"]}]}"
+          }
+        ],
+        "stopReason": "end_turn",
+        "stopDetails": null,
+        "usage": {
+          "input": 19741,
+          "cacheWrite": 9737,
+          "cacheRead": 0,
+          "output": 328
+        },
+        "model": "claude-opus-5-5"
+      },
+      "error": null,
+      "durationMs": 4324
+    }
+  ],
+  "knowledge": {
+    "version": "faca844eb987",
+    "chunks": [
+      {
+        "id": "fight.advantage.ALL.bad.R10",
+        "content": "딜러가 오브젝트 싸움 첫 킬 직후 곧바로 죽었을 때 (득실 칸)\n딜러 유형인데 내가 참여한 오브젝트 싸움에서 첫 킬 직후 곧바로 죽었다. 내 데스는 상대 팀의 득실이 되고, 남은 싸움은 아군이 한 명 적은 채로 치르게 된다. 다음 판에는 오브젝트 싸움에서 죽지 않을 위치를 잡는다."
+      },
+      {
+        "id": "macro.farm.MID_DAMAGE.bad.R1",
+        "content": "딜미드의 중후반 파밍이 부족했을 때\n딜미드는 운영 평가에서 중후반 파밍의 비중이 가장 크다. 라인전 이후 챙긴 미니언과 정글 몹이 적었고 상대 라이너보다도 적었다는 뜻이다. 다음 판에는 중후반 CS를 챙기는 데 신경 쓴다."
+      },
+      {
+        "id": "macro.solo.ALL.bad.R5",
+        "content": "혼자 싸워 죽은 장면이 있을 때\n오브젝트 싸움 밖에서 킬 하나로 끝난 싸움에 내가 죽은 장면이 있고, 단독 킬보다 단독 데스가 많았다. 그 시각과 지역에서 혼자 싸워 상대에게 킬을 내준 것이다. 다음 판에는 그 시각과 지역 같은 상황에서 혼자 싸우지 않는다."
+      },
+      {
+        "id": "laning.deaths.ALL.bad.R6",
+        "content": "라인전에서 상대 라이너에게 일대일로 죽었을 때\n라인전에서 상대 라이너가 어시스트 없이 혼자 나를 잡은 데스다. 죽기 직전 내가 준 피해가 받은 피해보다 훨씬 적었다면 교환이 일방적이었다는 뜻이다. 데이터에는 교환 전 체력이 없어 왜 졌는지는 알 수 없고, 그 시각과 지역에서 상대 라이너와 맞붙어 졌다는 사실만 있다. 다음 판에는 그 시각과 지역에서 상대 라이너와의 일대일 교환을 줄인다."
+      },
+      {
+        "id": "fight.advantage.ALL.bad.R4",
+        "content": "우리 팀이 먼저 죽고 싸움을 졌을 때\n데이터에는 누가 싸움을 걸었는지가 없고 누가 먼저 죽었는지만 있다. 먼저 죽은 사람이 탱커이고 싸움을 졌다면 혼자 들어갔거나 팀이 따라오지 못한 것으로 보고, 딜러였다면 먼저 잡혀 싸움을 졌다고만 말한다. 해석일 뿐이라 행동 조언은 붙이지 않는다."
+      },
+      {
+        "id": "macro.farm.ALL.bad.R1",
+        "content": "중후반 파밍 비중이 큰 유형인데 부족했을 때\n이 유형은 운영 평가에서 중후반 파밍, 곧 라인전 이후 분당 CS의 비중이 크다. 라인전이 끝난 뒤 챙긴 미니언과 정글 몹이 적었고 상대 라이너보다도 적었다는 뜻이다. 다음 판에는 중후반 CS를 챙기는 데 신경 쓴다."
+      },
+      {
+        "id": "laning.deaths.ALL.bad.R7",
+        "content": "라인전에서 상대 정글의 갱에 죽었을 때\n라인전에서 상대 정글이 킬이나 어시스트, 또는 피해로 관여한 데스다. 죽기 전 내가 둔 와드가 없었다면 상대 정글이 오는 길을 미리 보지 못한 상태였다는 뜻이다. 다음 판에는 갱에 당한 그 지역 쪽에 와드를 먼저 둔다."
+      }
+    ]
+  }
+}

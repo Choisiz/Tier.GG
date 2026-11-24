@@ -3,9 +3,9 @@
 // → 4) 그 유형 조각을 먼저, 없으면 role=ALL 조각으로 넓힘 → 5) 과목당 2개, 판당 8개, 같은 조각은 한 번.
 // Q3: 조언 규칙이 발동한 칸만 검색하고, ID 끝 규칙(.R1 등)이 그 칸의 규칙인 조각만 쓴다 (규칙 칸이 없는 옛 조각은 버림).
 // DB·임베딩 함수는 주입받는다 (단위 테스트는 가짜). 판정·숫자는 건드리지 않는다.
-import { ADVICE_RULES, rulesFor } from '../advice.js';
+import { ADVICE_RULES } from '../advice.js';
+import { planItems } from '../coverage.js';
 import { ROLE_LABEL } from '../role.js';
-import { MAX_PER_KIND } from '../llm/facts.js';
 import { AREA_LABEL, SUBJECT_LABEL, type Area } from '../llm/labels.js';
 import type { AdviceRuleId, AnalysisResult, Role } from '../types.js';
 import { ROLE_POSITION, roleOfId, ruleOfId, type ChunkPolarity, type ChunkPosition, type ChunkRole } from './chunks.js';
@@ -101,16 +101,21 @@ export function queryText(role: Role, area: Area, subjectId: string, kind: 'good
   return parts.join(', ');
 }
 
-/** 엔진 결과에서 검색할 과목들. 칸(facts.ts)과 같은 순서·개수 (영역마다 좋은 점·부족한 점 최대 2개). Q3: 규칙이 발동한 칸만 (라인전은 규칙이 없다) */
+/**
+ * 엔진 결과에서 검색할 과목들. 칸(facts.ts)과 같은 순서·개수 (영역마다 좋은 점·부족한 점 최대 2개). Q3: 규칙이 발동한 칸만.
+ * Q5 B: 칸은 coverage.planItems(등급 과목 + 규칙·재료로 채운 빈 칸)와 같다. 합친 규칙(merged)은 사실 한 구절만 쓰므로 조각을 찾지 않는다.
+ */
 export function ragTargets(result: AnalysisResult): RagTarget[] {
   const out: RagTarget[] = [];
   const verdict: Record<Area, string | null> = { laning: result.summary.laning, fight: result.summary.fight, macro: result.summary.macro };
+  const plan = planItems(result);
   // 반영 비율이 큰 교전·운영을 먼저, 그 안에서는 부족한 점을 먼저 (판당 상한에 걸릴 때 앞쪽이 남는다)
   for (const area of ['fight', 'macro', 'laning'] as const) {
     if (area === 'laning' && result.laning === null) continue;
     for (const kind of ['bad', 'good'] as const) {
-      result.speakOrder[area][kind].slice(0, MAX_PER_KIND).forEach((subjectId, i) => {
-        const rules = [...new Set(rulesFor(result.advice, subjectId, kind).map((r) => r.id))];
+      plan.items.filter((it) => it.area === area && it.kind === kind).forEach((it, i) => {
+        const subjectId = it.subjectId;
+        const rules = [...new Set(it.rules.map((r) => r.id))];
         if (rules.length === 0) return;
         out.push({
           key: `${area}.${kind}.${i}`,
@@ -164,8 +169,19 @@ export function pickForSubject(rows: readonly RagRow[], role: Role, subjectId: s
   const byDist = [...bySubject].sort((a, b) => a.distance - b.distance || (a.id < b.id ? -1 : 1));
   const own = byDist.filter((r) => roleOfId(r.id) === role);
   const all = byDist.filter((r) => roleOfId(r.id) === 'ALL');
-  const picked = own.slice(0, perSubject);
-  if (picked.length < perSubject) picked.push(...all.slice(0, perSubject - picked.length));
+  const ordered = [...own, ...all];
+  // Q4: 한 칸에 규칙이 여럿이면(예: 교전 시야 R1 + R11) 규칙마다 1순위 조각을 먼저 담고, 남은 자리를 순서대로 채운다
+  const picked: RagRow[] = [];
+  for (const rule of rules) {
+    const c = ordered.find((r) => ruleOfId(r.id) === rule && !picked.includes(r));
+    if (c && picked.length < perSubject) picked.push(c);
+  }
+  for (const r of ordered) {
+    if (picked.length >= perSubject) break;
+    if (!picked.includes(r)) picked.push(r);
+  }
+  // 담은 순서는 유형 조각 먼저, 그 안에서 거리순 (규칙마다 고른 뒤 다시 정렬)
+  picked.sort((a, b) => ordered.indexOf(a) - ordered.indexOf(b));
   return { rows: picked, widened: own.length === 0 && picked.length > 0 };
 }
 

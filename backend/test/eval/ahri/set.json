@@ -1,0 +1,14 @@
+{
+  "description": "검증용 아리 1판 (계정 식별 값 가림)",
+  "items": [
+    {
+      "matchId": "KR_8456658640",
+      "match": "KR_8456658640.match.json",
+      "timeline": "KR_8456658640.timeline.json",
+      "participantId": 3,
+      "position": "MIDDLE",
+      "role": "",
+      "note": "아리, 패, 35.5분"
+    }
+  ]
+}

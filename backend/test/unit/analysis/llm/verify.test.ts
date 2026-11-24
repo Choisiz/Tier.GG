@@ -127,8 +127,9 @@ describe('검사 4: 금지어', () => {
     assert.deepEqual(rules('fight.bad.0', '오브젝트 전 시야 점수가 오브젝트당 0.5로 낮았습니다.', ['fight.vision.perObjective']), []);
   });
   it('해석어는 "보입니다"가 있어야 함', () => {
-    assert.deepEqual(rules('fight.bad.1', '이니시를 잘못 걸었습니다.', []), ['forbidden']);
-    assert.deepEqual(rules('fight.bad.1', '무리한 진입이 있었던 것으로 보입니다.', []), []);
+    // Q7: 세나 fight.bad.1(득실 등급 과목)은 두 팀 점수를 써야 해서(4-7) 시야 칸(fight.bad.0)으로 본다
+    assert.deepEqual(rules('fight.bad.0', '이니시를 잘못 걸었습니다.', []), ['forbidden']);
+    assert.deepEqual(rules('fight.bad.0', '무리한 진입이 있었던 것으로 보입니다.', []), []);
   });
 });
 
@@ -191,13 +192,17 @@ describe('검사 3-1: 단위 (Q1)', () => {
     assert.deepEqual(rules('laning.bad.0', '15골드 시점에 상대 애쉬보다 703 적었습니다.', GOLD), ['number']);
   });
   it('%와 %p를 구분한다 (차이는 %p)', () => {
-    assert.deepEqual(rules('fight.bad.1', '오브젝트 싸움 득실 중 우리 팀 몫이 4.5%에 그쳤습니다.', ['fight.advantage.sharePct']), []);
-    assert.deepEqual(rules('fight.bad.1', '오브젝트 싸움 득실 중 우리 팀 몫이 4.5%p에 그쳤습니다.', ['fight.advantage.sharePct']), ['number']);
+    // Q7: 득실 칸은 몫(%) 대신 두 팀 점수라 운영 득실 R1 칸(세나 macro.bad.1)의 몫 값으로 본다
+    const R1 = ['rule.R1.macro.advantage.me', 'rule.R1.macro.advantage.opponent', 'macro.advantage.ours', 'macro.advantage.theirs'];
+    const pts = '오브젝트 싸움 밖에서 내가 참여한 싸움에서 우리 팀 51점, 상대 팀 150점이었습니다. ';
+    const ids = (s: string) => rules('macro.bad.1', s, R1);
+    assert.deepEqual(ids(`${pts}득실 중 우리 팀 몫이 25.4%로 상대 라이너 80.2%보다 낮았습니다.`), []);
+    assert.deepEqual(ids(`${pts}득실 중 우리 팀 몫이 25.4%p로 상대 라이너 80.2%보다 낮았습니다.`), ['number']);
   });
 });
 
 describe('검사 2-1: 좋은 점·부족한 점 칸 방향 (Q1)', () => {
-  const fake = (subjectId: string, kind: 'good' | 'bad') => ({ slot: `${subjectId.split('.')[0]}.${kind}.0`, area: subjectId.split('.')[0] as 'laning', kind, subjectId, index: null, factIds: [], rules: [] });
+  const fake = (subjectId: string, kind: 'good' | 'bad') => ({ slot: `${subjectId.split('.')[0]}.${kind}.0`, area: subjectId.split('.')[0] as 'laning', kind, subjectId, index: null, factIds: [], rules: [], origin: 'graded' as const });
   const dir = (subjectId: string, kind: 'good' | 'bad', text: string) => verifySlot(fake(subjectId, kind), { text, factIds: [] }, ctx).map((f) => f.rule);
   it('과목마다 반대 방향 단어가 있으면 실패, 맞는 방향은 통과', () => {
     for (const [id, w] of Object.entries(SUBJECT_DIRECTION_WORDS)) {

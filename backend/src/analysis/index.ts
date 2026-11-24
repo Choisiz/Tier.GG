@@ -3,7 +3,7 @@ import { buildAdvice } from './advice.js';
 import { analyzeFight } from './fight.js';
 import { scoreObjectives } from './fights.js';
 import { analyzeKeyMoments } from './keyMoments.js';
-import { analyzeLaning } from './laning.js';
+import { analyzeLaning, laneInvolvementOf } from './laning.js';
 import { analyzeMacro } from './macro.js';
 import { determineRole, isPosition } from './role.js';
 import { ENGINE_VERSION } from './rules.js';
@@ -105,6 +105,7 @@ function analyzeCore(input: AnalysisInput): { ctx: MatchContext; objectives: Ret
       win: me.win,
       durationSec: ctx.durationSec,
     },
+    participants: [...ctx.players.values()].map((p) => ({ participantId: p.participantId, teamId: p.teamId, position: p.position, championId: p.championId })),
     laning: laning.result,
     ...(laning.result === null ? { laningUnavailableReason: laning.reason } : {}),
     fight: fight.area,
@@ -114,7 +115,7 @@ function analyzeCore(input: AnalysisInput): { ctx: MatchContext; objectives: Ret
     speakOrder,
     notes: fight.notes,
     // 장면(Q2): 판정이 끝난 뒤 문장 재료만 모은다. 점수·등급·말할 순서에 영향 없음
-    scenes: buildScenes(ctx, objectives, laning.result, speakOrder),
+    scenes: buildScenes(ctx, objectives, laning.result, speakOrder, laneInvolvementOf(ctx, laning.result)),
     warnings: ctx.warnings,
   };
   return { ctx, objectives, result };

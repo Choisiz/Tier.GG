@@ -1,0 +1,23 @@
+{
+  "description": "검증용 최근 솔로랭크 2판 (한 계정, 계정 식별 값 가림)",
+  "items": [
+    {
+      "matchId": "KR_8469351265",
+      "match": "KR_8469351265.match.json",
+      "timeline": "KR_8469351265.timeline.json",
+      "participantId": 5,
+      "position": "UTILITY",
+      "role": "",
+      "note": "Senna, 패, 28.5분, 2026-11-22"
+    },
+    {
+      "matchId": "KR_8468352867",
+      "match": "KR_8468352867.match.json",
+      "timeline": "KR_8468352867.timeline.json",
+      "participantId": 3,
+      "position": "MIDDLE",
+      "role": "",
+      "note": "Ahri, 승, 42.0분, 2026-11-21"
+    }
+  ]
+}

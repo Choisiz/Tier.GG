@@ -1,0 +1,267 @@
+{
+  "label": "live.ahri2.claude-opus-5-5.low.rag",
+  "promptVersion": "2026-11-22.2",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "totals": {
+    "slots": 12,
+    "firstPass": 12,
+    "numberFirstPass": 12,
+    "retried": 0,
+    "templated": 0,
+    "templateMode": 0,
+    "costUsd": 0.182952,
+    "finalNumber": 0,
+    "finalDirection": 0,
+    "finalForbidden": 0
+  },
+  "results": [
+    {
+      "matchId": "KR_8468352867",
+      "participantId": 3,
+      "position": "MIDDLE",
+      "role": "MID_DAMAGE",
+      "note": "Ahri, 승, 42.0분, 2026-11-21",
+      "feedback": {
+        "mode": "llm",
+        "summary": {
+          "text": "라인전은 경험치는 따라갔지만 골드를 내줬고, 오브젝트 싸움은 잘했으며 그 밖의 운영은 보통이었습니다. 29:36 싸움에서 우리 팀 2킬, 상대 팀 5킬로 골드 격차가 약 4,300 벌어졌습니다.",
+          "factIds": [
+            "keyMoment.0.startMin",
+            "keyMoment.0.killsOurs",
+            "keyMoment.0.killsTheirs",
+            "keyMoment.0.gapChangeAbs"
+          ],
+          "source": "llm",
+          "chunkIds": []
+        },
+        "sections": {
+          "laning": {
+            "good": [
+              {
+                "subjectId": "laning.roam",
+                "text": "15:00까지 다른 라인·정글 싸움 킬·어시스트가 나 2번, 상대 다이애나 0번이었습니다. 4:22 상대 정글 위쪽(탑 쪽)에서 참여했습니다. 라인전 전체 킬/데스/어시스트는 나 1/1/1, 다이애나 1/0/0입니다.",
+                "factIds": [
+                  "laning.referenceMin",
+                  "laning.roam.me",
+                  "laning.roam.enemy",
+                  "laning.opponent",
+                  "laning.roam.me.0.min",
+                  "laning.roam.me.0.region",
+                  "laning.kda.me.kills",
+                  "laning.kda.me.deaths",
+                  "laning.kda.me.assists",
+                  "laning.kda.enemy.kills",
+                  "laning.kda.enemy.deaths",
+                  "laning.kda.enemy.assists"
+                ],
+                "source": "llm",
+                "chunkIds": []
+              }
+            ],
+            "bad": [
+              {
+                "subjectId": "laning.growth",
+                "text": "15:00 라인전은 경험치는 따라갔지만 골드를 내줬습니다. CS가 121개로 상대의 128개보다 적었습니다. 다음 판에는 CS에 신경 쓰세요.",
+                "factIds": [
+                  "laning.referenceMin",
+                  "laning.growth.cell",
+                  "rule.R8.me",
+                  "rule.R8.enemy",
+                  "rule.R8.action"
+                ],
+                "source": "llm",
+                "chunkIds": [
+                  "laning.growth.ALL.bad.R8"
+                ]
+              },
+              {
+                "subjectId": "laning.deaths",
+                "text": "3:21 미드 라인 우리 포탑 쪽에서 상대 라이너에게 1:1로 죽었고, 죽기 직전 내가 준 피해는 260, 받은 피해는 561이었습니다. 다음 판에는 라인전 1:1 교환에 더 집중해서 신경 쓰세요.",
+                "factIds": [
+                  "rule.R6.min",
+                  "rule.R6.region",
+                  "rule.R6.dealt",
+                  "rule.R6.received",
+                  "rule.R6.action"
+                ],
+                "source": "llm",
+                "chunkIds": [
+                  "laning.deaths.ALL.bad.R6"
+                ]
+              }
+            ]
+          },
+          "fight": {
+            "good": [
+              {
+                "subjectId": "fight.damage",
+                "text": "15:00~30:00 챔피언 딜 비중이 25.3%로 기대치 22%보다 높았습니다. 40:38 우리 팀이 장로 용을 잡은 싸움에서 우리 팀 딜 중 내 비중은 79.5%로 보입니다.",
+                "factIds": [
+                  "fight.damage.phase1StartMin",
+                  "fight.damage.phase1EndMin",
+                  "fight.damage.share1",
+                  "fight.damage.expected1",
+                  "scene.fight.damage.0.min",
+                  "scene.fight.damage.0.objectives",
+                  "scene.fight.damage.0.damageSharePct"
+                ],
+                "source": "llm",
+                "chunkIds": []
+              },
+              {
+                "subjectId": "fight.advantage",
+                "text": "오브젝트를 잡은 시각 앞뒤 40초 동안 내가 참여한 싸움 8번에서 우리 팀 몫이 82.7%였습니다. 40:38 싸움은 우리 팀이 더 얻었고, 내 데스 1번(상대 팀 7점)으로 우리 팀이 장로 용(80점)을 얻어 이득 교환이었습니다.",
+                "factIds": [
+                  "fight.windowSec",
+                  "fight.advantage.fights",
+                  "fight.advantage.sharePct",
+                  "rule.R4.good.min",
+                  "rule.R4.good.outcome",
+                  "rule.R4.good.me",
+                  "rule.R4.good.myDeaths",
+                  "rule.R4.good.deathPoints",
+                  "rule.R4.good.objective",
+                  "rule.R4.good.objectivePoints"
+                ],
+                "source": "llm",
+                "chunkIds": [
+                  "fight.advantage.ALL.good.R4"
+                ]
+              }
+            ],
+            "bad": [
+              {
+                "subjectId": "fight.vision",
+                "text": "11:01 상대가 잡은 용 전 60초 동안 내가 둔 제어 와드는 0개였습니다. 다음 판에는 그 오브젝트 전에 제어 와드를 두세요.",
+                "factIds": [
+                  "rule.R11.min",
+                  "rule.R11.objective",
+                  "rule.R11.windowSec",
+                  "rule.R11.controlWards"
+                ],
+                "source": "llm",
+                "chunkIds": [
+                  "fight.vision.ALL.bad.R11"
+                ]
+              }
+            ]
+          },
+          "macro": {
+            "good": [
+              {
+                "subjectId": "macro.solo",
+                "text": "단독 킬 2번, 단독 데스 1번이었습니다. 33:26 위쪽 강(바론 쪽)에서 단독 킬을 냈습니다.",
+                "factIds": [
+                  "macro.solo.kills",
+                  "macro.solo.deaths",
+                  "scene.macro.solo.0.min",
+                  "scene.macro.solo.0.region",
+                  "scene.macro.solo.0.what"
+                ],
+                "source": "llm",
+                "chunkIds": []
+              },
+              {
+                "subjectId": "macro.vision",
+                "text": "오브젝트 싸움 밖 시야 점수가 31로, 약 42분 동안 분당 0.74였습니다.",
+                "factIds": [
+                  "macro.vision.points",
+                  "macro.vision.minutes",
+                  "macro.vision.perMinute"
+                ],
+                "source": "llm",
+                "chunkIds": []
+              }
+            ],
+            "bad": []
+          }
+        },
+        "keyMoments": [
+          {
+            "index": 1,
+            "text": "19:24 싸움에서 우리 팀 3킬, 상대 팀 3킬로 앞선 팀이 우리 팀에서 상대 팀으로 바뀌었고, 우리 팀은 골드 약 500 손해를 봤습니다.",
+            "factIds": [
+              "keyMoment.1.startMin",
+              "keyMoment.1.killsOurs",
+              "keyMoment.1.killsTheirs",
+              "keyMoment.1.leaderBefore",
+              "keyMoment.1.leaderAfter",
+              "keyMoment.1.swingAbs"
+            ],
+            "chunkIds": [],
+            "source": "llm"
+          },
+          {
+            "index": 0,
+            "text": "29:36 싸움에서 우리 팀 2킬, 상대 팀 5킬로 골드 격차가 약 4,300 벌어졌고, 우리 미드 1차 포탑과 2차 포탑을 잃었습니다.",
+            "factIds": [
+              "keyMoment.0.startMin",
+              "keyMoment.0.killsOurs",
+              "keyMoment.0.killsTheirs",
+              "keyMoment.0.gapChangeAbs",
+              "keyMoment.0.followUp.0",
+              "keyMoment.0.followUp.1"
+            ],
+            "chunkIds": [],
+            "source": "llm"
+          },
+          {
+            "index": 2,
+            "text": "41:25 싸움에서 우리 팀 4킬, 상대 팀 1킬로 골드 격차가 약 1,900 좁혀졌고, 상대 미드 억제기를 깼습니다.",
+            "factIds": [
+              "keyMoment.2.startMin",
+              "keyMoment.2.killsOurs",
+              "keyMoment.2.killsTheirs",
+              "keyMoment.2.gapChangeAbs",
+              "keyMoment.2.followUp.1"
+            ],
+            "chunkIds": [],
+            "source": "llm"
+          }
+        ],
+        "meta": {
+          "engineVersion": "2026-11-22.1",
+          "promptVersion": "2026-11-22.2",
+          "knowledgeVersion": "f95797f84513",
+          "knowledgeIds": [
+            "fight.vision.ALL.bad.R11",
+            "fight.advantage.ALL.good.R4",
+            "laning.growth.ALL.bad.R8",
+            "laning.deaths.ALL.bad.R6"
+          ],
+          "model": "claude-opus-5-5",
+          "effort": "low",
+          "attempts": 1,
+          "verification": {
+            "firstPass": 12,
+            "firstTotal": 12,
+            "numberFirstPass": 12,
+            "retried": 0,
+            "templated": 0,
+            "failures": [],
+            "retryFailures": [],
+            "extras": []
+          },
+          "usage": {
+            "input": 17478,
+            "cacheWrite": 12836,
+            "cacheRead": 0,
+            "output": 2443
+          },
+          "costUsd": 0.182952,
+          "durationMs": 17145,
+          "fallbackReason": null
+        }
+      },
+      "finalCheck": {
+        "number": 0,
+        "direction": 0,
+        "forbidden": 0,
+        "other": 0,
+        "details": []
+      },
+      "recording": "KR_8468352867.p3.2026-11-22.2.claude-opus-5-5.low.json"
+    }
+  ]
+}

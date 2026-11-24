@@ -41,13 +41,21 @@ describe('facts: 세나 판 값', () => {
     assert.deepEqual(fact('laning.gold.diffAbs').approx, { step: 100 });
     assert.equal(fact('laning.opponent').value, '애쉬');
     assert.equal(fact('player.champion').value, '세나');
-    assert.deepEqual(sheet.allowedNames, ['세나', '애쉬']);
+    // Q4: 라인전 데스에 관여한 상대(8:32 다이브의 미스 포츈)도 이름을 쓸 수 있다
+    assert.deepEqual(sheet.allowedNames, ['세나', '애쉬', '미스 포츈']);
   });
-  it('KDA 세부와 기준 전 데스 2번', () => {
-    assert.equal(fact('laning.kda.me').value, 1);
-    assert.equal(fact('laning.kda.enemy').value, 5);
-    assert.equal(fact('laning.kda.me.deaths').value, 2);
+  it('Q4 2-1 칸·원인(킬 골드 상대 700·나 0, CS 16:19)과 기준 전 데스 2번(1:1, 다이브)', () => {
+    assert.equal(fact('laning.growth.cell').value, '경험치는 따라갔지만 골드를 내줌');
+    assert.equal(fact('laning.cause.killGold.enemy').value, 700);
+    assert.equal(fact('laning.cause.killGold.me').value, 0);
+    assert.equal(fact('laning.cause.cs.me').value, 16);
+    assert.equal(fact('laning.cause.cs.enemy').value, 19);
+    assert.equal(fact('laning.growth.causes').value, '킬 골드(상대가 앞섬), 그다음 CS(상대가 앞섬)');
     assert.equal(fact('laning.deathsBefore.count').value, 2);
+    assert.equal(fact('laning.deathsBefore.0.type').value, '1:1');
+    assert.equal(fact('laning.deathsBefore.1.type').value, '다이브');
+    assert.equal(fact('laning.deathsBefore.1.type').estimate, true, '다이브는 추정');
+    assert.equal(fact('laning.deathsBefore.0.type').estimate, undefined);
   });
   it('결정적 장면 0: 15:04, 킬 5, 격차 변화 3,895, 상대 팀 우세에서 시작', () => {
     assert.deepEqual(fact('keyMoment.0.startMin').display, ['15:04']);
@@ -57,9 +65,11 @@ describe('facts: 세나 판 값', () => {
     assert.equal(fact('keyMoment.2.gapChangeAbs').value, 465);
     assert.equal(fact('keyMoment.0.followUp.0').value, '우리 바텀 1차 포탑을 잃었습니다');
   });
-  it('말할 과목의 숫자만 평평하게 (시야 0.5, 이득 4.5%, 사이드 분당 87.4)', () => {
+  it('말할 과목의 숫자만 평평하게 (시야 0.5, 득실 두 팀 점수 5점 대 105점, 사이드 분당 87.4)', () => {
     assert.equal(fact('fight.vision.perObjective').value, 0.5);
-    assert.equal(fact('fight.advantage.sharePct').value, 4.5);
+    // Q7(2): 득실은 몫(4.5%) 대신 두 팀 점수와 결과
+    assert.equal(sheet.byId.has('fight.advantage.sharePct'), false);
+    assert.deepEqual([fact('fight.advantage.ours').value, fact('fight.advantage.theirs').value, fact('fight.advantage.outcome').value], [5, 105, '크게 짐']);
     assert.equal(fact('macro.side.perMinute').value, 87.4);
     // fight.damage는 C라 말하지 않는다 → facts에 없음
     assert.equal(sheet.byId.has('fight.damage.share1'), false);
@@ -70,6 +80,8 @@ describe('facts: 등급·점수·반영 비율은 넣지 않는다 (Q3: 발동�
   it('id와 label에 grade·score·impact·weight·total이 없음', () => {
     for (const f of sheet.facts) {
       if (f.id.startsWith('rule.')) continue;
+      // Q7(2): 득실 과목의 두 팀 점수(5-4, 킬·포탑·오브젝트)는 문장 재료로 낸다 (등급 점수·총점은 여전히 없음)
+      if (/^(fight|macro)\.advantage\.(ours|theirs)$/.test(f.id)) continue;
       assert.doesNotMatch(f.id, /grade|score|impact|weight|total|\.ours$|\.theirs$|lastHitPoints/i, f.id);
       assert.doesNotMatch(f.label, /등급|총점|반영/, f.label);
     }
@@ -81,13 +93,13 @@ describe('facts: 등급·점수·반영 비율은 넣지 않는다 (Q3: 발동�
 });
 
 describe('facts: 칸 구성 (영역마다 좋은 점·부족한 점 최대 2개)', () => {
-  it('세나 판 칸: 요약, 라인전 부족 2, 교전 부족 2, 운영 좋음 1·부족 2, 결정적 장면 3', () => {
+  it('세나 판 칸: 요약, 라인전 부족 2(Q4: 성장·데스), 교전 부족 2, 운영 좋음 1·부족 2, 결정적 장면 3', () => {
     assert.deepEqual(
       sheet.slots.map((s) => `${s.slot}:${s.subjectId ?? s.index ?? ''}`),
       [
         'summary:',
-        'laning.bad.0:laning.gold',
-        'laning.bad.1:laning.kda',
+        'laning.bad.0:laning.growth',
+        'laning.bad.1:laning.deaths',
         'fight.bad.0:fight.vision',
         'fight.bad.1:fight.advantage',
         'macro.good.0:macro.side',

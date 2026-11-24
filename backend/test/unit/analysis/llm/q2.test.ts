@@ -87,7 +87,9 @@ describe('Q2 템플릿', () => {
         const t = templateFor(sh, s);
         assert.doesNotMatch(t.text, /낀|다음 판/, `${id} ${s.slot}`);
         assert.deepEqual(verifySlot(s, t, ctxOf(sh)), [], `${id} ${s.slot}`);
-        if (s.subjectId === 'fight.advantage') assert.match(t.text, /앞뒤 40초 동안 내가 참여한 싸움.*\d+:\d\d/, `${id} ${s.slot}`);
+        // Q5 B: 규칙으로 채운 칸(origin rule)은 과목 등급 문장이 아니라 규칙 근거 문장이라 등급 과목 칸만 본다
+        // Q7: P4 칸의 한 문장 꼴(R4와 함께 칸 길이에 맞출 때)은 기준 시간 대신 "내가 참여한 오브젝트 싸움 N번"
+        if (s.subjectId === 'fight.advantage' && s.origin === 'graded') assert.match(t.text, /(앞뒤 40초 동안 내가 참여한 싸움|내가 참여한 오브젝트 싸움 \d+번).*\d+:\d\d/, `${id} ${s.slot}`);
         if (s.subjectId === 'macro.advantage') assert.match(t.text, /앞뒤 40초 밖에서 내가 참여한 싸움/, `${id} ${s.slot}`);
         if (s.subjectId === 'fight.vision') assert.match(t.text, /잡기 전 60초 동안.*\d+:\d\d에 잡힌 .+ 전 60초 동안 내가 설치한 와드는 \d+개/, `${id} ${s.slot}`);
       }

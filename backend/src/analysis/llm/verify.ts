@@ -1,6 +1,7 @@
 // 검증기 (ai_spec 2-6): 문장마다 모양·방향·숫자·금지어·길이·이름을 검사한다.
 // 판단은 코드가 한다. LLM 문장의 숫자는 그 문장의 factIds가 가리키는 fact의 표기(또는 어림 규칙)와만 대조한다.
-import { isReversed, TIME_UNIT, type Fact, type FactSheet, type Slot, type SlotRule } from './facts.js';
+import { isPraise } from '../praise.js';
+import { isReversed, LANE_INVOLVE_IDS, TIME_UNIT, type Fact, type FactSheet, type Slot, type SlotRule } from './facts.js';
 import {
   ADVICE_SENTENCE,
   allowedUnitWords,
@@ -9,11 +10,15 @@ import {
   AREAS,
   DEATH_CLAUSE,
   DIRECTION_WORDS,
+  ESTIMATE_ENDING,
   FORBIDDEN_PATTERNS,
+  LANING_CELL_WORDS,
   INTERPRETIVE_WORDS,
   NUMBER_NAME_PATTERNS,
+  PRAISE_WORDS,
   RULE_EXEMPT_PATTERNS,
   REVERSAL_WORDS,
+  SUBJECT_EXEMPT_PATTERNS,
   SUBJECT_DIRECTION_WORDS,
   SWING_WORDS,
   UNIT_WORD_RE,
@@ -21,7 +26,7 @@ import {
   VERDICT_WORDS,
   type Area,
 } from './labels.js';
-import type { KeyMoment } from '../types.js';
+import type { KeyMoment, LaningCell } from '../types.js';
 
 export type VerifyRule = 'shape' | 'direction' | 'number' | 'forbidden' | 'length' | 'name';
 
@@ -166,6 +171,29 @@ function subjectDirection(subjectId: string, kind: 'good' | 'bad', text: string)
   return wrong ? `${kind === 'good' ? '좋은 점' : '부족한 점'} 칸에 반대 방향 단어 "${wrong}"` : null;
 }
 
+/**
+ * Q4 라인전 성장 칸 방향: 판정은 칸(골드·레벨 앞섬/같음/뒤짐)이라 좋은 점/부족한 점 칸 단어 대신 골드·레벨 각각의 방향을 본다.
+ * 절(쉼표·"~지만"·"~고 "·"~며 ")마다 주어가 골드("골드가/는/도")나 레벨("레벨이/은/도") 하나뿐이면, 그 방향과 반대인 말이 있는지 본다.
+ * 골드 "같음"(작은 차이)은 많다/적다 모두 사실일 수 있어 보지 않고, 레벨 같음은 앞섰다/뒤졌다 모두 틀린 말이다.
+ */
+const GROWTH_UP = ['많았', '앞섰', '앞서', '높았'];
+const GROWTH_DOWN = ['적었', '뒤졌', '뒤처', '낮았', '밀렸'];
+export function growthDirection(cell: LaningCell, text: string): string | null {
+  const clauses = text.replace(DEATH_CLAUSE, ' ').split(/[.,]|(?<=지만)|(?<=고)\s|(?<=며)\s/);
+  for (const c of clauses) {
+    const gold = /골드[가는도]/.test(c);
+    const level = /레벨[이은도]/.test(c);
+    if (gold === level) continue;
+    const trend = gold ? cell.gold : cell.level;
+    const what = gold ? '골드' : '레벨';
+    if (trend === 'EVEN' && gold) continue;
+    const wrong = trend === 'AHEAD' ? GROWTH_DOWN : trend === 'BEHIND' ? GROWTH_UP : [...GROWTH_UP, ...GROWTH_DOWN];
+    const w = wrong.find((x) => c.includes(x));
+    if (w) return `라인전 ${what}는 ${trend === 'AHEAD' ? '앞섰는데' : trend === 'BEHIND' ? '뒤졌는데' : '같았는데'} "${w}"`;
+  }
+  return null;
+}
+
 function splitSentences(text: string): string[] {
   return text
     .split(/(?<=[.!?。])\s+|(?<=[다요])\.(?!\d)/)
@@ -173,7 +201,7 @@ function splitSentences(text: string): string[] {
     .filter((s) => s.replace(/[.!?。\s]/g, '').length > 0);
 }
 
-function sentenceCount(text: string): number {
+export function sentenceCount(text: string): number {
   return splitSentences(text).length;
 }
 
@@ -231,13 +259,17 @@ export function isAdviceSentence(sentence: string): boolean {
   return ADVICE_SENTENCE.some((re) => re.test(sentence));
 }
 
-/** 규칙의 근거 fact를 모두 factIds에 적고 문장에 썼나 */
+/** Q5(A2·A3) 정해진 조언 말의 어간: "다음 판에는 CS에 신경 쓰세요" → "CS에 신경 쓰" (쓰세요·쓰고 모두 허용) */
+export const actionStem = (action: string): string => action.replace(/^다음\s*판에는\s*/, '').replace(/세요[.!]?$/, '');
+
+/** 규칙의 근거 fact를 모두 factIds에 적고 문장에 썼나. Q5: 정해진 조언 말(actionText)이 있으면 그 말도 있어야 한다 */
 function citesRule(r: SlotRule, st: SlotText, sheet: FactSheet, text: string): string[] {
   const missing: string[] = [];
   for (const id of r.required) {
     const f = sheet.byId.get(id);
     if (!f || !st.factIds.includes(id) || !citesFact(f, text)) missing.push(id);
   }
+  if (r.actionText && !text.includes(actionStem(r.actionText))) missing.push(`조언 "${r.actionText}"`);
   return missing;
 }
 
@@ -263,7 +295,16 @@ export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): Verify
   // 2. 방향
   if (slot.area === 'summary') {
     const v = sheet.result.summary;
-    const verdicts = [v.laning, v.fight, v.macro].filter((x): x is NonNullable<typeof x> => x !== null);
+    // Q4: 라인전은 2-1 칸(cell)마다 판정어·반대 방향 말이 다르다 (요약 방향 v.laning은 칸에서 정해진다)
+    const cell = sheet.result.laning?.cell ?? null;
+    const verdicts = [cell ? null : v.laning, v.fight, v.macro].filter((x): x is NonNullable<typeof x> => x !== null);
+    const otherWords = verdicts.flatMap((x) => VERDICT_WORDS[x]);
+    if (cell) {
+      const cw = LANING_CELL_WORDS[cell.id];
+      if (!hasAny(text, cw.words)) add('direction', `요약에 라인전 판정 "${cell.label}"을 뜻하는 말(${cw.words.join('/')})이 없음`);
+      const w = cw.opposite.find((x) => text.includes(x) && !otherWords.some((o) => o.includes(x) || x.includes(o)));
+      if (w) add('direction', `요약에 라인전 반대 방향 단어 "${w}" (판정 ${cell.label})`);
+    }
     for (const verdict of verdicts) {
       if (!hasAny(text, VERDICT_WORDS[verdict])) add('direction', `요약에 판정어 "${verdict}"(또는 동의어)가 없음`);
       for (const opp of VERDICT_OPPOSITE[verdict]) {
@@ -279,6 +320,9 @@ export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): Verify
   } else if (slot.area === 'keyMoment' && slot.index !== null) {
     const km = sheet.result.keyMoments[slot.index];
     if (km) for (const d of keyMomentDirection(km, text, true)) add('direction', d);
+  } else if (slot.subjectId === 'laning.growth' && sheet.result.laning) {
+    const d = growthDirection(sheet.result.laning.cell, text);
+    if (d) add('direction', d);
   } else if (slot.kind !== null && slot.subjectId !== null) {
     const d = subjectDirection(slot.subjectId, slot.kind, text);
     if (d) add('direction', d);
@@ -288,6 +332,11 @@ export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): Verify
   const facts = st.factIds.map((id) => sheet.byId.get(id)).filter((f): f is Fact => f !== undefined);
   for (const tok of extractNumbers(text)) {
     const matched = facts.filter((f) => numberMatchesFact(tok, f));
+    if (tok.unit === '분' && !Number.isInteger(tok.value)) {
+      // Q5(C4): "21.03분" 같은 소수 분 표기 금지 (시각은 분:초, 시간 길이는 "약 N분")
+      add('number', `"${tok.raw}분": 분은 소수로 쓰지 않는다 (시각은 "분:초", 시간 길이는 "약 N분")`);
+      continue;
+    }
     if (matched.length === 0) {
       const near = facts.filter((f) => typeof f.value === 'number').map((f) => `${f.id}=${f.display[0]}`);
       add('number', `"${tok.raw}"가 이 문장의 factIds 값과 맞지 않음${near.length ? ` (쓸 수 있는 값: ${near.slice(0, 6).join(', ')})` : ' (factIds에 숫자 fact 없음)'}`);
@@ -298,10 +347,20 @@ export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): Verify
   }
 
   // 4. 금지어·해석어 (Q3: 발동한 규칙의 근거를 말할 때만 "반영 비율"(R1)·"득실 점수"(R1·R2·R3)를 허용)
-  const exempt = new Set(slot.rules.flatMap((r) => RULE_EXEMPT_PATTERNS[r.id] ?? []));
+  // Q7: 득실 과목 칸은 두 팀 점수("363점")를 쓴다
+  const exempt = new Set([...slot.rules.flatMap((r) => RULE_EXEMPT_PATTERNS[r.id] ?? []), ...((slot.subjectId && SUBJECT_EXEMPT_PATTERNS[slot.subjectId]) || [])]);
   for (const { re, why } of FORBIDDEN_PATTERNS) if (!exempt.has(re) && re.test(text)) add('forbidden', why);
-  const interp = INTERPRETIVE_WORDS.find((w) => text.includes(w));
-  if (interp && !text.includes('보입니다')) add('forbidden', `해석어 "${interp}"는 "~것으로 보입니다"로 끝맺어야 함`);
+  // Q6: 칭찬 규칙의 칭찬 말(P1 "캐리")은 데이터가 정한 칭찬이라 해석어 검사에서 뺀다 (근거 인용은 4-5가 본다)
+  const praiseRules = slot.rules.filter((r) => isPraise(r.id));
+  const praiseOk = new Set(praiseRules.flatMap((r) => PRAISE_WORDS[r.id] ?? []));
+  const interp = INTERPRETIVE_WORDS.find((w) => text.includes(w) && !praiseOk.has(w));
+  if (interp && !text.includes(ESTIMATE_ENDING)) add('forbidden', `해석어 "${interp}"는 "~것으로 보입니다"로 끝맺어야 함`);
+  // 4-0. 추정 fact (Q4): 추정 값(1분 단위 딜·받은 피해·CC, 다이브, 6레벨 차이 등)을 쓴 문장은 그 문장 안에서 "~로 보입니다"로 끝맺는다
+  for (const sentence of splitSentences(text)) {
+    if (sentence.includes(ESTIMATE_ENDING)) continue;
+    const est = facts.find((f) => f.estimate && citesFact(f, sentence));
+    if (est) add('forbidden', `추정 값 ${est.id}("${est.display[0]}")를 쓴 문장은 "~로 보입니다"로 끝맺어야 함`);
+  }
   // 4-1. 조언 규칙 (Q3, Q2의 "장면 없는 조언" 검사를 대체): 조언 문장("다음 판", 명령형, "신경 써")은
   //      이 칸에서 행동 조언 규칙(R1·R2·R3·R5)이 발동했을 때만 쓸 수 있고, 그 규칙의 근거 fact를 factIds에 적고 칸 문장에 써야 한다.
   //      규칙이 없는 칸(라인전·좋은 점·요약·결정적 장면 등)의 조언은 실패 → 재시도 → 템플릿(조언 없음).
@@ -326,7 +385,60 @@ export function verifySlot(slot: Slot, st: SlotText, ctx: VerifyContext): Verify
   for (const stem of R4_ME_STEMS) {
     if (!text.includes(stem)) continue;
     if (!r4) add('forbidden', `"${stem}" 문장은 R4가 발동한 칸에서만 쓴다`);
-    else if (!text.includes(r4.text ?? '')) add('forbidden', `내 역할 문장은 이 칸의 R4 문장 "${r4.text}" 그대로만 쓴다`);
+    else if (!slot.rules.some((r) => r.id === 'R4' && text.includes(r.text ?? ''))) add('forbidden', `내 역할 문장은 이 칸의 R4 문장 "${r4.text}" 그대로만 쓴다`);
+  }
+
+  // 4-3. Q5 B: 합친 규칙(merged)은 반드시 말한다 — 그 규칙의 최소 fact(mention)를 factIds에 적고 문장에 쓴다. R4는 그 문장 그대로
+  for (const r of slot.rules.filter((x) => x.merged)) {
+    const miss = r.mention.filter((id) => {
+      const f = sheet.byId.get(id);
+      return !f || !st.factIds.includes(id) || !citesFact(f, text);
+    });
+    if (r.id === 'R4' && r.text && !text.includes(r.text)) miss.push(`R4 문장 "${r.text}"`);
+    if (miss.length > 0) add('shape', `이 칸에 합친 ${r.id}(${r.subjectId})를 쓰지 않음 — 필요한 것: ${miss.join(', ')}`);
+  }
+  // 4-5. Q6 칭찬: ① 칭찬 말(캐리·주도 등)은 그 말의 칭찬 규칙이 이 칸에 있을 때만 ② 칸에 처음부터 붙은 칭찬 규칙은 근거 fact(required)를
+  //      factIds에 적고 문장에 쓴다(합친 칭찬은 4-3의 mention) ③ 칭찬하는 문장(칭찬 말 또는 칭찬 근거 값)에 추정 값(1분 단위)을 쓰지 않는다
+  //      ④ 1:1 킬(P2) 칸에서는 운영 "단독 킬"(6-1, 다른 정의) 수를 함께 쓰지 않는다
+  for (const [pid, words] of Object.entries(PRAISE_WORDS)) {
+    const w = words.find((x) => text.includes(x));
+    if (w && !praiseRules.some((r) => r.id === pid)) add('forbidden', `칭찬 말 "${w}"은 칭찬 규칙 ${pid}가 발동한 칸에서만 쓴다 (데이터로 정한 칭찬만)`);
+  }
+  for (const r of praiseRules.filter((x) => !x.merged)) {
+    const miss = r.required.filter((id) => {
+      const f = sheet.byId.get(id);
+      return !f || !st.factIds.includes(id) || !citesFact(f, text);
+    });
+    if (miss.length > 0) add('shape', `칭찬 규칙 ${r.id}(${r.subjectId})의 근거를 쓰지 않음 — 필요한 것: ${miss.join(', ')}`);
+  }
+  if (praiseRules.length > 0) {
+    const praiseFactIds = new Set(praiseRules.flatMap((r) => r.factIds));
+    const allWords = Object.values(PRAISE_WORDS).flat();
+    for (const sentence of splitSentences(text)) {
+      const praising = allWords.some((w) => sentence.includes(w)) || facts.some((f) => praiseFactIds.has(f.id) && citesFact(f, sentence));
+      if (!praising) continue;
+      const est = facts.find((f) => f.estimate && citesFact(f, sentence));
+      if (est) add('forbidden', `추정 값 ${est.id}("${est.display[0]}")를 칭찬 근거로 쓰지 않는다 (칭찬은 확정 값만)`);
+    }
+    if (praiseRules.some((r) => r.id === 'P2') && /단독\s*킬/.test(text)) add('forbidden', '1:1 킬(P2) 칸에서는 운영 "단독 킬"(오브젝트 싸움 밖 킬 1개 싸움, 다른 정의) 수를 쓰지 않는다 → "1:1 킬"로만');
+  }
+  // 4-4. Q5(A1)·Q7(1): 라인 밖 싸움 칸은 라인전 전체 킬 관여(킬+어시스트, 나·상대)를 먼저 쓴다 ("상대 0번"이 라인에서도 0으로 읽히지 않게)
+  if (slot.subjectId === 'laning.roam' && LANE_INVOLVE_IDS.every((id) => sheet.byId.has(id) && slot.factIds.includes(id))) {
+    const miss = LANE_INVOLVE_IDS.filter((id) => !st.factIds.includes(id) || !citesFact(sheet.byId.get(id)!, text));
+    if (miss.length > 0) add('shape', `라인 밖 싸움 칸은 라인전 전체 킬 관여(킬+어시스트, 나·상대)를 먼저 쓴다 — 쓰지 않음: ${miss.join(', ')}`);
+  }
+  // 4-6. Q7(4): 포지션 평균 딜 비중(5-2 기대 비중)을 쓰면 "이 유형의 기대치" 대신 포지션 이름("미드 딜러 평균")으로
+  const avg = sheet.byId.get('player.roleAverage');
+  if (avg) {
+    const expected = facts.find((f) => /(^fight\.damage\.expected\d|\.expected$|\.damageExpected$)/.test(f.id) && citesFact(f, text));
+    if (expected && !text.includes(String(avg.value))) add('forbidden', `포지션 평균 딜 비중(${expected.id})은 "${String(avg.value)} ${expected.display[0]}%"처럼 포지션 이름으로 쓴다`);
+  }
+  // 4-7. Q7(2): 득실 과목 칸(등급 과목)은 몫(%) 대신 두 팀 점수를 쓴다
+  if (slot.origin === 'graded' && (slot.subjectId === 'fight.advantage' || slot.subjectId === 'macro.advantage')) {
+    const ids = [`${slot.subjectId}.ours`, `${slot.subjectId}.theirs`].filter((id) => sheet.byId.has(id) && slot.factIds.includes(id));
+    const hasPraise = slot.rules.some((r) => r.id === 'P4' && !r.merged);
+    const miss = ids.filter((id) => !st.factIds.includes(id) || !citesFact(sheet.byId.get(id)!, text));
+    if (!hasPraise && miss.length > 0) add('shape', `득실 칸은 두 팀 점수(우리 팀·상대 팀)를 쓴다 — 쓰지 않음: ${miss.join(', ')}`);
   }
 
   // 5. 길이

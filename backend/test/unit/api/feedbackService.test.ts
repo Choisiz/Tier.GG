@@ -278,7 +278,8 @@ describe('피드백 서비스: 예산', () => {
   it('동시 2요청이 같이 통과해 상한을 넘지 않는다 (예약)', async () => {
     const client = new ScriptClient();
     client.hold();
-    const h = harness({ client, budgetUsd: 0.45 });
+    // 상한: 1요청 최악(Q4 라인전 facts로 약 0.47)보다 크고 2요청 최악보다 작게
+    const h = harness({ client, budgetUsd: 0.6 });
     const p1 = h.feedback('KR_1', SENA_PUUID);
     await tick();
     await tick();
@@ -305,7 +306,8 @@ describe('피드백 서비스: 시간 제한과 동시 실행', () => {
   it('동시 실행 + 대기열이 꽉 차면 503 ANALYSIS_BUSY (retryAfterSec 15), 하루 자리 반납', async () => {
     const client = new ScriptClient();
     client.hold();
-    const h = harness({ client, semaphore: createSemaphore(1, 0), dailyLimit: 2 });
+    // 예산이 아니라 동시 실행 자리를 보는 테스트라 상한을 넉넉히 (Q6: 칭찬 규칙으로 1요청 최악이 0.5를 넘어 기본 상한 1이면 둘째가 예산 429)
+    const h = harness({ client, semaphore: createSemaphore(1, 0), dailyLimit: 2, budgetUsd: 2 });
     const p1 = h.feedback('KR_1', SENA_PUUID);
     await tick();
     await tick();

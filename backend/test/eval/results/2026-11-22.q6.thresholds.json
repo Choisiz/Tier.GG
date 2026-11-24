@@ -1,0 +1,276 @@
+{
+ "description": "Q6 칭찬 규칙 경계값 표본 (ai_spec Q6, feedback_design 8-2). Q4 캐시 200판 재사용, 원본·계정 식별 값 없이 분포만",
+ "games": 200,
+ "players": 2000,
+ "thresholds": {
+  "carryDiff": 8,
+  "soloKillsMin": 2,
+  "lateSec": 1800,
+  "lateSoloKillsMin": 2,
+  "lateDiff": 6,
+  "objectiveFightsMin": 3
+ },
+ "duration": {
+  "minutes": {
+   "n": 200,
+   "p10": 19,
+   "p20": 22,
+   "p40": 26.6,
+   "p50": 27.8,
+   "p60": 29.5,
+   "p80": 32.4,
+   "p90": 35.8,
+   "mean": 27.64
+  },
+  "shareAtLeast30": 36.5,
+  "shareAtLeast33": 17
+ },
+ "soloKills": {
+  "note": "1:1 킬 = 킬러 나 · 어시스트 없음 · 피해자가 받은 챔피언 피해 출처가 나뿐 (이름 먼저)",
+  "agreeWithRiotSoloKills": {
+   "players": 2000,
+   "same": 1863,
+   "samePct": 93.2,
+   "diffHistogram": {
+    "-2": 5,
+    "-1": 132
+   }
+  },
+  "perPlayer": {
+   "histogram": {
+    "0": 909,
+    "1": 453,
+    "2": 304,
+    "3": 130,
+    "4": 90,
+    "5": 45,
+    "6": 24,
+    "7": 17,
+    "8": 10,
+    "9": 7,
+    "10": 6,
+    "12": 4,
+    "13": 1
+   },
+   "atLeast2Pct": 31.9,
+   "atLeast3Pct": 16.7
+  },
+  "killMinuteHistogram5": {
+   "0": 377,
+   "5": 549,
+   "10": 596,
+   "15": 469,
+   "20": 297,
+   "25": 179,
+   "30": 74,
+   "35": 17,
+   "40": 5
+  },
+  "killsAfter30Pct": 3.7,
+  "lateKillsPerPlayer": {
+   "histogram": {
+    "0": 1927,
+    "1": 55,
+    "2": 14,
+    "3": 3,
+    "4": 1
+   },
+   "atLeast1Pct": 3.7,
+   "atLeast2Pct": 0.9
+  }
+ },
+ "carry": {
+  "note": "가장 높은 구간의 딜 비중 − 기대치(%p). 팀 딜 1위 = 팀 5명 중 게임 전체 챔피언 딜 최다",
+  "bestDiffAllPlayers": {
+   "n": 2000,
+   "p10": -3.59,
+   "p20": -1.34,
+   "p40": 1.78,
+   "p50": 3.43,
+   "p60": 5.26,
+   "p80": 10.22,
+   "p90": 13.9,
+   "mean": 4.49
+  },
+  "bestDiffRank1": {
+   "n": 400,
+   "p10": 6.26,
+   "p20": 8.51,
+   "p40": 11.43,
+   "p50": 13.16,
+   "p60": 14.18,
+   "p80": 18.82,
+   "p90": 22.72,
+   "mean": 13.88
+  },
+  "rank1ByRole": {
+   "JUNGLE_DAMAGE": 52,
+   "TOP_DAMAGE": 87,
+   "TOP_TANK": 11,
+   "ADC": 126,
+   "MID_DAMAGE": 112,
+   "MID_TANK": 6,
+   "SUPPORT_DAMAGE": 6
+  },
+  "playersByRole": {
+   "TOP_DAMAGE": 326,
+   "JUNGLE_DAMAGE": 381,
+   "MID_TANK": 28,
+   "ADC": 400,
+   "SUPPORT_DAMAGE": 110,
+   "MID_DAMAGE": 372,
+   "SUPPORT_TANK": 156,
+   "TOP_TANK": 74,
+   "SUPPORT_UTILITY": 134,
+   "JUNGLE_TANK": 19
+  },
+  "fireRateAllPlayersByN": {
+   "3": 19.8,
+   "4": 19.6,
+   "5": 19.3,
+   "6": 18.2,
+   "7": 17.4,
+   "8": 16.4,
+   "9": 15.5,
+   "10": 14.3,
+   "12": 11.5
+  },
+  "fireRateAmongRank1ByN": {
+   "3": 98.8,
+   "4": 98,
+   "5": 96.5,
+   "6": 91,
+   "7": 87,
+   "8": 81.8,
+   "9": 77.5,
+   "10": 71.5,
+   "12": 57.3
+  }
+ },
+ "late": {
+  "note": "30분 이후 구간(3분 이상)이 있는 사람 중 그 구간 딜 비중이 세 구간에서 가장 높은 사람",
+  "playersWithLatePhase": 340,
+  "lateHighest": 111,
+  "diffWhenHighest": {
+   "n": 111,
+   "p10": -1.64,
+   "p20": 1.34,
+   "p40": 6.13,
+   "p50": 8.91,
+   "p60": 10.9,
+   "p80": 17.43,
+   "p90": 22.04,
+   "mean": 9.14
+  },
+  "fireRateAllPlayersByN": {
+   "0": 4.7,
+   "3": 4.2,
+   "4": 4,
+   "5": 3.7,
+   "6": 3.4,
+   "7": 3.2,
+   "8": 2.9
+  }
+ },
+ "objective": {
+  "graded": 1951,
+  "gradeA": 370,
+  "gradeAPct": 19,
+  "fightsWhenA": {
+   "1": 49,
+   "2": 75,
+   "3": 108,
+   "4": 86,
+   "5": 37,
+   "6": 10,
+   "7": 5
+  },
+  "aWithAtLeast3Pct": 12.3
+ },
+ "firedPlayers": {
+  "P1": {
+   "n": 327,
+   "pct": 16.4
+  },
+  "P2": {
+   "n": 638,
+   "pct": 31.9
+  },
+  "P4": {
+   "n": 246,
+   "pct": 12.3
+  },
+  "P3.damage": {
+   "n": 68,
+   "pct": 3.4
+  },
+  "P3.kills": {
+   "n": 18,
+   "pct": 0.9
+  }
+ },
+ "firedByRole": {
+  "JUNGLE_DAMAGE": {
+   "P1": 51,
+   "P2": 119,
+   "P4": 44,
+   "P3.damage": 16,
+   "P3.kills": 4
+  },
+  "TOP_DAMAGE": {
+   "P1": 78,
+   "P2": 193,
+   "P3.kills": 3,
+   "P4": 45,
+   "P3.damage": 7
+  },
+  "MID_TANK": {
+   "P2": 13,
+   "P1": 5,
+   "P4": 4,
+   "P3.kills": 1,
+   "P3.damage": 1
+  },
+  "TOP_TANK": {
+   "P1": 11,
+   "P2": 37,
+   "P3.damage": 1,
+   "P4": 7
+  },
+  "ADC": {
+   "P4": 43,
+   "P2": 66,
+   "P1": 89,
+   "P3.damage": 21,
+   "P3.kills": 3
+  },
+  "SUPPORT_UTILITY": {
+   "P4": 17,
+   "P2": 4
+  },
+  "MID_DAMAGE": {
+   "P1": 87,
+   "P2": 190,
+   "P4": 49,
+   "P3.damage": 16,
+   "P3.kills": 6
+  },
+  "SUPPORT_TANK": {
+   "P4": 22,
+   "P3.damage": 1,
+   "P2": 2
+  },
+  "JUNGLE_TANK": {
+   "P2": 3,
+   "P3.damage": 1,
+   "P4": 3
+  },
+  "SUPPORT_DAMAGE": {
+   "P4": 12,
+   "P2": 11,
+   "P3.kills": 1,
+   "P3.damage": 4,
+   "P1": 6
+  }
+ }
+}

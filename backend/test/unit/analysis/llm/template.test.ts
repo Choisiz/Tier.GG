@@ -1,4 +1,4 @@
-// 템플릿 (ai_spec 2-6): 과목 26개 × 방향 + 요약·결정적 장면·라인전 비교 불가가 모두 검증기를 통과
+// 템플릿 (ai_spec 2-6): 과목 24개(Q4 라인전 3과목) × 방향 + 요약·결정적 장면·라인전 비교 불가가 모두 검증기를 통과
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { buildFacts } from '../../../../src/analysis/llm/facts.js';
@@ -21,7 +21,8 @@ describe('템플릿: 모든 과목 × 방향이 검증기를 통과', () => {
   for (let pid = 1; pid <= 10; pid++) {
     const r = senaResult(pid);
     const subjects: ['laning' | 'fight' | 'macro', string][] = [
-      ...(r.laning?.items.map((x) => ['laning', x.id] as ['laning', string]) ?? []),
+      // Q4: 라인전 과목 = 2-1 성장·2-3 데스·2-2 라인 밖 관여
+      ...(r.laning ? (['laning.growth', 'laning.deaths', 'laning.roam'].map((x) => ['laning', x]) as ['laning', string][]) : []),
       ...r.fight.subjects.filter((s) => s.grade !== null).map((s) => ['fight', s.id] as ['fight', string]),
       ...r.macro.subjects.filter((s) => s.grade !== null).map((s) => ['macro', s.id] as ['macro', string]),
     ];
@@ -35,8 +36,8 @@ describe('템플릿: 모든 과목 × 방향이 검증기를 통과', () => {
       }
     }
   }
-  it('세나 판 10명으로 26개(라인전 8 + 교전 8 + 운영 10) 모두 만들어 봄', () => {
-    assert.equal(covered.size, 26, [...covered].sort().join(','));
+  it('세나 판 10명으로 24개(라인전 6 + 교전 8 + 운영 10) 모두 만들어 봄', () => {
+    assert.equal(covered.size, 24, [...covered].sort().join(','));
   });
   it('실패 0', () => {
     assert.deepEqual(failures, []);
@@ -59,7 +60,7 @@ describe('템플릿: 요약·결정적 장면 (벌어짐/좁혀짐)', () => {
   it('세나 요약 템플릿 문장', () => {
     const sheet = buildFacts(senaResult(5), NAMES);
     const t = templateFor(sheet, sheet.slots[0]!);
-    assert.equal(t.text, '라인전은 열세였고, 오브젝트 싸움은 부족했고, 그 밖의 운영은 부족했습니다. 15:04에 킬 5개가 난 싸움 뒤 골드 격차가 3,895 벌어졌습니다.');
+    assert.equal(t.text, '라인전은 경험치는 따라갔지만 골드를 내줬고, 오브젝트 싸움은 부족했고, 그 밖의 운영은 부족했습니다. 15:04에 킬 5개가 난 싸움 뒤 골드 격차가 3,895 벌어졌습니다.');
   });
 });
 
